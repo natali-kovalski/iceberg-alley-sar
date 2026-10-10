@@ -167,6 +167,20 @@ thor:
   smoke:
     scene: S1A_IW_20250508T094925_DHP_RTC10_G_gpuned_02C1
     ice_fraction_range: [0.05, 0.5]   # auto crop: most CFAR detections with some pack ice in view
+  training:
+    # 5b: frames with same-pass IIP Sentinel-1 analyst labels (point labels, no drift).
+    dir: data/thor          # scenes list, chips, features (gitignored)
+    seasons: [2019, 2020, 2021]
+    holdout:                # never trained on: the 2019-04-15 / 04-29 test scenes and their bergs
+      - ["2019-03-25", "2019-05-06"]   # April + 1 week each side (bergs drift only 10-20 km/day)
+    pol: HH+HV
+    pass_gap_min: 30        # sightings closer in time than this are one pass
+    match_min: 5            # ASF frame time window around the sightings
+    min_sightings: 10       # AOI sightings needed before a pass is searched
+    max_scenes: 20          # disk (~6 GB/scene raw at 10 m) is the limit, not credits
+    credits_per_scene: 60   # HyP3 RTC at 10 m
+    max_credits: 1500
+    radiometry: sigma0      # THOR was pretrained on sigma0
 
 output:
   crs: EPSG:4326

@@ -405,5 +405,67 @@ def thor_smoke(
         typer.echo(f"{kind:<8} {path}")
 
 
+@app.command("thor-scenes")
+def thor_scenes(config: ConfigOption = DEFAULT_CONFIG) -> None:
+    """Milestone 5b: find IW HH+HV frames with same-pass IIP labels; pick the training set."""
+    from iceberg_sar.thor.scenes import save_frames, training_scenes
+
+    cfg = load_config(config)
+    out = cfg.root / cfg.section("thor")["training"]["dir"]
+    frames, selected = training_scenes(cfg)
+    save_frames(frames, out / "candidate_frames.geojson")
+    path = save_frames(selected, out / "training_frames.geojson")
+    typer.echo(f"{len(frames)} candidate frames ({frames['aoi_sightings'].sum()} AOI sightings)")
+    typer.echo(f"{len(selected)} selected ({selected['aoi_sightings'].sum()} AOI sightings)")
+    for r in selected.itertuples():
+        typer.echo(f"  {r.scene}  {r.aoi_sightings:4d}")
+    typer.echo(f"ok  {path}")
+
+
+@app.command("thor-order")
+def thor_order(config: ConfigOption = DEFAULT_CONFIG) -> None:
+    """Order sigma0 HyP3 RTC for the THOR training frames (skips ones already ordered).
+
+    Frames HyP3 rejects (e.g. no DEM coverage over open ocean) are replaced by the next-ranked
+    candidates; the frames actually ordered are written back to training_frames.geojson.
+    """
+    import dataclasses
+
+    import geopandas as gpd
+    from hyp3_sdk.exceptions import HyP3Error
+
+    from iceberg_sar.hyp3 import get_client, submit_rtc
+    from iceberg_sar.thor.scenes import SceneParams, save_frames, select_frames
+
+    cfg = load_config(config)
+    t = cfg.section("thor")["training"]
+    params = SceneParams.from_config(cfg)
+    candidates = gpd.read_file(cfg.root / t["dir"] / "candidate_frames.geojson")
+    unlimited = dataclasses.replace(params, max_scenes=len(candidates), max_credits=10**9)
+    ranked = select_frames(candidates, unlimited).sort_values("aoi_sightings", ascending=False)
+    target = len(select_frames(candidates, params))
+    client = get_client()
+    typer.echo(f"Credits remaining: {client.check_credits()}")
+    ordered = []
+    for r in ranked.itertuples():
+        if len(ordered) == target:
+            break
+        try:
+            batch = submit_rtc(client, r.scene, cfg, name=THOR_JOB_NAME,
+                               overrides={"radiometry": t["radiometry"]})
+        except HyP3Error as e:
+            typer.echo(f"skip {r.scene}: {e}")
+            continue
+        ordered.append(r.Index)
+        for job in batch:
+            typer.echo(f"job {job.job_id}  status={job.status_code}  {r.scene}")
+    save_frames(ranked.loc[ordered].sort_values("start_time"),
+                cfg.root / t["dir"] / "training_frames.geojson")
+    typer.echo(f"{len(ordered)} frames ordered. Credits remaining: {client.check_credits()}")
+
+
+THOR_JOB_NAME = "iceberg-alley-thor"
+
+
 if __name__ == "__main__":
     app()

@@ -36,16 +36,23 @@ def rtc_options(cfg: Config) -> dict[str, object]:
     }
 
 
-def submit_rtc(client: hyp3_sdk.HyP3, granule: str, cfg: Config) -> hyp3_sdk.Batch:
-    """Submit one RTC job, unless one for this granule and resolution already exists."""
-    options = rtc_options(cfg)
-    existing = client.find_jobs(name=JOB_NAME, job_type="RTC_GAMMA")
+def submit_rtc(
+    client: hyp3_sdk.HyP3,
+    granule: str,
+    cfg: Config,
+    name: str = JOB_NAME,
+    overrides: dict[str, object] | None = None,
+) -> hyp3_sdk.Batch:
+    """Submit one RTC job, unless one with this granule, resolution and radiometry exists."""
+    options = {**rtc_options(cfg), **(overrides or {})}
+    existing = client.find_jobs(name=name, job_type="RTC_GAMMA")
     for job in existing:
         params = job.job_parameters
         same_res = float(params.get("resolution", 30)) == float(options["resolution"])
-        if granule in params.get("granules", []) and same_res and not job.failed():
+        same_rad = params.get("radiometry", "gamma0") == options["radiometry"]
+        if granule in params.get("granules", []) and same_res and same_rad and not job.failed():
             return hyp3_sdk.Batch([job])
-    return client.submit_rtc_job(granule, name=JOB_NAME, **options)
+    return client.submit_rtc_job(granule, name=name, **options)
 
 
 def download_jobs(batch: hyp3_sdk.Batch, out_dir: Path) -> list[Path]:
