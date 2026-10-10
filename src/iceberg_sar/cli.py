@@ -383,5 +383,27 @@ def validate_points_cmd(
     typer.echo(f"ok  {stem}_*.geojson")
 
 
+@app.command("thor-smoke")
+def thor_smoke(
+    product_dir: Annotated[
+        Path | None, typer.Argument(help="HyP3 RTC product directory (default: thor.smoke.scene).")
+    ] = None,
+    row: Annotated[int | None, typer.Option(help="Crop centre row (default: auto).")] = None,
+    col: Annotated[int | None, typer.Option(help="Crop centre column (default: auto).")] = None,
+    config: ConfigOption = DEFAULT_CONFIG,
+) -> None:
+    """Milestone 5a: embed one crop with frozen THOR, save PCA-of-tokens RGB next to the dB crop."""
+    from iceberg_sar.thor.smoke import run_smoke
+
+    cfg = load_config(config)
+    if product_dir is None:
+        product_dir = cfg.path("raw") / cfg.section("thor")["smoke"]["scene"]
+    center = (row, col) if row is not None and col is not None else None
+    outputs = run_smoke(Path(product_dir), cfg, center)
+    typer.echo(outputs["summary"].read_text(encoding="utf-8"))
+    for kind, path in outputs.items():
+        typer.echo(f"{kind:<8} {path}")
+
+
 if __name__ == "__main__":
     app()

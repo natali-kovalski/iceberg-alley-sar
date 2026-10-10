@@ -152,5 +152,21 @@ classifier:
   dropout: 0.3
   seed: 42
 
+thor:
+  # Milestone 5: THOR foundation model (FM4CS, Apache 2.0) as a frozen encoder + trained head.
+  model: thor_v1_tiny       # paper: Tiny ~ Base for icebergs, at a fraction of the compute
+  bands: [HH, HV]           # THOR has its own HH/HV patch embeddings, no VV/VH slot swap needed
+  patch_px: 8               # 512 px crop -> 64x64 tokens; 4 is ~4x the cost (try only if small bergs are missed)
+  crop_px: 512
+  layer: 5                  # encoder block (0-11) for the smoke test; mid blocks separate bergs best (5a sweep)
+  to_sigma0: true           # THOR was pretrained on sigma0; HyP3 RTC is gamma0 (sigma0 = gamma0 * cos(inc))
+  db_clip: [-40, 10]        # HyP3 removes the HV noise floor; values below -40 dB are noise residue
+  norm:                     # dB mean / std of THOR's 10 m IW pretraining data (thor_vit.py, S1:IW-HH/HV)
+    HH: [-13.9485, 6.8015]
+    HV: [-22.4575, 6.9106]
+  smoke:
+    scene: S1A_IW_20250508T094925_DHP_RTC10_G_gpuned_02C1
+    ice_fraction_range: [0.05, 0.5]   # auto crop: most CFAR detections with some pack ice in view
+
 output:
   crs: EPSG:4326
