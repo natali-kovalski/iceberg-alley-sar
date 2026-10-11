@@ -181,6 +181,27 @@ thor:
     credits_per_scene: 60   # HyP3 RTC at 10 m
     max_credits: 1500
     radiometry: sigma0      # THOR was pretrained on sigma0
+  targets:
+    # IIP positions are truncated to 0.1 arc-minutes (~185 m N-S, ~120 m E-W here). Labels are
+    # first moved to their cell centre (iip.cell_centres): median error 135 m -> 67 m, p90 118 m.
+    snap_m: 200             # then to the brightest HH peak within this distance...
+    snap_background_m: 600  # ...measured against the median of the ring out to here...
+    snap_min_db: 6          # ...if it is at least this much brighter (as copol_min_contrast_db)
+    sigma_m: 60             # Gaussian target width; rendered on the token grid at training time
+  chips:
+    # 5b: 512 px crops; scenes must be preprocessed (land + pack-ice masks) first.
+    margin_px: 48           # labels sit at least this far inside a positive crop (random jitter)
+    min_sea_fraction: 0.5   # skip crops that are mostly land / outside AOI / nodata
+    negatives_per_positive: 1.0
+    negative_mix: {water: 0.5, ice_edge: 0.25, edge: 0.25}   # edge = coast, AOI or swath border
+    ice_edge_range: [0.05, 0.6]     # pack-ice fraction of an ice-edge crop
+    edge_range: [0.05, 0.5]         # land/nodata fraction of an edge crop
+    labelled_area_buffer_m: 10000   # negatives only near where the analysts labelled
+    unlabelled_radius_m: 300        # CFAR detections farther than this from a label -> ignore in loss
+    coarse_factor: 16               # crop planning on a 160 m grid
+    seed: 42
+    val:                            # 8 weeks from any training frame, so no shared bergs
+      - ["2019-02-01", "2019-03-24"]
 
 output:
   crs: EPSG:4326

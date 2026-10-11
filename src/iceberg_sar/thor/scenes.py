@@ -138,6 +138,20 @@ def training_scenes(cfg: Config) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
     return frames, select_frames(frames, params)
 
 
+def find_product(raw_dir: Path, granule: str, radiometry: str | None = None) -> Path | None:
+    """Extracted HyP3 RTC product for a GRD granule (matched on platform and start time).
+
+    `S1A_IW_GRDH_1SDH_20190511T094108_...` -> `S1A_IW_20190511T094108_DHP_RTC10_G_spuned_*`.
+    """
+    from iceberg_sar.preprocess import product_radiometry
+
+    platform, start = granule[:3], granule.split("_")[4]
+    for d in sorted(raw_dir.glob(f"{platform}_IW_{start}_*_RTC*")):
+        if d.is_dir() and (radiometry is None or product_radiometry(d.name) == radiometry):
+            return d
+    return None
+
+
 def save_frames(frames: gpd.GeoDataFrame, path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     frames.to_file(path, driver="GeoJSON")

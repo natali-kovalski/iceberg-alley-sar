@@ -13,10 +13,10 @@ from pathlib import Path
 import geopandas as gpd
 import numpy as np
 import rasterio
-from rasterio.windows import Window
 
 from iceberg_sar.config import Config
 from iceberg_sar.preprocess import find_rtc_bands, linear_to_db, product_radiometry
+from iceberg_sar.thor.chips import read_crop
 from iceberg_sar.thor.encoder import (
     ThorParams,
     as_sigma0,
@@ -65,42 +65,6 @@ def pick_crop(
     chosen = best or best_any
     assert chosen is not None
     return chosen[1], chosen[2], chosen[3]
-
-
-def read_crop(
-    product_dir: Path, interim_dir: Path, r0: int, c0: int, params: ThorParams
-) -> tuple[dict[str, np.ndarray], np.ndarray, np.ndarray, np.ndarray, rasterio.Affine]:
-    """Raw linear bands with land set to NaN, incidence (deg), ice and land masks for a crop."""
-    name = product_dir.name
-    paths = find_rtc_bands(product_dir)
-    win = Window(c0, r0, params.crop_px, params.crop_px)
-    with rasterio.open(paths["inc"]) as src:
-        inc = src.read(1, window=win).astype(np.float32)
-    inc = np.where(inc > 0, inc, np.nan)
-    inc_deg = np.degrees(inc) if np.nanmax(inc) < 2 * np.pi else inc
-
-    with rasterio.open(interim_dir / f"{name}_seaice_mask.tif") as src, \
-            rasterio.open(paths[params.bands[0]]) as ref:
-        transform = ref.window_transform(win)
-        bounds = rasterio.windows.bounds(win, ref.transform)
-        ice_win = src.window(*bounds)
-        ice = src.read(1, window=ice_win, out_shape=(params.crop_px, params.crop_px),
-                       resampling=rasterio.enums.Resampling.nearest, boundless=True,
-                       fill_value=ICE_NODATA) == 1
-
-    bands: dict[str, np.ndarray] = {}
-    sea = np.ones((params.crop_px, params.crop_px), bool)
-    for b in params.bands:
-        with rasterio.open(paths[b]) as src:
-            raw = src.read(1, window=win).astype(np.float32)
-        with rasterio.open(interim_dir / f"{name}_{b}_masked.tif") as src:
-            masked = src.read(1, window=win)
-        sea &= np.isfinite(masked) | (ice & (raw > 0))
-        bands[b] = raw
-    land = ~sea
-    for b in bands:
-        bands[b] = np.where(land, np.nan, bands[b])
-    return bands, inc_deg, ice, land, transform
 
 
 def token_separation(

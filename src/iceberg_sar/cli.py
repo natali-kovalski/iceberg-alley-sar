@@ -484,6 +484,48 @@ def thor_download(
         typer.echo(f"FAILED  {j.job_parameters.get('granules')}  {j.job_id}")
 
 
+@app.command("thor-chips")
+def thor_chips(
+    product_dirs: Annotated[
+        list[Path] | None,
+        typer.Argument(help="Preprocessed RTC products (default: downloaded training frames)."),
+    ] = None,
+    out: Annotated[Path | None, typer.Option(help="Chips directory (default: <thor dir>/chips).")]
+    = None,
+    sheet: Annotated[int, typer.Option(help="Chips in the contact sheet.")] = 20,
+    config: ConfigOption = DEFAULT_CONFIG,
+) -> None:
+    """Milestone 5b: cut 512 px chips with point labels; write a summary and contact sheet."""
+    import geopandas as gpd
+    import pandas as pd
+
+    from iceberg_sar.thor.chips import chip_scene, contact_sheet, load_index, summary_table
+    from iceberg_sar.thor.scenes import find_product
+
+    cfg = load_config(config)
+    thor_dir = cfg.root / cfg.section("thor")["training"]["dir"]
+    out = out or thor_dir / "chips"
+    if not product_dirs:
+        frames = gpd.read_file(thor_dir / "training_frames.geojson")
+        product_dirs = [p for g in frames["scene"]
+                        if (p := find_product(cfg.path("raw"), g, "sigma0")) is not None]
+        typer.echo(f"{len(product_dirs)} of {len(frames)} training frames downloaded")
+    for d in product_dirs:
+        if not (cfg.path("interim") / d.name / f"{d.name}_seaice_mask.tif").is_file():
+            typer.echo(f"skip {d.name}: run `preprocess` first")
+            continue
+        index = chip_scene(d, cfg, out)
+        typer.echo(f"ok  {d.name}: {index['kind'].value_counts().to_dict()}")
+    index = load_index(out)
+    if index.empty:
+        return
+    with pd.option_context("display.width", 200, "display.max_columns", 20):
+        table = summary_table(index)
+        typer.echo(table.to_string())
+    table.to_csv(out / "summary.csv")
+    typer.echo(f"ok  {contact_sheet(index, out, out / 'contact_sheet.png', cfg, n=sheet)}")
+
+
 THOR_JOB_NAME = "iceberg-alley-thor"
 
 

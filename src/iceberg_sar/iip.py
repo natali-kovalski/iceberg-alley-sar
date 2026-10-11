@@ -15,6 +15,7 @@ from pathlib import Path
 from urllib.request import urlopen
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
 from shapely.geometry.base import BaseGeometry
 
@@ -45,6 +46,20 @@ def load_sightings(csv_path: Path) -> gpd.GeoDataFrame:
                   + pd.to_timedelta(hhmm // 100, unit="h") + pd.to_timedelta(hhmm % 100, unit="m"))
     df = df.drop(columns="date")
     return gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.lon, df.lat), crs="EPSG:4326")
+
+
+POSITION_STEP_DEG = 0.1 / 60  # positions are stored on a 0.1 arc-minute grid
+
+
+def cell_centres(lat: np.ndarray, lon: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Undo IIP's truncation of positions to 0.1 arc-minutes (toward the equator / Greenwich).
+
+    Measured on 2019-04-29 (271 same-pass labels): bergs sit on average 101 m north and 67 m
+    west of their IIP positions, i.e. half a grid step (93 m / 60 m at 49.5 N). Moving each
+    position to the centre of its cell cuts the median label error from 135 m to 67 m.
+    """
+    half = POSITION_STEP_DEG / 2
+    return lat + np.sign(lat) * half, lon + np.sign(lon) * half
 
 
 def select_sightings(
