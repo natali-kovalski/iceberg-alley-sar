@@ -31,7 +31,6 @@ from shapely.geometry import MultiPoint
 
 from iceberg_sar.config import Config, metres_to_px
 from iceberg_sar.detections import scene_timestamp
-from iceberg_sar.iip import cell_centres
 from iceberg_sar.pointval import load_truth
 from iceberg_sar.preprocess import find_rtc_bands, product_radiometry
 from iceberg_sar.thor.encoder import ThorParams, to_model_input
@@ -132,14 +131,14 @@ def read_crop(
 def scene_labels(
     product_dir: Path, cfg: Config, tparams: TargetParams
 ) -> gpd.GeoDataFrame:
-    """Same-pass IIP labels for a scene with pixel (row, col), corrected and snapped."""
+    """Same-pass IIP labels for a scene with pixel (row, col), at cell centres and snapped."""
     name = product_dir.name
     sar_time = pd.Timestamp(scene_timestamp(name)).tz_localize(None)
     pts, _ = load_truth(cfg, name, sar_time, "iip-satellite")
     hh = find_rtc_bands(product_dir)["HH"]
     with rasterio.open(hh) as src:
-        lat, lon = cell_centres(pts["lat"].to_numpy(), pts["lon"].to_numpy())
-        x, y = Transformer.from_crs(4326, src.crs, always_xy=True).transform(lon, lat)
+        x, y = Transformer.from_crs(4326, src.crs, always_xy=True).transform(
+            pts["lon"].to_numpy(), pts["lat"].to_numpy())  # already at 0.1' cell centres
         rows, cols = rasterio.transform.rowcol(src.transform, x, y, op=float)
         rc = np.c_[rows, cols].astype(np.float64)
         inside = ((rc >= 0) & (rc < [src.height, src.width])).all(axis=1)

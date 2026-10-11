@@ -4,7 +4,7 @@ Detecting icebergs off Newfoundland & Labrador in Sentinel-1 radar imagery, and 
 
 ![Cesium viewer: spring 2025 detections off NE Newfoundland](docs/img/viewer.png)
 
-**In short:** a CFAR detector on Sentinel-1 cross-pol (HV) imagery finds **77% of the icebergs that International Ice Patrol analysts marked** on the same satellite pass (207 of 268, median position difference 137 m). It runs end to end with one command, from scene search to a time-dynamic CZML file for the viewer.
+**In short:** a CFAR detector on Sentinel-1 cross-pol (HV) imagery finds **77% of the icebergs that International Ice Patrol analysts marked** on the same satellite pass (207 of 267, median position difference 68 m). It runs end to end with one command, from scene search to a time-dynamic CZML file for the viewer.
 
 ## The problem
 
@@ -16,7 +16,7 @@ This project builds that pipeline on free Copernicus Sentinel-1 data, for the co
 
 | | |
 |---|---|
-| **Recall vs. same-pass IIP analyst labels** (2019-04-29) | **77%** (207 / 268), median offset 137 m |
+| **Recall vs. same-pass IIP analyst labels** (2019-04-29) | **77%** (207 / 267), median offset 68 m |
 | Recall by berg size | small (15–60 m) 65%, medium (61–120 m) 81%, large (> 120 m) 0 of 4 |
 | Recall by distance from the coast | stable, 73–84% from 0 to 100 km |
 | Precision | not measurable without AIS ship positions (lower bound 39%) |

@@ -57,9 +57,15 @@ def cell_centres(lat: np.ndarray, lon: np.ndarray) -> tuple[np.ndarray, np.ndarr
     Measured on 2019-04-29 (271 same-pass labels): bergs sit on average 101 m north and 67 m
     west of their IIP positions, i.e. half a grid step (93 m / 60 m at 49.5 N). Moving each
     position to the centre of its cell cuts the median label error from 135 m to 67 m.
+    All satellite sightings are on the grid; 72-92% of aircraft / ship ones are, the rest carry
+    finer positions and are left alone.
     """
+    lat, lon = np.asarray(lat, dtype=np.float64), np.asarray(lon, dtype=np.float64)
     half = POSITION_STEP_DEG / 2
-    return lat + np.sign(lat) * half, lon + np.sign(lon) * half
+    on_grid = (np.abs(lat / POSITION_STEP_DEG - np.round(lat / POSITION_STEP_DEG)) < 0.03) & \
+              (np.abs(lon / POSITION_STEP_DEG - np.round(lon / POSITION_STEP_DEG)) < 0.03)
+    return (np.where(on_grid, lat + np.sign(lat) * half, lat),
+            np.where(on_grid, lon + np.sign(lon) * half, lon))
 
 
 def select_sightings(

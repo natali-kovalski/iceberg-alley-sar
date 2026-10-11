@@ -93,3 +93,11 @@ def test_render_heatmap_peaks_at_one_in_the_points_cell():
     assert heat[2, 5] == 1.0 and heat.max() == 1.0
     assert 0 < heat[2, 4] < 1 and heat[7, 0] < 1e-3
     assert render_heatmap(np.empty((0, 2)), (4, 4), 8, 6).sum() == 0
+
+
+def test_cell_centres_leave_off_grid_positions_and_are_idempotent():
+    lat, lon = cell_centres(np.array([49.51234]), np.array([-53.20777]))  # aircraft-style
+    np.testing.assert_allclose([lat[0], lon[0]], [49.51234, -53.20777])
+    lat1, lon1 = cell_centres(np.array([49.5]), np.array([-53.2]))
+    lat2, lon2 = cell_centres(lat1, lon1)
+    np.testing.assert_allclose([lat2[0], lon2[0]], [lat1[0], lon1[0]])
