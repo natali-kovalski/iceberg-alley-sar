@@ -170,3 +170,19 @@ def point_val_params(cfg: Config) -> PointValParams:
     return PointValParams(max_dist_m=float(v["max_dist_m"]),
                           offset_search_m=float(v["offset_search_m"]),
                           offset_step_m=float(v["offset_step_m"]))
+
+
+def run_point_validation(
+    cfg: Config, name: str, truth_kind: str, band: str = "HV", open_water: bool = True
+) -> tuple[dict, gpd.GeoDataFrame, gpd.GeoDataFrame]:
+    """Validate a scene's saved detections against one truth source (as `validate-points`)."""
+    from iceberg_sar.detections import scene_timestamp
+
+    sar_time = pd.Timestamp(scene_timestamp(name)).tz_localize(None)
+    det = gpd.read_file(cfg.path("outputs") / "detections" / f"{name}_{band}_detections.geojson")
+    if open_water:
+        near_km = float(cfg.raw.get("viewer", {}).get("near_ice_km", 5))
+        det = det[~(det["distance_to_ice_km"] < near_km)]
+    pts, area = load_truth(cfg, name, sar_time, truth_kind)
+    masked = cfg.path("interim") / name / f"{name}_{band}_masked.tif"
+    return validate_points(det, pts, masked, sar_time, point_val_params(cfg), area)

@@ -348,22 +348,13 @@ def validate_points_cmd(
     """Match detections to truth points (drift-corrected); report precision and recall."""
     import json
 
-    import geopandas as gpd
     import pandas as pd
 
-    from iceberg_sar.detections import scene_timestamp
-    from iceberg_sar.pointval import load_truth, point_val_params, validate_points
+    from iceberg_sar.pointval import run_point_validation
 
     cfg = load_config(config)
     name = Path(product_dir).name
-    sar_time = pd.Timestamp(scene_timestamp(name)).tz_localize(None)
-    det = gpd.read_file(cfg.path("outputs") / "detections" / f"{name}_{band}_detections.geojson")
-    if open_water:
-        near_km = float(cfg.raw.get("viewer", {}).get("near_ice_km", 5))
-        det = det[~(det["distance_to_ice_km"] < near_km)]
-    pts, area = load_truth(cfg, name, sar_time, truth)
-    masked = cfg.path("interim") / name / f"{name}_{band}_masked.tif"
-    summary, t, d = validate_points(det, pts, masked, sar_time, point_val_params(cfg), area)
+    summary, t, d = run_point_validation(cfg, name, truth, band, open_water)
     typer.echo(json.dumps(summary, indent=2))
     size_col = "size" if "size" in t else None
     if size_col is None and "area_m2" in t:
@@ -381,6 +372,15 @@ def validate_points_cmd(
     (out / f"{stem.name}_summary.json").write_text(json.dumps(summary, indent=2),
                                                     encoding="utf-8")
     typer.echo(f"ok  {stem}_*.geojson")
+
+
+@app.command()
+def figures(config: ConfigOption = DEFAULT_CONFIG) -> None:
+    """Regenerate the README / docs figures in docs/img from current outputs."""
+    from iceberg_sar.figures import make_figures
+
+    for kind, path in make_figures(load_config(config)).items():
+        typer.echo(f"ok  {kind:<11} {path}")
 
 
 @app.command("thor-smoke")

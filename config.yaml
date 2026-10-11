@@ -205,3 +205,16 @@ thor:
 
 output:
   crs: EPSG:4326
+
+figures:
+  # `figures` regenerates these in docs/img from current outputs. viewer.png is a manual screenshot.
+  out_dir: docs/img
+  validation:
+    scene: S1A_IW_20190429T094108_DHP_RTC10_G_gpuned_671B
+    truth: iip-satellite
+    band: HV
+    file: validation_20190429.png
+  detections:
+    scene: S1A_IW_20250508T094925_DHP_RTC10_G_gpuned_02C1
+    band: HV
+    file: detections_20250508.png
