@@ -464,6 +464,26 @@ def thor_order(config: ConfigOption = DEFAULT_CONFIG) -> None:
     typer.echo(f"{len(ordered)} frames ordered. Credits remaining: {client.check_credits()}")
 
 
+@app.command("thor-download")
+def thor_download(
+    config: ConfigOption = DEFAULT_CONFIG,
+    wait: Annotated[bool, typer.Option(help="Wait for running jobs to finish.")] = True,
+) -> None:
+    """Download the THOR training scenes into data/raw; zips are deleted after extraction."""
+    from iceberg_sar.hyp3 import download_jobs, get_client
+
+    cfg = load_config(config)
+    client = get_client()
+    batch = client.find_jobs(name=THOR_JOB_NAME)
+    if wait and not batch.complete():
+        batch = client.watch(batch)
+    failed = [j for j in batch if j.failed()]
+    for d in download_jobs(batch, cfg.path("raw"), delete_zip=True):
+        typer.echo(f"ok  {d}")
+    for j in failed:
+        typer.echo(f"FAILED  {j.job_parameters.get('granules')}  {j.job_id}")
+
+
 THOR_JOB_NAME = "iceberg-alley-thor"
 
 

@@ -91,3 +91,12 @@ def test_overpass_query_and_point_discs() -> None:
     discs = points_to_discs(pts, 20, "EPSG:32621")
     area = gpd.GeoSeries(discs, crs="EPSG:4326").to_crs("EPSG:32621").area.iloc[0]
     assert abs(area - np.pi * 20**2) < 0.05 * np.pi * 20**2
+
+
+def test_product_radiometry_from_hyp3_name():
+    from iceberg_sar.preprocess import product_radiometry
+
+    assert product_radiometry("S1A_IW_20250508T094925_DHP_RTC10_G_gpuned_02C1") == "gamma0"
+    assert product_radiometry("S1B_IW_20190517T094027_DHP_RTC10_G_spuned_A1B2_HH.tif") == "sigma0"
+    with pytest.raises(ValueError):
+        product_radiometry("S1A_IW_GRDH_1SDH_20190511T094108")

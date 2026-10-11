@@ -47,6 +47,17 @@ def linear_to_db(x: np.ndarray) -> np.ndarray:
         return np.where(x > 0, 10.0 * np.log10(np.maximum(x, DB_FLOOR)), np.nan).astype(np.float32)
 
 
+RADIOMETRY_PATTERN = re.compile(r"_RTC\d+_[A-Z]_([gs])[a-z]{5}_", re.IGNORECASE)
+
+
+def product_radiometry(name: str) -> str:
+    """'gamma0' or 'sigma0' from a HyP3 RTC product name (`..._RTC10_G_gpuned_...`: g / s)."""
+    m = RADIOMETRY_PATTERN.search(name)
+    if not m:
+        raise ValueError(f"Not a HyP3 RTC product name: {name}")
+    return "gamma0" if m.group(1).lower() == "g" else "sigma0"
+
+
 def find_rtc_bands(product_dir: Path) -> dict[str, Path]:
     """Map polarization (and 'inc' for the incidence-angle map) to file paths."""
     bands: dict[str, Path] = {}
@@ -246,6 +257,7 @@ def preprocess_product(product_dir: Path, land: gpd.GeoDataFrame, cfg: Config) -
     outputs: dict[str, Path] = {}
     meta: dict[str, object] = {
         "product": name,
+        "radiometry": product_radiometry(name),  # sigma0 dB is ~1-1.5 dB below gamma0 at sea
         "crs": crs.to_string(),
         "bounds_wgs84": list(transform_bounds(crs, "EPSG:4326", *bounds)),
         "land_buffer_m": p["land_buffer_m"],

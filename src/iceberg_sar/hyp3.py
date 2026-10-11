@@ -55,15 +55,25 @@ def submit_rtc(
     return client.submit_rtc_job(granule, name=name, **options)
 
 
-def download_jobs(batch: hyp3_sdk.Batch, out_dir: Path) -> list[Path]:
-    """Download succeeded jobs as zips and extract them. Returns product directories."""
+def download_jobs(batch: hyp3_sdk.Batch, out_dir: Path, delete_zip: bool = False) -> list[Path]:
+    """Download succeeded jobs as zips and extract them. Returns product directories.
+
+    Already-extracted products are skipped. `delete_zip` removes each zip once extracted
+    (HyP3 keeps products for ~14 days, so they can be fetched again).
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     product_dirs: list[Path] = []
     for job in batch:
         if not job.succeeded():
             continue
+        names = [Path(f["filename"]).stem for f in job.files]
+        if names and all((out_dir / n).is_dir() for n in names):
+            product_dirs += [out_dir / n for n in names]
+            continue
         for zip_path in job.download_files(out_dir):
             product_dirs.append(extract(Path(zip_path)))
+            if delete_zip:
+                Path(zip_path).unlink()
     return product_dirs
 
 

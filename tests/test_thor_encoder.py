@@ -71,3 +71,11 @@ def test_token_separation_flags_odd_tokens():
     assert s["berg_tokens"] == 1 and s["berg_rank_pct"] == 100.0
     assert s["berg_median_dist"] > 3 and s["water_median_dist"] == 1.0
     assert dist.shape == (8, 8)
+
+
+def test_to_model_input_leaves_sigma0_products_alone():
+    p = params(bands=("HH",))
+    hh = np.full((2, 2), 10 ** (-1.4), np.float32)
+    inc = np.full((2, 2), 60.0, np.float32)
+    np.testing.assert_allclose(to_model_input({"HH": hh}, inc, p, "sigma0"), 0.0, atol=1e-5)
+    np.testing.assert_allclose(to_model_input({"HH": hh}, None, p, "sigma0"), 0.0, atol=1e-5)

@@ -51,20 +51,32 @@ class ThorParams:
         return self.crop_px // self.patch_px
 
 
-def to_model_input(
-    bands_lin: dict[str, np.ndarray], inc_deg: np.ndarray | None, params: ThorParams
+def as_sigma0(
+    lin: np.ndarray, inc_deg: np.ndarray | None, params: ThorParams, radiometry: str
 ) -> np.ndarray:
-    """Linear gamma0 bands -> (C, H, W) float32, normalized like THOR's pretraining.
+    """Linear band in the radiometry THOR expects (gamma0 products are converted)."""
+    if not (params.to_sigma0 and radiometry == "gamma0"):
+        return lin
+    if inc_deg is None:
+        raise ValueError("gamma0 -> sigma0 needs the incidence-angle map")
+    return lin * np.cos(np.radians(inc_deg)).astype(np.float32)
 
+
+def to_model_input(
+    bands_lin: dict[str, np.ndarray],
+    inc_deg: np.ndarray | None,
+    params: ThorParams,
+    radiometry: str = "gamma0",
+) -> np.ndarray:
+    """Linear RTC bands -> (C, H, W) float32, normalized like THOR's pretraining.
+
+    `radiometry` is the product's ('gamma0' or 'sigma0', see `product_radiometry`).
     NaN (land / nodata) becomes 0 after normalization, i.e. the band mean.
     """
     out = []
     for band in params.bands:
-        lin = np.asarray(bands_lin[band], dtype=np.float32)
-        if params.to_sigma0:
-            if inc_deg is None:
-                raise ValueError("to_sigma0 needs the incidence-angle map")
-            lin = lin * np.cos(np.radians(inc_deg)).astype(np.float32)
+        lin = as_sigma0(np.asarray(bands_lin[band], dtype=np.float32), inc_deg, params,
+                        radiometry)
         with np.errstate(divide="ignore", invalid="ignore"):
             db = np.where(lin > 0, 10.0 * np.log10(np.maximum(lin, 1e-12)), params.db_clip[0])
         db = np.clip(db, *params.db_clip)

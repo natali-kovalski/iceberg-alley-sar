@@ -16,8 +16,15 @@ import rasterio
 from rasterio.windows import Window
 
 from iceberg_sar.config import Config
-from iceberg_sar.preprocess import find_rtc_bands, linear_to_db
-from iceberg_sar.thor.encoder import ThorParams, embed, load_encoder, pca_rgb, to_model_input
+from iceberg_sar.preprocess import find_rtc_bands, linear_to_db, product_radiometry
+from iceberg_sar.thor.encoder import (
+    ThorParams,
+    as_sigma0,
+    embed,
+    load_encoder,
+    pca_rgb,
+    to_model_input,
+)
 
 ICE_NODATA = 255
 
@@ -199,7 +206,8 @@ def run_smoke(product_dir: Path, cfg: Config, center_rc: tuple[int, int] | None 
     det_rc = det_rc_all - [r0, c0]
     det_rc = det_rc[((det_rc >= 0) & (det_rc < params.crop_px)).all(1)]
 
-    x = to_model_input(bands, inc_deg, params)
+    radiometry = product_radiometry(name)
+    x = to_model_input(bands, inc_deg, params, radiometry)
     model = load_encoder(params, pixel_m, device)
     feats = embed(model, x, device, params.layer)[0]
     g = params.grid_px()
@@ -207,10 +215,8 @@ def run_smoke(product_dir: Path, cfg: Config, center_rc: tuple[int, int] | None 
         g, params.patch_px, g, params.patch_px).mean((1, 3)) > 0.5
     rgb, ratio = pca_rgb(feats, ~land_tokens)
 
-    sigma0_db = {
-        b: linear_to_db(bands[b] * np.cos(np.radians(inc_deg))) if params.to_sigma0
-        else linear_to_db(bands[b]) for b in params.bands
-    }
+    sigma0_db = {b: linear_to_db(as_sigma0(bands[b], inc_deg, params, radiometry))
+                 for b in params.bands}
     separation, dist = token_separation(feats, det_rc, ice, land, params.patch_px)
     out_dir = cfg.path("outputs") / "thor"
     stem = f"smoke_{name}_r{r0}_c{c0}"
