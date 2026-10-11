@@ -16,6 +16,7 @@ the points in crop pixel coordinates. Heatmaps are rendered at training time.
 from __future__ import annotations
 
 import json
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -279,6 +280,20 @@ def unlabelled_detections(det_rc: np.ndarray, label_rc: np.ndarray, radius_px: f
     return det_rc[d > radius_px]
 
 
+def visible_at(product_dir: Path, interim_dir: Path, band: str, rc: np.ndarray) -> np.ndarray:
+    """True where a (row, col) is water or pack ice in the preprocessed scene, i.e. not land,
+    the land buffer, outside the AOI or nodata. Labels elsewhere can't be seen by the model."""
+    name = product_dir.name
+    if len(rc) == 0:
+        return np.zeros(0, bool)
+    with rasterio.open(interim_dir / f"{name}_{band}_masked.tif") as src, \
+            rasterio.open(interim_dir / f"{name}_seaice_mask.tif") as ice:
+        xy = list(zip(*rasterio.transform.xy(src.transform, rc[:, 0], rc[:, 1]), strict=True))
+        water = np.isfinite([v[0] for v in src.sample(xy)])
+        packed = np.array([v[0] for v in ice.sample(xy)]) == 1
+    return water | packed
+
+
 def to_local(rc: np.ndarray, r0: int, c0: int, crop_px: int) -> np.ndarray:
     """Scene (row, col) points -> crop coordinates, keeping only those inside the crop."""
     if len(rc) == 0:
@@ -305,6 +320,8 @@ def chip_scene(product_dir: Path, cfg: Config, out_dir: Path) -> pd.DataFrame:
 
     labels = scene_labels(product_dir, cfg, tgt)
     label_rc = labels[["row", "col"]].to_numpy(np.float64)
+    labels["visible"] = visible_at(product_dir, interim, tp.bands[-1], label_rc)
+    seen = labels["visible"].to_numpy()
     sea, ice = coarse_masks(product_dir, interim, tp.bands[-1], cp.coarse_factor)
 
     det_path = (cfg.path("outputs") / "detections"
@@ -315,7 +332,7 @@ def chip_scene(product_dir: Path, cfg: Config, out_dir: Path) -> pd.DataFrame:
         det_rc, label_rc, cp.unlabelled_radius_m / pixel_m)
 
     pos = [(r0, c0, "berg") for r0, c0 in
-           plan_positive_crops(label_rc, shape, tp.crop_px, cp.margin_px, rng)]
+           plan_positive_crops(label_rc[seen], shape, tp.crop_px, cp.margin_px, rng)]
     pos = [p for p in pos
            if crop_fractions(sea, ice, p[0], p[1], tp.crop_px, cp.coarse_factor)[0]
            >= cp.min_sea_fraction]
@@ -325,13 +342,16 @@ def chip_scene(product_dir: Path, cfg: Config, out_dir: Path) -> pd.DataFrame:
                               tp.crop_px, cp, rng)
 
     scene_dir = out_dir / name
-    scene_dir.mkdir(parents=True, exist_ok=True)
+    if scene_dir.is_dir():
+        shutil.rmtree(scene_dir)  # a rerun may plan fewer chips; no stale files
+    scene_dir.mkdir(parents=True)
     rows = []
     for k, (r0, c0, kind) in enumerate(pos + neg):
         bands, inc_deg, ice_px, land, _ = read_crop(product_dir, interim, r0, c0, tp)
         x = to_model_input(bands, inc_deg, tp, radiometry).astype(np.float16)
 
-        in_crop = ((label_rc >= [r0, c0]) & (label_rc < [r0 + tp.crop_px, c0 + tp.crop_px])).all(1)
+        in_box = ((label_rc >= [r0, c0]) & (label_rc < [r0 + tp.crop_px, c0 + tp.crop_px])).all(1)
+        in_crop = in_box & seen
         chip_id = f"{name}_{k:03d}"
         np.savez(
             scene_dir / f"{chip_id}.npz",
@@ -340,6 +360,7 @@ def chip_scene(product_dir: Path, cfg: Config, out_dir: Path) -> pd.DataFrame:
             berg_snapped=labels["snapped"].to_numpy()[in_crop],
             berg_size=labels["size"].astype(str).to_numpy()[in_crop],
             unlabelled_rc=to_local(unlabelled, r0, c0, tp.crop_px),
+            masked_rc=to_local(label_rc[in_box & ~seen], r0, c0, tp.crop_px),  # never targets
         )
         rows.append({
             "chip_id": chip_id, "scene": name, "time": sar_time, "split": split, "kind": kind,
@@ -353,10 +374,12 @@ def chip_scene(product_dir: Path, cfg: Config, out_dir: Path) -> pd.DataFrame:
     in_any = np.zeros(len(label_rc), bool)
     for r0, c0, _ in pos + neg:
         in_any |= ((label_rc >= [r0, c0]) & (label_rc < [r0 + tp.crop_px, c0 + tp.crop_px])).all(1)
+    in_any &= seen
     meta = {
         "scene": name, "split": split, "radiometry": radiometry, "labels": len(labels),
         "labels_snapped": int(labels["snapped"].sum()),
-        "labels_in_chips": int(in_any.sum()),  # < labels where crops would be mostly land
+        "labels_masked": int((~seen).sum()),  # outside the AOI or within the land buffer
+        "labels_in_chips": int(in_any.sum()),  # visible labels inside some chip
         "median_snap_m": round(float(labels.loc[labels["snapped"], "snap_m"].median()), 1)
         if labels["snapped"].any() else None,
         "cfar_detections": len(det_rc), "unlabelled_detections": len(unlabelled),

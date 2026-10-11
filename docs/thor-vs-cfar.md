@@ -56,3 +56,44 @@ crop and writes `data/outputs/thor/smoke_<scene>_r<row>_c<col>.png` + `.json`.
 
 **Verdict:** pass. Bergs and ice strips are distinct from open water in the frozen
 features. Go ahead with 5b.
+
+## 5b: Training data
+
+`thor-scenes` → `thor-order` → `thor-download` → `preprocess` + `detect` per scene →
+`thor-chips`. Output in `data/thor/chips/` (`summary.csv`, `contact_sheet.png`, one folder per
+scene with `.npz` chips, `labels.csv`, `index.csv`, `scene.json`).
+
+### Scenes
+20 IW HH+HV frames with same-pass IIP Sentinel-1 analyst labels, HyP3 RTC **sigma0** at 10 m
+(1,200 credits). Six top-ranked frames were rejected by HyP3 (no DEM over open ocean) and
+replaced by the next-ranked ones.
+
+- **Holdout:** 2019-03-25 to 2019-05-06, i.e. April plus a week each side. The frames richest in
+  labels (2019-05-04/05/06) came 5-7 days after the 04-29 test scene and would show the same
+  bergs, which drift only 10-20 km/day.
+- **Split by date:** val = Feb-Mar 2019 (3 frames), at least 8 weeks from any training frame.
+  Train = 17 frames, May-Jun 2019 and Apr-May 2020.
+
+### Labels
+- **IIP positions are truncated to 0.1 arc-minute.** Moving them to the cell centre halves the
+  label error (median 135 m → 67 m). Then each label snaps to the brightest HH peak within 200 m
+  if it is ≥ 6 dB above its surroundings: 99% of training labels snap.
+- **Labels the model can't see are not targets.** 75 of 515 training labels (15%) fall on
+  masked pixels: 82 of the 110 such labels overall are outside the AOI (the land mask exists
+  only inside it), 28 are within the 500 m land buffer of islands and islets, where bergs
+  often ground. They are kept as `masked_rc` but never rendered as targets.
+- **Unlabelled CFAR detections** (no label within 300 m) are stored per chip so the loss can
+  ignore them instead of treating them as water: 267 in train, 449 in val.
+
+| Split | Frames | Labels | On masked pixels | Visible, in chips | Crops (berg / water / edge / ice edge) |
+|---|---|---|---|---|---|
+| train | 17 | 515 | 75 | 432 | 723 (398 / 198 / 99 / 28) |
+| val | 3 | 114 | 35 | 78 | 154 (76 / 38 / 20 / 20) |
+
+### Caveats
+- **The pack-ice mask fails in early-season scenes.** It defines open water from the darkest
+  quarter of the scene; when ice covers most of it (Feb-Mar 2019) the reference is ice and the
+  pack goes unmasked. The CFAR then fires on floes: 326 of 329 detections on 2019-03-06 have no
+  label. This affects val more than train, and matters for the 5d comparison too.
+- One berg can appear in two adjacent frames of the same pass (both in train); that is the
+  same image twice, not leakage across splits.

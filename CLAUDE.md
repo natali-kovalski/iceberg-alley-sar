@@ -84,7 +84,7 @@ iceberg-alley-sar/
 - **Experimental:** iceberg vs. ship CNN trained on Kaggle chips (`iceberg_prob`). Use it as a review hint only; see the README.
 - **Milestone 4: done.** Portfolio README with screenshots, `cli.py run` end to end for a date range (`pipeline.py`, scene selection in `run:` in `config.yaml`), and two LinkedIn post drafts in `docs/linkedin-posts.md` (local only, excluded via `.git/info/exclude`, never commit). Not done: Dockerfile, deployed static viewer.
 - **Stretch not done:** OS-CFAR / K-distribution (`cfar.variant` has a slot for it).
-- **Milestone 5 (branch `milestone5-thor`):** 5a done (`thor-smoke`, `src/iceberg_sar/thor/`). THOR takes HH/HV natively; frozen features separate bergs and ice strips from water. See `docs/thor-vs-cfar.md`. Local GPU (CUDA) works; no Triton on Windows, so dynamo is disabled.
+- **Milestone 5 (branch `milestone5-thor`):** 5a and 5b done (`thor-smoke`, `thor-scenes/order/download/chips`, `src/iceberg_sar/thor/`). 20 sigma0 training frames, 723 train / 154 val chips, 432 / 78 visible labelled bergs. THOR takes HH/HV natively; frozen features separate bergs and ice strips from water. See `docs/thor-vs-cfar.md`. Local GPU (CUDA) works; no Triton on Windows, so dynamo is disabled.
 
 ## Milestones
 
