@@ -652,6 +652,27 @@ def thor_detect(
             typer.echo(f"{kind:<10} {path}")
 
 
+@app.command("thor-compare")
+def thor_compare(
+    sweep: Annotated[bool, typer.Option(help="(Re)run the CFAR PFA sweep first.")] = False,
+    config: ConfigOption = DEFAULT_CONFIG,
+) -> None:
+    """Milestone 5d: THOR vs CFAR recall at matched detection counts on `thor.compare.scenes`.
+
+    Needs `thor-detect` (final models) on those scenes. Writes tables to thor.compare.out_dir
+    and the recall-vs-detections figure to docs/img.
+    """
+    from iceberg_sar.thor.compare import CompareParams, cfar_sweep, run_compare
+
+    cfg = load_config(config)
+    if sweep:
+        p = CompareParams.from_config(cfg)
+        for name in p.scenes:
+            cfar_sweep(cfg, cfg.path("raw") / name, p, log=typer.echo)
+    for kind, path in run_compare(cfg, log=typer.echo).items():
+        typer.echo(f"{kind:<24} {path}")
+
+
 THOR_JOB_NAME = "iceberg-alley-thor"
 
 

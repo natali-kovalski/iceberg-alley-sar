@@ -5,6 +5,9 @@ the Cesium timeline steps through the dates. Detections keep all their attribute
 `properties`; `near_ice` flags candidates close to mapped pack ice (likely floes), which
 the viewer greys out or hides instead of deleting them. Static targets (seen at the same
 spot on several dates, see `static_targets.py`) are left out.
+
+THOR detections (Milestone 5), where a scene has them, are a second layer of `thor/`
+entities: open rings above the score threshold, so the CFAR points stay visible inside them.
 """
 
 from __future__ import annotations
@@ -28,6 +31,7 @@ from iceberg_sar.static_targets import StaticParams, find_static, is_static, sta
 NEAR_ICE_RGBA = [150, 150, 150, 200]
 FOOTPRINT_RGBA = [255, 210, 60, 255]
 ICE_RGBA = [120, 200, 255, 90]
+THOR_RGBA = [0, 229, 255, 255]   # cyan ring: off the plasma ramp, readable on dark water
 
 
 @dataclass(frozen=True)
@@ -39,6 +43,8 @@ class ViewerParams:
     point_px_range: tuple[float, float] = (6.0, 16.0)
     structure_m_max: float = 300.0    # = detections.max_structure_m
     simplify_m: float = 100.0         # polygon simplification before reprojecting
+    thor_model: str = "thor-linear"   # THOR detection tag shown as its own layer
+    thor_score: float = 0.35          # THOR operating point (thor.compare.view_score)
 
 
 @dataclass(frozen=True)
@@ -48,6 +54,7 @@ class Scene:
     detections: Path
     footprint: Path | None
     seaice: Path | None
+    thor: Path | None = None
 
 
 def _iso(t: datetime) -> str:
@@ -184,6 +191,37 @@ def detection_packets(gdf: gpd.GeoDataFrame, availability: str, p: ViewerParams
     return packets
 
 
+def thor_packets(gdf: gpd.GeoDataFrame, availability: str, p: ViewerParams
+                 ) -> list[dict[str, Any]]:
+    """THOR detections as open rings; `near_ice` flagged as for the CFAR points."""
+    if gdf.empty:
+        return []
+    flags = near_ice(gdf["distance_to_ice_km"].to_numpy(), p.near_ice_km)
+    packets = []
+    for (_, row), flag in zip(gdf.iterrows(), flags, strict=True):
+        raw = row.drop(labels="geometry").to_dict()
+        raw["timestamp"] = str(row["timestamp"])[:19].replace(" ", "T") + "Z"
+        raw["near_ice"] = bool(flag)
+        props = {k: c for k, v in raw.items() if (c := _clean(v)) is not None}
+        rgba = NEAR_ICE_RGBA if flag else THOR_RGBA
+        packets.append({
+            "id": f"thor/{row['id']}",
+            "name": f"THOR {row['id']} (score {float(row['score']):.2f})",
+            "parent": f"scene/{row['scene_id']}",
+            "availability": availability,
+            "description": _description(raw),
+            "position": {"cartographicDegrees": [float(row["lon"]), float(row["lat"]), 0.0]},
+            "point": {
+                "pixelSize": 14,
+                "color": {"rgba": [0, 0, 0, 1]},   # near-transparent fill keeps it clickable
+                "outlineColor": {"rgba": rgba},
+                "outlineWidth": 2,
+            },
+            "properties": props,
+        })
+    return packets
+
+
 def polygon_packets(geom: BaseGeometry, id_prefix: str, availability: str,
                     fill_rgba: list[int] | None, outline_rgba: list[int]
                     ) -> list[dict[str, Any]]:
@@ -206,7 +244,7 @@ def polygon_packets(geom: BaseGeometry, id_prefix: str, availability: str,
 
 
 def find_scenes(cfg: Config, band: str, start: date | None = None,
-                end: date | None = None) -> list[Scene]:
+                end: date | None = None, thor_model: str = "thor-linear") -> list[Scene]:
     """Scenes with a detections GeoJSON for `band` at the configured HyP3 resolution, by time.
 
     Filtering on the product's RTC resolution (e.g. `_RTC10_`) keeps a date from showing
@@ -224,8 +262,10 @@ def find_scenes(cfg: Config, band: str, start: date | None = None,
             continue
         shp = cfg.path("raw") / name / f"{name}_shape.shp"
         ice = cfg.path("outputs") / "seaice" / f"{name}_seaice.geojson"
+        thor = det_dir / f"{name}_{thor_model}_detections.geojson"
         scenes.append(Scene(name, _parse(summary["timestamp"]), f,
-                            shp if shp.is_file() else None, ice if ice.is_file() else None))
+                            shp if shp.is_file() else None, ice if ice.is_file() else None,
+                            thor if thor.is_file() else None))
     return sorted(scenes, key=lambda s: s.start)
 
 
@@ -267,6 +307,13 @@ def build_czml(scenes: list[Scene], p: ViewerParams, static: gpd.GeoDataFrame | 
             gdf, n_static = gdf[~drop], int(drop.sum())
         flags = (near_ice(gdf["distance_to_ice_km"].to_numpy(), p.near_ice_km) if len(gdf)
                  else np.zeros(0, dtype=bool))
+        thor = gpd.GeoDataFrame()
+        if scene.thor:
+            thor = gpd.read_file(scene.thor)
+            if len(thor):
+                thor = thor[thor["score"] >= p.thor_score]
+            if len(thor) and static is not None and sp is not None:
+                thor = thor[~is_static(thor, static, sp)]
         ice_km2 = 0.0
         if scene.seaice:
             ice = gpd.read_file(scene.seaice)
@@ -285,6 +332,9 @@ def build_czml(scenes: list[Scene], p: ViewerParams, static: gpd.GeoDataFrame | 
                 "n_open_water": int(len(gdf) - np.sum(flags)),
                 "ice_area_km2": round(ice_km2, 1),
                 "n_static_removed": n_static,
+                **({"n_thor": int((~near_ice(thor["distance_to_ice_km"].to_numpy(),
+                                              p.near_ice_km)).sum()) if len(thor) else 0,
+                    "thor_score": p.thor_score} if scene.thor else {}),
             },
         })
         if scene.footprint:
@@ -297,6 +347,7 @@ def build_czml(scenes: list[Scene], p: ViewerParams, static: gpd.GeoDataFrame | 
             packets += polygon_packets(ice_geom, f"seaice/{scene.name}", avail, ICE_RGBA,
                                        ICE_RGBA[:3] + [200])
         packets += detection_packets(gdf, avail, p)
+        packets += thor_packets(thor, avail, p)
     return packets
 
 
@@ -311,6 +362,9 @@ def viewer_params(cfg: Config) -> ViewerParams:
         point_px_range=tuple(v.get("point_px_range", d.point_px_range)),  # type: ignore[arg-type]
         structure_m_max=float(v.get("structure_m_max", d.structure_m_max)),
         simplify_m=float(v.get("simplify_m", d.simplify_m)),
+        thor_model=str(v.get("thor_model", d.thor_model)),
+        thor_score=float(cfg.raw.get("thor", {}).get("compare", {}).get("view_score",
+                                                                         d.thor_score)),
     )
 
 
@@ -327,7 +381,8 @@ def build_static(cfg: Config, band: str) -> tuple[gpd.GeoDataFrame, StaticParams
 def export_czml(cfg: Config, band: str = "HV", start: date | None = None,
                 end: date | None = None) -> tuple[Path, list[dict[str, Any]]]:
     static, sp = build_static(cfg, band)
-    packets = build_czml(find_scenes(cfg, band, start, end), viewer_params(cfg), static, sp)
+    p = viewer_params(cfg)
+    packets = build_czml(find_scenes(cfg, band, start, end, p.thor_model), p, static, sp)
     out = cfg.path("czml")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(packets, separators=(",", ":")), encoding="utf-8")

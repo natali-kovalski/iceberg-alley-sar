@@ -18,7 +18,7 @@ const scenes = shallowRef<SceneInfo[]>([]);
 const currentId = ref<string>();
 const legend = ref<Legend>({ nearIceKm: 5, contrastDbMin: 10, contrastDbMax: 20 });
 const error = ref<string>();
-const layers = reactive<Layers>({ nearIce: true, seaIce: true, footprints: true });
+const layers = reactive<Layers>({ nearIce: true, seaIce: true, footprints: true, thor: true });
 
 // Plain variables, not refs: Cesium objects must stay out of Vue's reactivity.
 let viewer: Viewer | undefined;

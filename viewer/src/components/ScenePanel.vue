@@ -9,6 +9,7 @@ const emit = defineEmits<{ jump: [scene: SceneInfo] }>();
 
 // Ice controls only mean something when the scene on screen has pack ice mapped.
 const hasIce = (s: SceneInfo) => s.iceAreaKm2 > 0;
+const hasThor = computed(() => props.scenes.some((s) => s.nThor !== undefined));
 const currentHasIce = computed(() => {
   const s = props.scenes.find((x) => x.id === props.currentId);
   return s ? hasIce(s) : props.scenes.some(hasIce);
@@ -18,7 +19,7 @@ const currentHasIce = computed(() => {
 <template>
   <aside class="panel">
     <h1>Iceberg Alley SAR</h1>
-    <p class="sub">Sentinel-1 HV, CA-CFAR candidates</p>
+    <p class="sub">Sentinel-1 HV, CA-CFAR candidates<template v-if="hasThor"> + THOR</template></p>
 
     <h2>Scenes</h2>
     <ul class="scenes">
@@ -34,6 +35,7 @@ const currentHasIce = computed(() => {
         </div>
         <div class="stats">
           <span><b>{{ s.nOpenWater }}</b> open water</span>
+          <span v-if="s.nThor !== undefined"><b>{{ s.nThor }}</b> THOR (open water)</span>
           <template v-if="hasIce(s)">
             <span class="muted">{{ s.nNearIce }} near ice</span>
             <span class="muted">{{ s.iceAreaKm2.toLocaleString() }} km² pack ice</span>
@@ -52,6 +54,7 @@ const currentHasIce = computed(() => {
       <span v-if="!currentHasIce" class="muted">(none in this scene)</span>
     </label>
     <label><input v-model="layers.footprints" type="checkbox" /> Scene footprint</label>
+    <label v-if="hasThor"><input v-model="layers.thor" type="checkbox" /> THOR detections (foundation model)</label>
 
     <h2>Legend</h2>
     <div class="ramp" />
@@ -62,6 +65,7 @@ const currentHasIce = computed(() => {
     <div class="key"><span class="dot small" /><span class="dot big" /> size = grown target extent</div>
     <div class="key" :class="{ off: !currentHasIce }"><span class="swatch ice" /> pack-ice mask</div>
     <div class="key"><span class="swatch footprint" /> scene footprint</div>
+    <div v-if="hasThor" class="key"><span class="ring" /> THOR, score ≥ {{ legend.thorScore ?? 0.35 }}</div>
     <p class="note">Click a point for its attributes. Candidates are not verified icebergs; ships also
       appear as bright targets.</p>
   </aside>
@@ -116,5 +120,6 @@ label.off { cursor: default; }
 .swatch { display: inline-block; width: 14px; height: 10px; }
 .swatch.ice { background: rgba(120, 200, 255, 0.35); border: 1px solid rgb(120, 200, 255); }
 .swatch.footprint { border: 1px solid rgb(255, 210, 60); }
+.ring { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 2px solid rgb(0, 229, 255); }
 .note { margin: 10px 0 0; font-size: 11px; color: #8fa3bb; }
 </style>

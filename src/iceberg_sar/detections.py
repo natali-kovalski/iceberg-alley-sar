@@ -11,7 +11,8 @@ scenes. Each block reads `halo` extra rows above and below:
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -22,7 +23,7 @@ import rasterio
 from rasterio.windows import Window
 from scipy import ndimage
 
-from iceberg_sar.cfar import CfarParams, ca_cfar, ring_mean
+from iceberg_sar.cfar import CfarParams, ring_mean
 from iceberg_sar.config import Config, metres_to_px
 from iceberg_sar.seaice import distance_to_ice_km
 
@@ -87,6 +88,45 @@ def _extent(slices: list[tuple[slice, slice] | None]) -> np.ndarray:
                      for s in slices])
 
 
+class _LabelStats:
+    """Per-label sum / max / mean over the labelled pixels only.
+
+    Same results as `ndimage.sum_labels` etc., but those scan the whole block on every call;
+    on a 10 m scene (40 M px per block, targets a tiny fraction of it) that dominated the run.
+    """
+
+    def __init__(self, labels: np.ndarray, n: int) -> None:
+        self.flat = np.flatnonzero(labels)
+        self.lab = labels.ravel()[self.flat]
+        self.n = n
+        self.rows, self.cols = np.divmod(self.flat, labels.shape[1])
+
+    def _vals(self, a: np.ndarray) -> np.ndarray:
+        return a.ravel()[self.flat].astype(np.float64)
+
+    def sum(self, a: np.ndarray | None = None, vals: np.ndarray | None = None) -> np.ndarray:
+        v = self._vals(a) if vals is None else vals
+        return np.bincount(self.lab, weights=v, minlength=self.n + 1)[1:]
+
+    def count(self) -> np.ndarray:
+        return np.bincount(self.lab, minlength=self.n + 1)[1:].astype(np.float64)
+
+    def max(self, a: np.ndarray) -> np.ndarray:
+        out = np.full(self.n + 1, -np.inf)
+        np.maximum.at(out, self.lab, self._vals(a))
+        return out[1:]
+
+    def mean(self, a: np.ndarray) -> np.ndarray:
+        with np.errstate(invalid="ignore", divide="ignore"):
+            return self.sum(a) / self.count()
+
+    def centre_of_mass(self, weights: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        w = self._vals(weights)
+        total = self.sum(vals=w)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            return self.sum(vals=w * self.rows) / total, self.sum(vals=w * self.cols) / total
+
+
 def component_table(
     det: np.ndarray,
     bands: dict[str, np.ndarray],
@@ -124,12 +164,12 @@ def component_table(
     bottom = np.array([s[0].stop for s in slices]) + row_offset
     height = np.array([s[0].stop - s[0].start for s in slices])
     width = np.array([s[1].stop - s[1].start for s in slices])
-    idx = np.arange(1, n + 1)
-    area = ndimage.sum_labels(det, labels, idx).astype(int)
+    st = _LabelStats(labels, n)
+    area = st.count().astype(int)   # labels cover exactly the det pixels
 
     owned = (top >= keep_rows[0]) & (top < keep_rows[1]) & (bottom <= trusted_stop)
-    touches_edge = ndimage.maximum(near_edge, labels, idx).astype(bool)
-    blob = ndimage.maximum(grown, labels, idx).astype(int)  # each target lies in one blob
+    touches_edge = st.max(near_edge) > 0
+    blob = st.max(grown).astype(int)  # each target lies in one blob
     structure = _extent(ndimage.find_objects(grown))[blob - 1]
     keep = (
         owned
@@ -141,30 +181,26 @@ def component_table(
     )
     if not keep.any():
         return pd.DataFrame()
-    k = idx[keep]
-
-    ref = np.nan_to_num(bands[cfar_band], nan=0.0)
-    com = np.array(ndimage.center_of_mass(ref, labels, k)).reshape(-1, 2)
+    com_r, com_c = st.centre_of_mass(np.nan_to_num(bands[cfar_band], nan=0.0))
     out = pd.DataFrame({
-        "row": com[:, 0] + row_offset,
-        "col": com[:, 1],
+        "row": com_r[keep] + row_offset,
+        "col": com_c[keep],
         "area_px": area[keep],
         "extent_px": np.maximum(height, width)[keep],
         "structure_px": structure[keep],
-        "background_db": to_db(ndimage.mean(background, labels, k)),
+        "background_db": to_db(st.mean(background)[keep]),
     })
     for pol, arr in bands.items():
         finite = np.isfinite(arr)
         vals = np.where(finite, arr, 0.0)
-        cnt = ndimage.sum_labels(finite, labels, k)
         with np.errstate(invalid="ignore", divide="ignore"):
-            mean = ndimage.sum_labels(vals, labels, k) / cnt
-        out[f"peak_db_{pol}"] = to_db(ndimage.maximum(vals, labels, k))
-        out[f"mean_db_{pol}"] = to_db(mean)
+            mean = st.sum(vals) / st.sum(finite)
+        out[f"peak_db_{pol}"] = to_db(st.max(vals)[keep])
+        out[f"mean_db_{pol}"] = to_db(mean[keep])
     out["contrast_db"] = out[f"peak_db_{cfar_band}"] - out["background_db"]
     if copol is not None:
         pol, bg = copol
-        out["copol_contrast_db"] = out[f"peak_db_{pol}"] - to_db(ndimage.mean(bg, labels, k))
+        out["copol_contrast_db"] = out[f"peak_db_{pol}"] - to_db(st.mean(bg)[keep])
         if p.copol_min_contrast_db is not None:
             # Icebergs stand out in co- and cross-pol; HV speckle spikes have no HH support.
             # NaN (no co-pol background) fails the test, like a masked CFAR ring.
@@ -179,6 +215,26 @@ def detect_raster(
     p: DetectionParams,
 ) -> tuple[pd.DataFrame, rasterio.Affine, rasterio.crs.CRS]:
     """Block-wise CFAR + component extraction over co-registered masked rasters."""
+    tables, transform, crs = detect_raster_multi(paths, cfar_band, [cfar], p)
+    return tables[0], transform, crs
+
+
+def detect_raster_multi(
+    paths: dict[str, Path],
+    cfar_band: str,
+    cfars: list[CfarParams],
+    p: DetectionParams,
+) -> tuple[list[pd.DataFrame], rasterio.Affine, rasterio.crs.CRS]:
+    """`detect_raster` at several thresholds (e.g. a PFA sweep) in one pass over the scene.
+
+    The CFAR windows must match; only the threshold differs. Background, grown structures and
+    the co-pol background are computed once per block, so each extra threshold only costs its
+    component table.
+    """
+    cfar = cfars[0]
+    if any((c.guard_px, c.background_px, c.min_background_fraction)
+           != (cfar.guard_px, cfar.background_px, cfar.min_background_fraction) for c in cfars):
+        raise ValueError("All CFAR settings must share the windows and background fraction")
     halo = cfar.background_px + p.edge_buffer_px + p.max_extent_px
     copol_band = COPOL.get(cfar_band, "")
     trusted_margin = cfar.background_px + p.edge_buffer_px
@@ -189,7 +245,7 @@ def detect_raster(
         for pol, s in srcs.items():
             if (s.height, s.width) != (h, w) or s.transform != ref.transform:
                 raise ValueError(f"Band {pol} is not on the same grid as {cfar_band}")
-        tables = []
+        tables: list[list[pd.DataFrame]] = [[] for _ in cfars]
         for r0 in range(0, h, p.block_rows):
             r1 = min(r0 + p.block_rows, h)
             w0, w1 = max(0, r0 - halo), min(h, r1 + halo)
@@ -198,19 +254,23 @@ def detect_raster(
             x = bands[cfar_band]
             if not np.isfinite(x).any():
                 continue
-            det, bg = ca_cfar(x, cfar)
+            bg, n = ring_mean(x, cfar.guard_px, cfar.background_px)
+            candidate = np.isfinite(x) & (n >= cfar.min_background_fraction * cfar.ring_pixels)
             edge = near_invalid(np.isfinite(x), p.edge_buffer_px)
             grown = bright_structures(x, bg, p.grow_db)
             trusted_stop = h if w1 == h else w1 - trusted_margin
             copol = None
-            if copol_band in bands and det.any():
-                copol_bg, _ = ring_mean(bands[copol_band], cfar.guard_px, cfar.background_px)
-                copol = (copol_band, copol_bg)
-            t = component_table(det, bands, cfar_band, bg, edge, grown, w0, (r0, r1),
-                                trusted_stop, p, copol)
-            if not t.empty:
-                tables.append(t)
-        return (pd.concat(tables, ignore_index=True) if tables else pd.DataFrame(),
+            for i, c in enumerate(cfars):
+                with np.errstate(invalid="ignore"):
+                    det = candidate & (x > c.alpha * bg)   # = ca_cfar(x, c)
+                if copol is None and copol_band in bands and det.any():
+                    copol_bg, _ = ring_mean(bands[copol_band], cfar.guard_px, cfar.background_px)
+                    copol = (copol_band, copol_bg)
+                t = component_table(det, bands, cfar_band, bg, edge, grown, w0, (r0, r1),
+                                    trusted_stop, p, copol)
+                if not t.empty:
+                    tables[i].append(t)
+        return ([pd.concat(t, ignore_index=True) if t else pd.DataFrame() for t in tables],
                 ref.transform, ref.crs)
     finally:
         for s in srcs.values():
@@ -312,16 +372,10 @@ def save_overlay(
     return png_path
 
 
-def detect_product(product_dir: Path, cfg: Config, band: str | None = None) -> dict[str, Path]:
-    """CFAR detection on a preprocessed HyP3 product; writes GeoJSON, overlay PNG, summary JSON.
-
-    `band` overrides `cfar.band` from the config (e.g. to compare HH vs HV).
-    """
-    import json
-
-    from iceberg_sar.preprocess import db_stretch, find_rtc_bands, read_downsampled_db
-
-    product_dir = Path(product_dir)
+def _product_setup(
+    product_dir: Path, cfg: Config, band: str | None,
+) -> tuple[dict[str, Path], str, float, CfarParams, DetectionParams]:
+    """Masked rasters, CFAR band, pixel size, CFAR and detection parameters from the config."""
     name = product_dir.name
     interim = cfg.path("interim") / name
     masked = {
@@ -348,8 +402,9 @@ def detect_product(product_dir: Path, cfg: Config, band: str | None = None) -> d
 
     enl = resolve_enl(c.get("enl", "auto"), masked[band], px(c.get("enl_cell_m", 500)))
     cfar = CfarParams(
-        guard_px=px(c["guard_m"]), background_px=px(c["background_m"]), pfa=float(c["pfa"]),
-        enl=enl, min_background_fraction=float(c.get("min_background_fraction", 0.5)),
+        guard_px=px(c["guard_m"]), background_px=px(c["background_m"]),
+        pfa=float(c["pfa"]), enl=enl,
+        min_background_fraction=float(c.get("min_background_fraction", 0.5)),
     )
     params = DetectionParams(
         min_area_px=int(d["min_area_px"]),
@@ -362,6 +417,22 @@ def detect_product(product_dir: Path, cfg: Config, band: str | None = None) -> d
         merge_by_structure=bool(d.get("merge_by_structure", True)),
         block_rows=int(d.get("block_rows", 1024)),
     )
+    return masked, band, pixel_m, cfar, params
+
+
+def detect_product(product_dir: Path, cfg: Config, band: str | None = None) -> dict[str, Path]:
+    """CFAR detection on a preprocessed HyP3 product; writes GeoJSON, overlay PNG, summary JSON.
+
+    `band` overrides `cfar.band` from the config (e.g. to compare HH vs HV).
+    """
+    import json
+
+    from iceberg_sar.preprocess import db_stretch, find_rtc_bands, read_downsampled_db
+
+    product_dir = Path(product_dir)
+    name = product_dir.name
+    interim = cfg.path("interim") / name
+    masked, band, pixel_m, cfar, params = _product_setup(product_dir, cfg, band)
     table, transform, crs = detect_raster(masked, band, cfar, params)
     inc = find_rtc_bands(product_dir).get("inc") if product_dir.is_dir() else None
     ice_mask = interim / f"{name}_seaice_mask.tif"
@@ -391,7 +462,7 @@ def detect_product(product_dir: Path, cfg: Config, band: str | None = None) -> d
         "guard_px": cfar.guard_px,
         "background_px": cfar.background_px,
         "pfa": cfar.pfa,
-        "enl": round(enl, 3),
+        "enl": round(cfar.enl, 3),
         "alpha": round(cfar.alpha, 3),
         "alpha_db": round(float(to_db(cfar.alpha)), 2),
         "n_detections": len(gdf),
@@ -401,3 +472,46 @@ def detect_product(product_dir: Path, cfg: Config, band: str | None = None) -> d
     summary_path = out_dir / f"{name}_{band}_detections.json"
     summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
     return {"detections": geojson, "overlay": overlay, "summary": summary_path}
+
+
+def detect_product_sweep(
+    product_dir: Path, cfg: Config, pfas: list[float], out_dir_for: Callable[[float], Path],
+    band: str | None = None,
+) -> dict[float, Path]:
+    """`detect_product` at several PFAs in one pass (no overlay PNG). Each PFA's GeoJSON and
+    summary JSON go to `out_dir_for(pfa)` under the usual file names."""
+    import json
+
+    from iceberg_sar.preprocess import find_rtc_bands
+
+    product_dir = Path(product_dir)
+    name = product_dir.name
+    interim = cfg.path("interim") / name
+    masked, band, pixel_m, base, params = _product_setup(product_dir, cfg, band)
+    cfars = [replace(base, pfa=float(pfa)) for pfa in pfas]
+    tables, transform, crs = detect_raster_multi(masked, band, cfars, params)
+    inc = find_rtc_bands(product_dir).get("inc") if product_dir.is_dir() else None
+    ice_mask = interim / f"{name}_seaice_mask.tif"
+    # One GeoDataFrame for the whole sweep, so incidence and distance to ice (a full-scene
+    # distance transform) are computed once, not per PFA.
+    tagged = [t.assign(sweep_k=k) for k, t in enumerate(tables) if not t.empty]
+    allg = to_geodataframe(pd.concat(tagged, ignore_index=True) if tagged else pd.DataFrame(),
+                           transform, crs, name, inc, ice_mask if ice_mask.is_file() else None)
+    out = {}
+    for k, c in enumerate(cfars):
+        gdf = allg[allg["sweep_k"] == k].drop(columns="sweep_k") if len(allg) else allg
+        d = Path(out_dir_for(c.pfa))
+        d.mkdir(parents=True, exist_ok=True)
+        geojson = d / f"{name}_{band}_detections.geojson"
+        if gdf.empty:
+            geojson.write_text('{"type": "FeatureCollection", "features": []}', encoding="utf-8")
+        else:
+            gdf.to_file(geojson, driver="GeoJSON")
+        summary = {"product": name, "timestamp": scene_timestamp(name), "cfar_band": band,
+                   "pixel_m": pixel_m, "guard_px": c.guard_px, "background_px": c.background_px,
+                   "pfa": c.pfa, "enl": round(c.enl, 3), "alpha": round(c.alpha, 3),
+                   "alpha_db": round(float(to_db(c.alpha)), 2), "n_detections": len(gdf)}
+        (d / f"{name}_{band}_detections.json").write_text(json.dumps(summary, indent=2),
+                                                           encoding="utf-8")
+        out[c.pfa] = geojson
+    return out

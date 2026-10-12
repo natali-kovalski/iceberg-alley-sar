@@ -264,3 +264,152 @@ irrelevant, but 5d should check the recall-vs-radius curve.
 - Bergs in pack ice: neither detector handles them; report them separately.
 - The CFAR-mask filter on THOR peaks was a no-op on 2020-05-05 (no pack ice in that scene).
   Check `outside_cfar_mask` in the summary on a scene with ice before trusting it.
+
+## 5d: Head-to-head on the held-out April 2019 scenes
+
+```
+python -m iceberg_sar.cli thor-detect <2019-04-15> <2019-04-29> --head linear      # final models,
+python -m iceberg_sar.cli thor-detect <2019-04-15> <2019-04-29> --head centernet   # once each
+python -m iceberg_sar.cli thor-compare --sweep    # CFAR PFA sweep, tables, figure
+```
+
+Tables go to `data/outputs/thor/5d/` (`sweep.csv`, `breakdown.csv`, `radius.csv`,
+`detections_by_incidence.csv`, `summary.json`), the figure to `docs/img/thor_vs_cfar_recall.png`.
+
+### Setup: everything identical except the detector
+- **Masks:** THOR peaks must fall on the CFAR's masked HV raster (land + 500 m, pack ice + 1 km,
+  AOI). Both detectors then lose detections within 5 km of pack ice (the open-water filter of
+  `validate-points`).
+- **Truth and matching:** `pointval.load_truth` (IIP positions at cell centres), kept where the
+  SAR is valid, matched one-to-one (`matching.match_points`) within 500 m
+  (`validation.max_dist_m`).
+- **Recall at a matched number of detections:** precision can't be measured without AIS, so each
+  operating point is (detections per scene, labels matched). The CFAR is swept over PFA 1e-3 to
+  1e-12 (`thor.compare.cfar_pfas`). THOR is swept over its score: every peak ≥ 0.1 was saved,
+  so the threshold is applied afterwards.
+- **Nothing was tuned on these scenes.** The models were fixed in 5c. The PFA list, bins and
+  radii were in `config.yaml` before the first run.
+
+**Faster CFAR as a side effect.** The sweep runs all PFAs in one pass
+(`detections.detect_raster_multi`), because the ring background, grown structures and co-pol
+background don't depend on the threshold. Profiling the first attempt showed that
+`component_table`'s per-target statistics (`ndimage.sum_labels`, `maximum`, `center_of_mass`)
+scanned the whole 40 M px block on every call. They now reduce over the labelled pixels only
+(`_LabelStats`). The output is identical (checked against the old code on a synthetic scene, and
+by a test that compares one-pass and separate runs). Both April scenes at all 8 PFAs now take
+13 minutes. Before, a single PFA on one scene took over 20 minutes.
+
+### Test scenes
+| Scene | Truth | Labels compared | Scored |
+|---|---|---|---|
+| **2019-04-29** | IIP satellite analysts, same pass | **267** | **yes** |
+| 2019-04-15 | IIP ship and aircraft sightings, 5.6 h after the pass | 25 | no |
+
+**2019-04-15 can't be scored.** It has no same-pass labels, and the later sightings need a drift
+correction. One offset was estimated from the pooled detections of both detectors, to be applied
+to both. The best offset (2.2 km E, 5.1 km N) lines up only 3 sightings, below the 5 that
+`pointval` requires, so it isn't used. Without it the sightings sit kilometres from where the
+bergs were imaged. The scene is still useful for the pack-ice question below.
+
+### Result (2019-04-29)
+![Recall vs. detections, THOR vs. CFAR](img/thor_vs_cfar_recall.png)
+
+| Operating point | Detections (open water) | Labels matched | Recall |
+|---|---|---|---|
+| CFAR, PFA 1e-6 (configured) | 476 | 197 | 0.74 |
+| THOR linear, same count (score ≥ 0.46) | 476 | 238 | **0.89** |
+| THOR CenterNet, same count (score ≥ 0.49) | 476 | 237 | 0.89 |
+| CFAR, PFA 1e-3 (loosest) | 1,513 | 224 | 0.84 |
+| THOR linear, score ≥ 0.35 (viewer threshold) | 653 | 249 | 0.93 |
+| THOR linear, score ≥ 0.14 | 1,987 | 256 | 0.96 |
+
+(The CFAR's 0.74 is the open-water figure from `validation-findings.md`. Its headline 78% counts
+detections near pack ice too.)
+
+- **THOR finds more labelled bergs at every detection count.** It matches the CFAR's recall with
+  about 345 detections instead of 476 (~30% fewer), and the CFAR's best recall (0.84 at 1,513
+  detections) with about 445 (~3.4× fewer). THOR's top ~100 peaks lie almost on the "ideal" line:
+  nearly every one is a labelled berg.
+- **Linear and CenterNet are indistinguishable** here, as on the folds. The 769-parameter linear
+  head is the one to keep.
+- **The CFAR saturates.** Loosening the PFA from 1e-5 to 1e-3 adds 915 detections but only 12
+  labels. THOR keeps climbing to 0.96. Of the 11 labels it never finds, all lie within 5 km of
+  pack ice, where both detectors' detections are filtered out.
+
+**Overlap at the matched count (476 each, linear):** 187 labels found by both, **51 by THOR
+only**, 10 by the CFAR only, 19 by neither.
+- The 10 CFAR-only labels are not invisible to THOR. Each has a THOR peak 25-130 m away with a
+  score of 0.15-0.43, just under the matched threshold.
+- Of the 19 found by neither, 11 are within 5 km of pack ice (filtered for both); 8 are small or
+  medium bergs in open water.
+
+### Breakdown (matched count, 476 detections each)
+| Labels | n | CFAR | THOR linear | THOR CenterNet |
+|---|---|---|---|---|
+| Small 15-60 m | 31 | 0.65 | 0.71 | 0.77 |
+| Medium 61-120 m | 232 | 0.76 | 0.91 | 0.90 |
+| **Large > 120 m** | 4 | **0 / 4** | **4 / 4** | **4 / 4** |
+| < 5 km from pack ice | 11 | 0 | 0 | 0 |
+| 5-20 km from pack ice | 76 | 0.83 | 0.92 | 0.91 |
+| > 20 km from pack ice | 180 | 0.74 | 0.93 | 0.93 |
+| Incidence 35-40° | 26 | 0.77 | 1.00 | 1.00 |
+| Incidence 40-47° | 241 | 0.73 | 0.88 | 0.88 |
+
+- **Large bergs: the CFAR sees them and then throws them away.** All four are 30+ dB above the
+  sea in HV, so the CFAR threshold fires at any PFA. But their grown blobs measure 340-470 m,
+  above `detections.max_structure_m` (300 m), the rule that rejects sea-ice strips. THOR has no
+  such rule and finds all four (scores 0.68-0.75). The CFAR could be fixed by a better
+  strip test (shape, not just length). That has to be tuned on other scenes, not this one.
+- **Medium bergs carry the result:** 232 of the 267 labels, recall 0.76 → 0.91.
+- **Small bergs gain least** (0.65 → 0.71-0.77). They are near the ~20 m true resolution, and a
+  THOR token (patch 8) is 80 m. A 4 × 4 patch run would show whether finer tokens help here.
+- **Incidence angle can't be judged on this scene.** The AOI part of the pass is almost all far
+  range (241 of 267 labels at 40-47°; of the 476 CFAR detections, 1 is below 35° and 27 are at
+  35-40°).
+- **The matching radius doesn't drive the gap.** Recall at 100 / 200 / 300 / 500 m: CFAR 0.63 /
+  0.73 / 0.73 / 0.74, THOR linear 0.76 / 0.89 / 0.89 / 0.89. THOR peaks are snapped to HH maxima
+  like the labels, while the CFAR reports HV blob centroids; that explains part of the gap at
+  100 m. From 200 m on, both curves are flat.
+
+### Where THOR doesn't beat the CFAR
+- **Pack ice, on its own.** On 2019-04-15 (pack ice in the scene) 47% of the linear head's peaks
+  (5,368 of 11,431) and 59% of CenterNet's (15,810 of 26,817) fall in the CFAR's masked area
+  and are dropped. On the ice-free part of 04-29 it is 3% (118 of 4,001). THOR alone fires on
+  pack ice and ice strips (5c pack-ice set: F1 0.2-0.35). It depends on the HV pack-ice mask
+  of the CFAR pipeline.
+- **Bergs in or near pack ice:** neither detector is scored there.
+- **Compute:** the CFAR runs on CPU (the full 8-PFA sweep takes ~6 min per scene). THOR needs a
+  GPU: 8-15 min per scene on the laptop RTX 3070.
+
+### Caveats
+- **One scored scene: 267 labels from one pass.** The gap at the same count (0.74 vs 0.89) is
+  large next to the sampling noise (±0.03 for a binomial at n = 267). But it is one day, one sea
+  state and mostly far range.
+- **THOR learned what IIP analysts label; the CFAR did not.** The head was trained on IIP
+  satellite labels from other dates in 2019 and 2020. Agreeing with the analysts on these bergs is
+  the aim, but part of the gap may be agreement with their labelling style, not only better
+  detection.
+- **Unlabelled detections count against neither detector.** At the matched count the CFAR has
+  279 and THOR 238 detections without a label: bergs the analysts skipped, ships or clutter.
+  Without AIS the two can't be compared on precision.
+
+### Clutter check on spring 2025 (no labels)
+Open-water detections per scene, CFAR (PFA 1e-6) vs. THOR linear:
+
+| Scene | CFAR | THOR ≥ 0.35 | THOR ≥ 0.5 |
+|---|---|---|---|
+| 2025-05-02 | 82 | 49 | 12 |
+| 2025-05-08 | 78 | 132 | 82 |
+| 2025-05-14 | 112 | 67 | 32 |
+
+Same order of magnitude on all three dates, no blow-up. THOR is now a toggleable viewer layer:
+cyan rings at score ≥ `thor.compare.view_score` (0.35), model `viewer.thor_model`.
+
+### Verdict
+On the held-out same-pass scene, **THOR (frozen encoder + a 769-parameter linear head) finds
+15 percentage points more of the analyst-labelled bergs than the CA-CFAR at the same number of
+detections (0.89 vs 0.74), and finds the large bergs that the CFAR's strip rule rejects.** It
+does not replace the CFAR pipeline: it needs the pipeline's pack-ice mask and a GPU, and its
+precision is as unknown as the CFAR's. Worth doing next: a 4 × 4 patch run for small bergs, a
+shape-based strip test for the CFAR (tuned off the test scenes), and AIS for 2019-04-29 to turn
+unlabelled detections into a precision estimate.

@@ -175,3 +175,22 @@ def test_export_writes_valid_json(cfg: Config) -> None:
     out, packets = export_czml(cfg)
     assert out == cfg.path("czml")
     assert json.loads(out.read_text(encoding="utf-8")) == packets
+
+
+def test_thor_layer_threshold_and_counts(cfg: Config) -> None:
+    """THOR detections: own `thor/` entities above the score threshold, counted per scene."""
+    name, ts = next(iter(SCENES.items()))
+    thor = _detections(name, ts, [0.5, 12.0, np.nan]).assign(
+        id=lambda d: "t" + d["id"], score=[0.9, 0.5, 0.2], detector="thor")
+    thor.to_file(cfg.path("outputs") / "detections" / f"{name}_thor-linear_detections.geojson",
+                 driver="GeoJSON")
+    scenes = find_scenes(cfg, "HV")
+    assert scenes[0].thor is not None and scenes[1].thor is None
+    packets = build_czml(scenes, ViewerParams(near_ice_km=5, thor_score=0.35))
+    rings = [p for p in packets if p["id"].startswith("thor/")]
+    assert len(rings) == 2                                         # score 0.2 dropped
+    assert rings[0]["point"]["outlineColor"]["rgba"][:3] == [150, 150, 150]   # near ice
+    assert rings[1]["properties"]["score"] == 0.5
+    by_id = {p["id"]: p for p in packets}
+    assert by_id[f"scene/{name}"]["properties"]["n_thor"] == 1     # open water only
+    assert "n_thor" not in by_id[f"scene/{next(reversed(SCENES))}"]["properties"]

@@ -28,18 +28,21 @@ export interface SceneInfo {
   nOpenWater: number;
   nNearIce: number;
   iceAreaKm2: number;
+  nThor?: number; // THOR detections in open water; undefined when THOR wasn't run on the scene
 }
 
 export interface Legend {
   nearIceKm: number;
   contrastDbMin: number;
   contrastDbMax: number;
+  thorScore?: number;
 }
 
 export interface Layers {
   nearIce: boolean;
   seaIce: boolean;
   footprints: boolean;
+  thor: boolean;
 }
 
 function esriImagery(): ImageryLayer {
@@ -106,6 +109,7 @@ export async function loadDetections(viewer: Viewer): Promise<{
         // 0 when the scene is ice-free (summer) or no pack-ice mask was built.
         nNearIce: (prop(e, "n_near_ice") as number | undefined) ?? 0,
         iceAreaKm2: (prop(e, "ice_area_km2") as number | undefined) ?? 0,
+        nThor: prop(e, "n_thor") as number | undefined,
       };
     })
     .sort((a, b) => JulianDate.compare(a.start, b.start));
@@ -114,6 +118,10 @@ export async function loadDetections(viewer: Viewer): Promise<{
     nearIceKm: l ? (prop(l, "near_ice_km") as number) : 5,
     contrastDbMin: l ? (prop(l, "contrast_db_min") as number) : 10,
     contrastDbMax: l ? (prop(l, "contrast_db_max") as number) : 20,
+    thorScore: scenes
+      .map((s) => dataSource.entities.getById(s.id))
+      .map((e) => (e ? (prop(e, "thor_score") as number | undefined) : undefined))
+      .find((v) => v !== undefined),
   };
   return { dataSource, scenes, legend };
 }
@@ -121,6 +129,8 @@ export async function loadDetections(viewer: Viewer): Promise<{
 export function applyLayers(dataSource: CzmlDataSource, layers: Layers): void {
   for (const e of dataSource.entities.values) {
     if (e.id.startsWith("det/")) e.show = layers.nearIce || prop(e, "near_ice") !== true;
+    else if (e.id.startsWith("thor/"))
+      e.show = layers.thor && (layers.nearIce || prop(e, "near_ice") !== true);
     else if (e.id.startsWith("seaice/")) e.show = layers.seaIce;
     else if (e.id.startsWith("footprint/")) e.show = layers.footprints;
   }

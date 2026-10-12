@@ -130,6 +130,7 @@ viewer:
   point_px_range: [6, 16]   # point size from structure_m (0 .. structure_m_max)
   structure_m_max: 300
   simplify_m: 100           # footprint / pack-ice outline simplification
+  thor_model: thor-linear   # THOR layer (Milestone 5): `thor-detect` tag; shown at thor.compare.view_score
 
 chips:
   # Chips around detections for the iceberg/ship CNN, matched to the Kaggle chips.
@@ -245,6 +246,20 @@ thor:
     batch: 8
     blob_window_m: 320      # attributes: berg blob grown around the peak within this window
     grow_db: 4              # blob = pixels this far above the ring background (as detections.grow_db)
+  compare:
+    # 5d: THOR vs CFAR on the held-out April 2019 scenes. Nothing in here is tuned on them.
+    out_dir: data/outputs/thor/5d
+    scenes:                 # product -> IIP truth (pointval.load_truth)
+      S1A_IW_20190429T094108_DHP_RTC10_G_gpuned_671B: iip-satellite   # primary: same-pass analyst labels
+      S1A_IW_20190415T095705_DHP_RTC10_G_gpuned_59A9: iip-aircraft    # secondary: ship/air 5.6 h later
+    cfar_pfas: [1.0e-3, 1.0e-4, 1.0e-5, 1.0e-6, 1.0e-7, 1.0e-8, 1.0e-10, 1.0e-12]
+    thor_models: [thor-linear, thor-centernet]   # detection tags from `thor-detect` (final models)
+    view_score: 0.35        # folds' best-F1 threshold: THOR operating point for the viewer
+    # Aircraft truth drifts: one offset per scene from the pooled detections of both detectors
+    # (CFAR at cfar.pfa, THOR at view_score), applied to both. Same reliability rule as pointval.
+    radii_m: [100, 200, 300, 500]     # recall-vs-radius check; headline is validation.max_dist_m
+    ice_bins_km: [0, 5, 20, 1000]     # truth distance to (buffered) pack ice
+    incidence_bins_deg: [29, 35, 40, 47]
 
 output:
   crs: EPSG:4326
