@@ -475,9 +475,19 @@ def contact_sheet(
     n_neg = n // 4
     bergs = index[index["kind"] == "berg"]
     picks = [bergs.sort_values("n_bergs", ascending=False).head(n - n_neg)]
-    negs = index[index["kind"] != "berg"]
-    if len(negs):
-        picks.append(negs.sample(min(n_neg, len(negs)), random_state=int(rng.integers(1 << 31))))
+    # Negatives round-robin over kinds, so each kind shows up (most ice for ice-edge chips).
+    pools = {k: g.sample(frac=1, random_state=int(rng.integers(1 << 31)))
+             for k, g in index[index["kind"] != "berg"].groupby("kind")}
+    if "ice_edge" in pools:
+        pools["ice_edge"] = pools["ice_edge"].sort_values("ice_fraction", ascending=False)
+    neg_rows = []
+    while len(neg_rows) < n_neg and any(len(g) for g in pools.values()):
+        for k in list(pools):
+            if len(pools[k]) and len(neg_rows) < n_neg:
+                neg_rows.append(pools[k].iloc[0])
+                pools[k] = pools[k].iloc[1:]
+    if neg_rows:
+        picks.append(pd.DataFrame(neg_rows))
     sel = pd.concat(picks).head(n)
 
     cols = 5
