@@ -87,7 +87,7 @@ replaced by the next-ranked ones.
 
 | Split | Frames | Labels | On masked pixels | Visible, in chips | Crops (berg / water / edge / ice edge) |
 |---|---|---|---|---|---|
-| train | 17 | 515 | 75 | 432 | 713 (398 / 198 / 99 / 18) |
+| train | 17 | 515 | 75 | 432 | 702 (398 / 198 / 99 / 7) |
 | val | 3 | 114 | 35 | 78 | 154 (76 / 38 / 20 / 20) |
 
 ### Masks in the chips
@@ -109,7 +109,8 @@ replaced by the next-ranked ones.
   absolute floor on top of the relative rule. Real ice cells sit at -27.6 dB (p1) and above;
   the false cells at -30 to -31 dB. Checked on all 35 processed scenes: only 2 masks change
   (2019-05-17: 98 -> 0 km2, 2020-05-16: 83 -> 8 km2, buffered), both training scenes; the
-  viewer and validation scenes are unaffected.
+  viewer and validation scenes are unaffected. Training ice-edge chips: 18 -> 7, six of them
+  real pack ice (2020-04-27); one small coastal patch on 2019-05-11 still looks like water.
 - **Not fixed: brighter swath-edge water on the Sep/Oct 2026 scenes.** 2026-10-01 still shows
   ~70 km2 of "ice" (water at about -29 dB, 62% of it within 4 km of the swath edge). An
   incidence-angle-dependent water reference does not explain it (water HV is flat from 30 to
