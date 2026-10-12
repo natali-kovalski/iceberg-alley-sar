@@ -454,23 +454,8 @@ def summary_table(index: pd.DataFrame) -> pd.DataFrame:
     return pd.concat([t, totals]).sort_index()
 
 
-def contact_sheet(
-    index: pd.DataFrame, chips_dir: Path, png: Path, cfg: Config, n: int = 20, seed: int = 0
-) -> Path:
-    """Grid of chips (HH dB) with the token-grid target heatmap and points overlaid.
-
-    Picks berg chips with the most labels plus a few of each negative kind. Labels are
-    red (snapped) or yellow (not snapped); unlabelled CFAR detections are cyan.
-    """
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    from iceberg_sar.thor.targets import render_heatmap
-
-    tp = ThorParams.from_config(cfg)
-    tgt = TargetParams.from_config(cfg)
+def overview_selection(index: pd.DataFrame, n: int = 20, seed: int = 0) -> pd.DataFrame:
+    """Berg chips with the most labels, plus negatives round-robin over kinds."""
     rng = np.random.default_rng(seed)
     n_neg = n // 4
     bergs = index[index["kind"] == "berg"]
@@ -488,7 +473,29 @@ def contact_sheet(
                 pools[k] = pools[k].iloc[1:]
     if neg_rows:
         picks.append(pd.DataFrame(neg_rows))
-    sel = pd.concat(picks).head(n)
+    return pd.concat(picks).head(n)
+
+
+def contact_sheet(
+    index: pd.DataFrame, chips_dir: Path, png: Path, cfg: Config, n: int = 20, seed: int = 0,
+    title: str | None = None,
+) -> Path:
+    """Grid of chips (HH dB) with the token-grid target heatmap and points overlaid.
+
+    Without `title`, shows an overview (`overview_selection`); with it, renders the first
+    `n` rows of `index` as given. Labels are red (snapped) or yellow (not snapped);
+    unlabelled CFAR detections are cyan, the pack-ice mask (no buffer) blue.
+    """
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    from iceberg_sar.thor.targets import render_heatmap
+
+    tp = ThorParams.from_config(cfg)
+    tgt = TargetParams.from_config(cfg)
+    sel = index.head(n) if title else overview_selection(index, n, seed)
 
     cols = 5
     rows_n = int(np.ceil(len(sel) / cols))
@@ -516,12 +523,13 @@ def contact_sheet(
             ax.contour(z["ice"].astype(np.float32), levels=[0.5], colors="deepskyblue",
                        linewidths=0.6)
         ax.set_title(f"{r.split} {r.kind}  {str(r.time)[:10]}\n{r.n_bergs} bergs, "
-                     f"{r.n_unlabelled} unlabelled", fontsize=8)
+                     f"{r.n_unlabelled} unlabelled, ice {r.ice_fraction:.0%}", fontsize=8)
     for ax in axes.flat:
         ax.set_xticks([])
         ax.set_yticks([])
-    fig.suptitle("THOR chips: HH dB, target heatmap (token grid), labels red = snapped / "
-                 "yellow = not, cyan = unlabelled CFAR, blue = pack ice", fontsize=10)
+    legend = ("HH dB, target heatmap (token grid), labels red = snapped / yellow = not, "
+              "cyan = unlabelled CFAR, blue = pack ice (no buffer)")
+    fig.suptitle(f"{title or 'THOR chips'}: {legend}", fontsize=10)
     png.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(png, dpi=100)
     plt.close(fig)

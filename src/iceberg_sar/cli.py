@@ -529,6 +529,35 @@ def thor_chips(
         typer.echo(f"warning: could not write {out / 'summary.csv'} (is it open?)")
 
 
+@app.command("thor-sheet")
+def thor_sheet(
+    kind: Annotated[str | None, typer.Option(help="berg, water, edge or ice_edge.")] = None,
+    split: Annotated[str | None, typer.Option(help="train, val or test.")] = None,
+    scene: Annotated[str | None, typer.Option(help="Substring of the scene name.")] = None,
+    n: Annotated[int, typer.Option(help="Max chips (5 per row).")] = 40,
+    config: ConfigOption = DEFAULT_CONFIG,
+) -> None:
+    """Contact sheet of a subset of chips (no re-cutting), e.g. --kind ice_edge --split train."""
+    from iceberg_sar.thor.chips import contact_sheet, load_index
+
+    cfg = load_config(config)
+    chips = cfg.root / cfg.section("thor")["training"]["dir"] / "chips"
+    index = load_index(chips)
+    for col, val in (("kind", kind), ("split", split)):
+        if val:
+            index = index[index[col] == val]
+    if scene:
+        index = index[index["scene"].str.contains(scene, regex=False)]
+    if index.empty:
+        typer.echo("no chips match")
+        raise typer.Exit(1)
+    index = index.sort_values(["time", "chip_id"])
+    parts = [p for p in (split, kind, scene) if p]
+    name = "contact_sheet_" + ("_".join(parts) if parts else "all") + ".png"
+    title = " ".join(parts) + f" ({min(len(index), n)} of {len(index)} chips)"
+    typer.echo(f"ok  {contact_sheet(index, chips, chips / name, cfg, n=n, title=title)}")
+
+
 THOR_JOB_NAME = "iceberg-alley-thor"
 
 
