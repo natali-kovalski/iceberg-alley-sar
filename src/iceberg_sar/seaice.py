@@ -85,8 +85,14 @@ def detect_ice(
     strip_min_km2: float = 0.5,
     water_percentile: float = 25.0,
     closing_m: float = 600.0,
+    min_db: float | None = None,
 ) -> tuple[np.ndarray, float]:
     """Boolean ice mask on the coarse grid, plus the open-water reference level (dB).
+
+    A cell is "bright" if it is `min_excess_db` above the open-water reference and, when
+    `min_db` is set, also above that absolute level. HyP3 removes the HV noise floor, so on
+    calm days the reference can sit near -40 dB and slightly brighter water by coasts and
+    swath edges passes the relative test alone.
 
     Two rules, OR-ed, then buffered:
     - pack-ice cores: bright AND uniform (CV < max_cv), closed, >= min_area_km2.
@@ -101,6 +107,8 @@ def detect_ice(
         return np.zeros(mean_lin.shape, dtype=bool), float("nan")
     water_db = float(np.percentile(db[finite], water_percentile))
     bright = finite & (db > water_db + min_excess_db)
+    if min_db is not None:
+        bright &= db > min_db
     cell_km2 = cell_m**2 / 1e6
 
     r_close = max(1, round(closing_m / cell_m))

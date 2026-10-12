@@ -250,7 +250,7 @@ def mask_sea_ice(
         st.mean_lin, st.cv, cell_m=cell_m,
         min_excess_db=ice_cfg["min_excess_db"], max_cv=ice_cfg["max_cv"],
         min_area_km2=ice_cfg["min_area_km2"], strip_min_km2=ice_cfg["strip_min_km2"],
-        buffer_m=ice_cfg["buffer_m"],
+        buffer_m=ice_cfg["buffer_m"], min_db=ice_cfg.get("min_db"),
     )
     mask_tif = write_mask(ice, st.transform, st.crs, interim / f"{name}_seaice_mask.tif")
     polys = ice_polygons(ice, st.transform, st.crs)

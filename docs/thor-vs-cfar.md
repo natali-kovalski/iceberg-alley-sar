@@ -102,10 +102,21 @@ replaced by the next-ranked ones.
   on this core, so they contain real ice (median 12% of the chip), not just buffer water.
 
 ### Caveats
-- **The ice detector may flag coastal water.** On 2020-05-16 it marks a thin band along the
-  coast that looks like open water in HH. With the HV noise floor removed the open-water
-  reference is very low (-36 dB on that scene), so +6 dB is easy to exceed. CFAR-side issue;
-  not fixed here.
+- **Ice-detector false alarms at the swath edge (fixed for calm days).** On calm days the
+  open-water reference drops to about -36 to -37 dB (HyP3 removes the HV noise floor), and
+  water within ~4 km of the swath edge (about 1-1.5 dB brighter) passed the +6 dB rule. 12 of
+  the first 18 training "ice-edge" chips held no visible ice. Fix: `seaice.min_db: -30`, an
+  absolute floor on top of the relative rule. Real ice cells sit at -27.6 dB (p1) and above;
+  the false cells at -30 to -31 dB. Checked on all 35 processed scenes: only 2 masks change
+  (2019-05-17: 98 -> 0 km2, 2020-05-16: 83 -> 8 km2, buffered), both training scenes; the
+  viewer and validation scenes are unaffected.
+- **Not fixed: brighter swath-edge water on the Sep/Oct 2026 scenes.** 2026-10-01 still shows
+  ~70 km2 of "ice" (water at about -29 dB, 62% of it within 4 km of the swath edge). An
+  incidence-angle-dependent water reference does not explain it (water HV is flat from 30 to
+  46 deg) and shifts real ice by -6 to +8%. Needs a local water reference or swath-edge
+  handling. These scenes are not used in the viewer, validation or THOR training.
+- **Not fixed: ice-dominated scenes** (Feb-Mar 2019). When ice covers most of the scene the
+  open-water reference is itself ice, and only part of the pack is masked.
 - **The pack-ice mask fails in early-season scenes.** It defines open water from the darkest
   quarter of the scene; when ice covers most of it (Feb-Mar 2019) the reference is ice and the
   pack goes unmasked. The CFAR then fires on floes: 326 of 329 detections on 2019-03-06 have no

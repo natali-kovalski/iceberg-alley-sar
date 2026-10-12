@@ -112,3 +112,16 @@ def test_ice_core_undoes_the_buffer():
     buffered = ndimage.binary_dilation(core, structure=_disk(5))
     np.testing.assert_array_equal(ice_core(buffered, cell_m=200, buffer_m=1000), core)
     assert not ice_core(np.zeros((5, 5), bool), 200, 1000).any()
+
+
+def test_min_db_drops_faint_coastal_water_but_keeps_ice() -> None:
+    # Calm day: noise-floor-removed water at -40 dB, a band of slightly brighter water at
+    # -31 dB (passes +6 dB alone), and real pack ice at -22 dB.
+    mean = np.full((100, 100), 10 ** (-40 / 10))
+    cv = np.full((100, 100), 1.1)
+    mean[:, 0:4], cv[:, 0:4] = 10 ** (-31 / 10), 0.5      # coastal band, 80 km2
+    mean[40:60, 40:60], cv[40:60, 40:60] = 10 ** (-22 / 10), 0.5
+    loose, _ = detect_ice(mean, cv, **KW)
+    strict, _ = detect_ice(mean, cv, **{**KW, "min_db": -30})
+    assert loose[:, 0:4].all() and loose[40:60, 40:60].all()
+    assert not strict[:, 0:4].any() and strict[40:60, 40:60].all()

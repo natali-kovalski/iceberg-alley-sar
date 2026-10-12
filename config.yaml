@@ -66,6 +66,9 @@ seaice:
   band: HV                  # falls back to VH for VV/VH scenes
   cell_m: 200               # coarse cells; big enough for stable stats, small vs. ice floes
   min_excess_db: 6          # brighter than the open-water reference (25th pct of cells) by this much
+  min_db: -30               # and at least this bright. Calm days put the reference near -40 dB (HyP3
+                            # removes the HV noise floor) and coastal water passed +6 dB alone.
+                            # Real ice cells: p1 -27.6 dB (sigma0); false coastal "ice" -30 to -31 dB.
   max_cv: 0.8               # pack ice is uniform at 200 m; iceberg cells are spiky (CV > 1)
   min_area_km2: 2           # smallest pack-ice core kept
   strip_min_km2: 0.5        # connected bright cells this large count as ice strips; icebergs light 1-4 cells

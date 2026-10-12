@@ -103,8 +103,9 @@ def ensure_core_mask(interim_dir: Path, name: str, buffer_m: float) -> Path:
     from iceberg_sar.seaice import write_core_mask
 
     core = interim_dir / f"{name}_seaice_core.tif"
-    if not core.is_file():
-        write_core_mask(interim_dir / f"{name}_seaice_mask.tif", buffer_m, core)
+    mask = interim_dir / f"{name}_seaice_mask.tif"
+    if not core.is_file() or core.stat().st_mtime < mask.stat().st_mtime:  # re-preprocessed
+        write_core_mask(mask, buffer_m, core)
     return core
 
 
