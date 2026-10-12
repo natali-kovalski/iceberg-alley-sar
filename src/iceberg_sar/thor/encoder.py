@@ -122,6 +122,28 @@ def embed(model: Any, x: np.ndarray, device: str = "cpu", layer: int = -1) -> np
     return feats[layer].float().cpu().numpy()
 
 
+def embed_blocks(
+    model: Any, x: np.ndarray, blocks: tuple[int, ...], device: str = "cpu"
+) -> np.ndarray:
+    """(B, C, H, W) model input -> (B, len(blocks) * D, h, w) float16, blocks concatenated."""
+    import torch
+
+    with torch.no_grad():
+        feats = model(torch.from_numpy(np.ascontiguousarray(x, np.float32)).to(device))
+        out = torch.cat([feats[b] for b in blocks], dim=1)
+    return out.half().cpu().numpy()
+
+
+def pixel_m_from_name(name: str) -> float:
+    """Pixel size from a HyP3 RTC product name (`..._RTC10_...` -> 10 m)."""
+    import re
+
+    m = re.search(r"_RTC(\d+)_", name)
+    if m is None:
+        raise ValueError(f"No RTC pixel size in {name!r}")
+    return float(m.group(1))
+
+
 def pca_rgb(
     feats: np.ndarray, valid: np.ndarray | None = None, pct: tuple[float, float] = (2, 98)
 ) -> tuple[np.ndarray, np.ndarray]:

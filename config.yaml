@@ -205,6 +205,46 @@ thor:
     seed: 42
     val:                            # 8 weeks from any training frame, so no shared bergs
       - ["2019-02-01", "2019-03-24"]
+  features:
+    # 5c: frozen-encoder features cached per chip (float16, blocks concatenated).
+    blocks: [2, 5, 8, 11]   # the paper's detector taps; 4 x 192 = 768 channels, ~6 MB per chip
+    batch: 8
+  head:
+    hidden: 32              # CenterNet head width (1x1 -> 3x3 -> 1x1); 64-256 overfit (5c sweep)
+    dropout: 0.5
+    prior: 0.01             # initial berg probability per token (output bias)
+  train:
+    # Penalty-reduced focal loss (CenterNet): alpha on the prediction, beta on the Gaussian.
+    focal_alpha: 2
+    focal_beta: 4
+    ignore_tokens: 1        # tokens within this of an unlabelled CFAR detection / masked label
+    min_valid: 0.5          # tokens with less sea than this are ignored
+    epochs: 200
+    patience: 25            # early stopping on val loss
+    batch: 32
+    lr: 0.001
+    weight_decay: 0.05
+    match_m: 200            # val peak <-> label matching radius (labels are snapped, ~10 m)
+    seed: 0
+    # Year folds: val = training-split chips in these dates, a year from the train frames, so no
+    # shared bergs. The chips' own val split (Feb-Mar 2019, bergs inside pack ice) is never
+    # trained on and is scored as a separate pack-ice set. April 2019 (test) is never touched.
+    folds:
+      a: [["2020-01-01", "2020-12-31"]]   # train 2019 (May-Jun), val 2020 (Apr-May)
+      b: [["2019-01-01", "2019-12-31"]]   # train 2020, val 2019 (May-Jun)
+    final:
+      # 5d models from both years (702 chips), no val set left. The folds fixed the recipe.
+      linear:
+        epochs: 150         # refit on all; fold best epochs 159 / 151, val loss flat from ~100
+      centernet:
+        ensemble: [a, b]    # mean probability of the early-stopped fold models (peaks ~epoch 12)
+  infer:
+    overlap_px: 128         # sliding windows overlap; each keeps its central tokens only
+    score_min: 0.1          # peaks written to GeoJSON (5d sweeps the threshold above this)
+    min_valid: 0.02         # skip windows with less sea than this
+    batch: 8
+    blob_window_m: 320      # attributes: berg blob grown around the peak within this window
+    grow_db: 4              # blob = pixels this far above the ring background (as detections.grow_db)
 
 output:
   crs: EPSG:4326

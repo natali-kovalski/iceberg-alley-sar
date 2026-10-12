@@ -85,6 +85,11 @@ iceberg-alley-sar/
 - **Milestone 4: done.** Portfolio README with screenshots, `cli.py run` end to end for a date range (`pipeline.py`, scene selection in `run:` in `config.yaml`), and two LinkedIn post drafts in `docs/linkedin-posts.md` (local only, excluded via `.git/info/exclude`, never commit). Not done: Dockerfile, deployed static viewer.
 - **Stretch not done:** OS-CFAR / K-distribution (`cfar.variant` has a slot for it).
 - **Milestone 5 (branch `milestone5-thor`):** 5a and 5b done (`thor-smoke`, `thor-scenes/order/download/chips`, `src/iceberg_sar/thor/`). 20 sigma0 training frames, 723 train / 154 val chips, 432 / 78 visible labelled bergs. THOR takes HH/HV natively; frozen features separate bergs and ice strips from water. See `docs/thor-vs-cfar.md`. Local GPU (CUDA) works; no Triton on Windows, so dynamo is disabled.
+  5c done: cached features (blocks 2/5/8/11), linear + CenterNet heads (`thor-features`,
+  `thor-train`, `thor-overlays`, `thor-detect`). Val moved to two year folds (2019 <-> 2020; the
+  Feb-Mar 2019 chips are pack ice, kept as a separate stress set). Linear F1 0.72 / 0.83 on the
+  folds, CenterNet no better (overfits). Final 5d models: linear refit on both years (150 epochs),
+  CenterNet = ensemble of the two fold models. Next: 5d.
 
 ## Milestones
 
@@ -202,7 +207,11 @@ New code lives in `src/iceberg_sar/thor/` (`encoder.py`, `chips.py`, `targets.py
 - Start with THOR Tiny at 8×8 patches. The paper reports Tiny ≈ Base, and 8×8 is close to
   4×4 at a quarter of the tokens. Try 4×4 only if small bergs are being missed.
 - Encoder stays frozen. No fine-tuning of THOR itself.
-- CenterNet head is primary, linear head is the sanity baseline.
+- CenterNet head is primary, linear head is the sanity baseline. (Revised in 5c: linear matched or
+  beat CenterNet on both folds, so linear is the main THOR curve, CenterNet the second.)
+- Head selection on year folds, never on April 2019. Final models train without a val set
+  (linear: fixed-epoch refit; CenterNet: fold ensemble), see `docs/thor-vs-cfar.md`. Nothing is
+  tuned on the 5d test scenes; if something must change after 5d, change it on the folds and say so.
 
 #### Milestone 5 pitfalls
 - Radiometry: gamma0 RTC ≠ sigma0. Use sigma0 products or convert with incidence angle.

@@ -558,6 +558,100 @@ def thor_sheet(
     typer.echo(f"ok  {contact_sheet(index, chips, chips / name, cfg, n=n, title=title)}")
 
 
+@app.command("thor-features")
+def thor_features(
+    device: Annotated[str, typer.Option(help="torch device (cuda or cpu).")] = "cuda",
+    overwrite: Annotated[bool, typer.Option(help="Re-embed chips already cached.")] = False,
+    config: ConfigOption = DEFAULT_CONFIG,
+) -> None:
+    """Milestone 5c: cache frozen THOR features for every chip (<thor dir>/features)."""
+    from iceberg_sar.thor.features import cache_features
+
+    cfg = load_config(config)
+    thor_dir = cfg.root / cfg.section("thor")["training"]["dir"]
+    done, cached = cache_features(thor_dir / "chips", thor_dir / "features", cfg, device,
+                                  overwrite)
+    typer.echo(f"ok  {done} chips embedded, {cached} already cached -> {thor_dir / 'features'}")
+
+
+@app.command("thor-train")
+def thor_train(
+    head: Annotated[str, typer.Option(help="linear or centernet.")] = "linear",
+    fold: Annotated[str, typer.Option(
+        help="A fold from thor.train.folds, 'final' (thor.train.final) or 'all' (both).",
+    )] = "all",
+    device: Annotated[str, typer.Option(help="torch device (cuda or cpu).")] = "cuda",
+    config: ConfigOption = DEFAULT_CONFIG,
+) -> None:
+    """Milestone 5c: train a head on the cached features (data/models/thor/<head>/<fold>).
+
+    Folds early-stop on the other year and write curves + val overlays; 'final' builds the 5d
+    model from both years (a fixed-epoch refit or an ensemble of the folds, per the config).
+    """
+    from iceberg_sar.thor.train import overlay_sheet, train_final, train_head
+
+    cfg = load_config(config)
+    head_dir = cfg.path("models") / "thor" / head
+    folds = list(cfg.section("thor")["train"]["folds"])
+    steps = [*folds, "final"] if fold == "all" else [fold]
+    for step in steps:
+        typer.echo(f"== {head} {step}")
+        if step == "final":
+            outputs = train_final(head, cfg, head_dir, device, log=typer.echo)
+        else:
+            out = head_dir / f"fold_{step}"
+            outputs = train_head(head, cfg, out, device, log=typer.echo, fold=step)
+            outputs["overlays"] = overlay_sheet(out, cfg, out / "val_overlays.png")
+        typer.echo(outputs["summary"].read_text(encoding="utf-8"))
+        for kind, path in outputs.items():
+            typer.echo(f"{kind:<8} {path}")
+
+
+@app.command("thor-overlays")
+def thor_overlays(
+    head: Annotated[str, typer.Option(help="linear or centernet.")] = "linear",
+    fold: Annotated[str, typer.Option(help="Fold whose val chips to show.")] = "a",
+    threshold: Annotated[float | None, typer.Option(help="Peak threshold (default: best F1).")]
+    = None,
+    n: Annotated[int, typer.Option(help="Chips (5 per row).")] = 20,
+    seed: Annotated[int, typer.Option(help="Negative-chip sample.")] = 0,
+    config: ConfigOption = DEFAULT_CONFIG,
+) -> None:
+    """Heatmap overlays of a trained fold head on its val chips (no retraining)."""
+    from iceberg_sar.thor.train import overlay_sheet
+
+    cfg = load_config(config)
+    out = cfg.path("models") / "thor" / head / f"fold_{fold}"
+    name = ("val_overlays.png" if threshold is None and seed == 0
+            else f"val_overlays_t{threshold}_s{seed}.png")
+    typer.echo(f"ok  {overlay_sheet(out, cfg, out / name, n, seed, threshold)}")
+
+
+@app.command("thor-detect")
+def thor_detect(
+    product_dirs: Annotated[list[Path], typer.Argument(help="Preprocessed RTC products.")],
+    head: Annotated[str, typer.Option(help="linear or centernet.")] = "linear",
+    model: Annotated[str, typer.Option(help="final, or fold_<name> for a fold model.")]
+    = "final",
+    device: Annotated[str, typer.Option(help="torch device (cuda or cpu).")] = "cuda",
+    config: ConfigOption = DEFAULT_CONFIG,
+) -> None:
+    """Milestone 5c: THOR detections for whole scenes (CFAR schema + detector, model, score).
+
+    Writes <scene>_thor-<head>[-<model>]_detections.geojson (model omitted for 'final').
+    """
+    from iceberg_sar.thor.infer import detect_scene
+
+    cfg = load_config(config)
+    weights = cfg.path("models") / "thor" / head / model / "head.pt"
+    tag = f"thor-{head}" if model == "final" else f"thor-{head}-{model}"
+    for d in product_dirs:
+        outputs = detect_scene(Path(d), cfg, weights, device, log=typer.echo, tag=tag)
+        typer.echo(outputs["summary"].read_text(encoding="utf-8"))
+        for kind, path in outputs.items():
+            typer.echo(f"{kind:<10} {path}")
+
+
 THOR_JOB_NAME = "iceberg-alley-thor"
 
 

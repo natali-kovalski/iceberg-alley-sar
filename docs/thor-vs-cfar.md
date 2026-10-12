@@ -124,3 +124,143 @@ replaced by the next-ranked ones.
   label. This affects val more than train, and matters for the 5d comparison too.
 - One berg can appear in two adjacent frames of the same pass (both in train); that is the
   same image twice, not leakage across splits.
+
+## 5c: Heads on frozen features
+
+```
+python -m iceberg_sar.cli thor-features                      # cache encoder features (once)
+python -m iceberg_sar.cli thor-train --head linear           # folds a, b, then the final model
+python -m iceberg_sar.cli thor-train --head centernet
+python -m iceberg_sar.cli thor-overlays --head linear --fold a
+python -m iceberg_sar.cli thor-detect <product_dir> --head linear [--model fold_a]
+```
+
+Everything lands in `data/models/thor/<head>/{fold_a,fold_b,final}/` (gitignored): `head.pt`,
+`history.csv`, `curves.png`, `summary.json`, and for folds `val_overlays.png`, `val_pr.csv`.
+
+### Setup
+- **Feature cache:** THOR Tiny blocks 2, 5, 8, 11 (the paper's taps) concatenated, float16:
+  768 × 64 × 64 per chip, 5.4 GB for 856 chips, 10 minutes on the laptop RTX 3070.
+- **Targets:** a Gaussian per visible label on the 64 × 64 token grid (σ = 60 m, peak token = 1).
+  Ignored in the loss: tokens with < 50% sea, and the 3 × 3 tokens around unlabelled CFAR
+  detections and labels on masked pixels.
+- **Heads:** features standardized per channel (train stats, part of the checkpoint), then
+  (1) a 1 × 1 conv (769 parameters) or (2) CenterNet-style 1 × 1 → 3 × 3 → 1 × 1 with GELU and
+  dropout, ending in a sigmoid. Penalty-reduced focal loss (α = 2, β = 4), AdamW, cosine
+  learning-rate schedule.
+- **Val score:** 3 × 3 max-pool peaks on the token grid, matched one-to-one to the labels
+  within 200 m. Peaks on ignored tokens count neither way. Precision is a lower bound: a real berg
+  that neither the analysts nor the CFAR flagged counts as a false alarm.
+
+### The val split had to change
+The 5b val split (Feb-Mar 2019) turned out to measure something else. Those chips are mostly
+**close pack ice**: bright, textured, with leads, and bergs sitting inside the ice. The ice
+detector misses that pack (the open-water reference is itself ice), so the chips look like "sea"
+to the masks. Training is all open water. On that split both heads reached F1 0.2-0.3, and the
+overlays showed why: the model had never seen this background.
+
+Replaced by two **year folds** (`thor.train.folds`):
+
+| Fold | Train | Val |
+|---|---|---|
+| a | 2019 May-Jun (7 frames, 274 chips) | 2020 Apr-May (10 frames, 428 chips, 278 labels) |
+| b | 2020 Apr-May (428 chips) | 2019 May-Jun (274 chips, 213 labels) |
+
+A year apart, so no berg is in both. The Feb-Mar 2019 chips are never trained on and are scored
+as a separate **pack-ice** set. The April 2019 test holdout is not used anywhere in 5c.
+
+### Fold results
+
+| Head | Parameters | Fold | Best epoch | Best F1 (threshold) | Precision | Recall | Pack-ice F1 |
+|---|---|---|---|---|---|---|---|
+| Linear | 769 | a | 159 | **0.72** (0.35) | 0.70 | 0.74 | 0.23 |
+| Linear | 769 | b | 151 | **0.83** (0.30) | 0.83 | 0.83 | 0.35 |
+| CenterNet, hidden 32 | 34 k | a | 13 | 0.70 (0.35) | 0.69 | 0.72 | 0.18 |
+| CenterNet, hidden 32 | 34 k | b | 11 | 0.81 (0.30) | 0.83 | 0.80 | 0.21 |
+| CenterNet, hidden 64 / 256 (one-off sweep) | 0.09-0.8 M | a | 6-13 | 0.66-0.69 | | | |
+
+![Linear head on 2020 val chips (fold a)](img/thor_val_overlays_linear.png)
+
+- **The frozen features are close to linearly separable for open-water bergs.** A 769-parameter
+  linear map matches or beats every CenterNet variant on both folds. Every CenterNet overfits
+  within 15 epochs (train loss keeps falling, val loss turns up), even at 34 k parameters. With
+  ~150 berg chips per year, extra head capacity mostly memorizes. CenterNet does hold higher
+  precision at strict thresholds (≈ 0.93 at recall 0.45 vs ≈ 0.85 for linear, fold a).
+- **More training data helps more than a bigger head:** fold b (428 train chips) reaches F1 0.83,
+  fold a (274) 0.72. The val sets differ too, so this is a hint, not a controlled comparison.
+- **Bergs inside pack ice stay out of reach** (F1 0.2-0.35). The pack-ice edge also scores 0.1-0.4
+  on open-water chips. Keep the CFAR's ice mask for THOR detections.
+- **Misses are mostly rough-sea chips** (2020-05-04) where several labels show no visible target
+  in HH at all.
+
+![CenterNet curves (fold a)](img/thor_curves_centernet.png)
+
+### Final models: training without a val set
+The 5d models should learn from both years (702 chips), and then no val set is left. That is
+fine because of what each data set is for:
+
+- **Val chooses; test measures.** The folds' val sets chose the head, its size, the regularization
+  and how long to train. Those choices are now fixed in `config.yaml`. The number we report is
+  measured in 5d on April 2019, which nothing in 5c has touched. Refitting on all data with a
+  recipe fixed beforehand is standard practice and does not bias that test.
+- **The real risk is the training length.** "Stop at epoch N" was learned on 274 or 428 chips;
+  with 702, one epoch is more update steps, and nothing stops training if it starts to overfit.
+  That risk differs a lot between the two heads, so they get different final models
+  (`thor.train.final`):
+
+| Head | Final model | Why |
+|---|---|---|
+| Linear | **Refit** on all 702 chips for 150 epochs | Best epochs 159 / 151 on the folds, and val loss is flat from ~100 to 180 (curves above). The cosine schedule runs over the 150 epochs, so the learning rate is ~0 at the end and the result doesn't hinge on the exact count. |
+| CenterNet | **Ensemble** of the fold a and b models: mean probability | It peaks at epoch 11-13 and overfits after, so a fixed count that is slightly off would hurt, unseen. Each fold model was early-stopped on its own val year, and together they have seen all 702 chips. Averaging two models usually helps a little too. |
+
+**What can't be measured any more:** a val score for the final models. Each ensemble member has
+seen the other's val year, and the refit has seen both. The only held-out check left in 5c is
+the pack-ice set, out of domain but never trained on. At threshold 0.35 for every model:
+
+| Model | Pack-ice detections | Precision | Recall | F1 |
+|---|---|---|---|---|
+| Linear, fold a / fold b | 60 / 31 | 0.28 / 0.55 | 0.20 / 0.20 | 0.23 / 0.29 |
+| **Linear final (refit)** | 32 | 0.53 | 0.20 | 0.29 |
+| CenterNet, fold a / fold b | 101 / 18 | 0.17 / 0.50 | 0.20 / 0.11 | 0.18 / 0.18 |
+| **CenterNet final (ensemble)** | 38 | 0.45 | 0.20 | 0.28 |
+
+The refit lands at its better fold's level and the ensemble beats both members: no sign that
+either final model went wrong. It is a sanity check, not a score.
+
+**Rules for 5d, so the test stays honest:**
+- Run the final models (`thor-detect --head linear|centernet`, default `--model final`) once on
+  the April 2019 scenes. No tuning of anything on those scenes.
+- No threshold needs choosing: 5d compares recall at matched detection counts and sweeps the score.
+  For the viewer, use the folds' best-F1 threshold (0.30-0.35).
+- If something needs changing after 5d, change it on the folds, re-run `thor-train`, and say in
+  the write-up that the test was looked at.
+
+### Full-scene inference
+`thor-detect` slides 512 px windows with 128 px overlap over the scene. Each scene token comes
+from the window whose centre is nearest, so border bergs are counted once. Peaks are 3 × 3 local
+maxima ≥ `score_min` (0.1). Each peak moves to the brightest HH pixel in its token, then has to
+pass the CFAR's own masked HV raster (land + buffer, pack ice + buffer, AOI). Output (`<tag>` =
+`thor-<head>` for the final model, `thor-<head>-fold_a` etc. otherwise):
+`<scene>_<tag>_detections.geojson` with the CFAR schema plus `detector`, `model`, `score`,
+`token_row/col`, and a token-resolution heatmap GeoTIFF. Blob attributes (area, extent,
+contrast) come from pixels ≥ 4 dB above the window median, connected to the peak.
+
+First scene, 2020-05-05, with the **fold a** linear model (2020 is its val year; 50 visible
+labels), 8.5 min:
+
+| Detector | Detections | Labels matched (≤ 200 m) |
+|---|---|---|
+| CA-CFAR (HV) | 34 | 22 (0.44) |
+| THOR linear, score ≥ 0.35 | 47 | 30 (0.60) |
+| THOR linear, score ≥ 0.2 | 333 | 43 (0.86) |
+
+Counts can differ by a few between runs (GPU floating point); the matches did not. A first sign, not the 5d result. Labels and THOR peaks are both snapped to HH maxima (median
+offset 10 m), while the CFAR reports HV blob centroids. The 200 m radius makes that mostly
+irrelevant, but 5d should check the recall-vs-radius curve.
+
+### Carry into 5d
+- Linear final is the main THOR curve, CenterNet ensemble the second.
+- `score_min: 0.1` writes ~4,000 peaks per scene, enough room for the threshold sweep.
+- Bergs in pack ice: neither detector handles them; report them separately.
+- The CFAR-mask filter on THOR peaks was a no-op on 2020-05-05 (no pack ice in that scene).
+  Check `outside_cfar_mask` in the summary on a scene with ice before trusting it.

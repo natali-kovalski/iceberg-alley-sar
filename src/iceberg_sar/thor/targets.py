@@ -89,3 +89,37 @@ def render_heatmap(
         if 0 <= i < shape[0] and 0 <= j < shape[1]:
             heat[i, j] = 1.0
     return heat
+
+
+def pool_tokens(mask: np.ndarray, patch_px: int) -> np.ndarray:
+    """(H, W) pixel mask -> (H/patch, W/patch) fraction of True pixels per token."""
+    h, w = mask.shape[0] // patch_px, mask.shape[1] // patch_px
+    m = mask[: h * patch_px, : w * patch_px].astype(np.float32)
+    return m.reshape(h, patch_px, w, patch_px).mean(axis=(1, 3))
+
+
+def token_weights(
+    valid: np.ndarray,
+    ignore_rc: np.ndarray,
+    target_rc: np.ndarray,
+    patch_px: int,
+    min_valid: float,
+    ignore_tokens: int,
+) -> np.ndarray:
+    """Per-token loss weight (0/1) for one chip.
+
+    Ignored: tokens with less than `min_valid` sea (land, nodata, outside the AOI), and the
+    (2k+1)^2 tokens around points we can't call water or berg (CFAR detections no analyst
+    labelled, labels on masked pixels). A target's own token is never ignored.
+    """
+    w = (pool_tokens(valid, patch_px) >= min_valid).astype(np.float32)
+    h, wd = w.shape
+    k = ignore_tokens
+    for r, c in ignore_rc:
+        i, j = int(r // patch_px), int(c // patch_px)
+        w[max(0, i - k):min(h, i + k + 1), max(0, j - k):min(wd, j + k + 1)] = 0
+    for r, c in target_rc:
+        i, j = int(r // patch_px), int(c // patch_px)
+        if 0 <= i < h and 0 <= j < wd:
+            w[i, j] = 1
+    return w
