@@ -100,3 +100,21 @@ def test_product_radiometry_from_hyp3_name():
     assert product_radiometry("S1B_IW_20190517T094027_DHP_RTC10_G_spuned_A1B2_HH.tif") == "sigma0"
     with pytest.raises(ValueError):
         product_radiometry("S1A_IW_GRDH_1SDH_20190511T094108")
+
+
+def test_sea_mask_matches_mask_band(product: Path, tmp_path: Path) -> None:
+    from iceberg_sar.preprocess import write_sea_mask
+
+    land_ll = gpd.GeoDataFrame(
+        geometry=[box(X0 - 5000, Y0 - H * PIX, X0 + 30 * PIX, Y0)], crs=CRS
+    ).to_crs("EPSG:4326")
+    band = product / f"{product.name}_HV.tif"
+    with rasterio.open(band) as src:
+        geoms = ocean_geometries(land_ll, src.crs, tuple(src.bounds), buffer_m=100)
+    masked = mask_band(band, tmp_path / "m.tif", geoms, None, block_rows=16)
+    sea_path = write_sea_mask(band, tmp_path / "sea.tif", geoms, None, block_rows=16)
+    with rasterio.open(sea_path) as s, rasterio.open(tmp_path / "m.tif") as m:
+        sea, data = s.read(1), m.read(1)
+    assert sea.dtype == np.uint8
+    np.testing.assert_array_equal(sea == 1, np.isfinite(data))   # same rule as the CFAR input
+    assert sea.mean() == pytest.approx(masked["valid_fraction"])

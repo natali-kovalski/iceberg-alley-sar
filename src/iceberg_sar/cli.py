@@ -522,8 +522,11 @@ def thor_chips(
     with pd.option_context("display.width", 200, "display.max_columns", 20):
         table = summary_table(index)
         typer.echo(table.to_string())
-    table.to_csv(out / "summary.csv")
     typer.echo(f"ok  {contact_sheet(index, out, out / 'contact_sheet.png', cfg, n=sheet)}")
+    try:
+        table.to_csv(out / "summary.csv")
+    except PermissionError:  # e.g. open in Excel, which locks it on Windows
+        typer.echo(f"warning: could not write {out / 'summary.csv'} (is it open?)")
 
 
 THOR_JOB_NAME = "iceberg-alley-thor"

@@ -33,7 +33,12 @@ from shapely.geometry import MultiPoint
 from iceberg_sar.config import Config, metres_to_px
 from iceberg_sar.detections import scene_timestamp
 from iceberg_sar.pointval import load_truth
-from iceberg_sar.preprocess import find_rtc_bands, product_radiometry
+from iceberg_sar.preprocess import (
+    ensure_sea_mask,
+    find_rtc_bands,
+    product_radiometry,
+    sea_mask_path,
+)
 from iceberg_sar.thor.encoder import ThorParams, to_model_input
 from iceberg_sar.thor.targets import TargetParams, snap_points
 
@@ -89,13 +94,55 @@ def scene_split(sar_time: pd.Timestamp, params: ChipParams) -> str:
     return "train"
 
 
+def ensure_core_mask(interim_dir: Path, name: str, buffer_m: float) -> Path:
+    """`<scene>_seaice_core.tif`: the pack-ice mask without its buffer (made once per scene).
+
+    The buffer keeps loose floes away from the CFAR; THOR sees the real pixels, so it learns
+    from where the ice actually is.
+    """
+    from iceberg_sar.seaice import write_core_mask
+
+    core = interim_dir / f"{name}_seaice_core.tif"
+    if not core.is_file():
+        write_core_mask(interim_dir / f"{name}_seaice_mask.tif", buffer_m, core)
+    return core
+
+
+_LAND_CACHE: dict[Path, gpd.GeoDataFrame] = {}
+
+
+def ensure_scene_masks(product_dir: Path, cfg: Config) -> None:
+    """Sea mask and unbuffered ice core for a preprocessed scene (each made once)."""
+    from iceberg_sar.landmask import build_land_mask, load_land
+
+    name = Path(product_dir).name
+    interim = cfg.path("interim") / name
+    if not sea_mask_path(interim, name).is_file():
+        if cfg.root not in _LAND_CACHE:
+            _LAND_CACHE[cfg.root] = load_land(build_land_mask(cfg))
+        ensure_sea_mask(product_dir, _LAND_CACHE[cfg.root], cfg)
+    ensure_core_mask(interim, name, float(cfg.section("seaice")["buffer_m"]))
+
+
+def read_ice(
+    path: Path, bounds: tuple[float, float, float, float], shape: tuple[int, int]
+) -> np.ndarray:
+    """A 0/1 ice mask resampled (nearest) onto a window; outside the mask = no ice."""
+    with rasterio.open(path) as src:
+        return src.read(1, window=src.window(*bounds), out_shape=shape,
+                        resampling=Resampling.nearest, boundless=True,
+                        fill_value=ICE_NODATA) == 1
+
+
 def read_crop(
     product_dir: Path, interim_dir: Path, r0: int, c0: int, params: ThorParams
 ) -> tuple[dict[str, np.ndarray], np.ndarray, np.ndarray, np.ndarray, rasterio.Affine]:
     """Raw linear bands with land set to NaN, incidence (deg), ice and land masks for a crop.
 
-    Bands come from the raw product so pack ice stays visible; "land" is everything the
-    preprocess step masked that is not pack ice (land, outside the AOI, nodata).
+    Bands come from the raw product so pack ice stays visible. "Land" (land and its buffer,
+    outside the AOI, nodata) comes from the scene's sea mask, never from the masked bands:
+    those blank pack ice too, and un-masking "ice" there let coastal land through.
+    The returned ice mask is the unbuffered core (see `ensure_core_mask`).
     """
     name = product_dir.name
     paths = find_rtc_bands(product_dir)
@@ -105,23 +152,22 @@ def read_crop(
     inc = np.where(inc > 0, inc, np.nan)
     inc_deg = np.degrees(inc) if np.nanmax(inc, initial=0) < 2 * np.pi else inc
 
-    with rasterio.open(interim_dir / f"{name}_seaice_mask.tif") as src, \
-            rasterio.open(paths[params.bands[0]]) as ref:
+    with rasterio.open(paths[params.bands[0]]) as ref:
         transform = ref.window_transform(win)
         bounds = rasterio.windows.bounds(win, ref.transform)
-        ice_win = src.window(*bounds)
-        ice = src.read(1, window=ice_win, out_shape=(params.crop_px, params.crop_px),
-                       resampling=Resampling.nearest, boundless=True,
-                       fill_value=ICE_NODATA) == 1
+    shape = (params.crop_px, params.crop_px)
+    core_path = interim_dir / f"{name}_seaice_core.tif"
+    if not core_path.is_file():
+        raise FileNotFoundError(f"{core_path} missing; call ensure_core_mask first")
+    ice = read_ice(core_path, bounds, shape)
 
     bands: dict[str, np.ndarray] = {}
-    sea = np.ones((params.crop_px, params.crop_px), bool)
+    with rasterio.open(sea_mask_path(interim_dir, name)) as src:
+        sea = src.read(1, window=win) == 1
     for b in params.bands:
         with rasterio.open(paths[b]) as src:
             raw = src.read(1, window=win).astype(np.float32)
-        with rasterio.open(interim_dir / f"{name}_{b}_masked.tif") as src:
-            masked = src.read(1, window=win)
-        sea &= np.isfinite(masked) | (ice & (raw > 0))
+        sea &= raw > 0
         bands[b] = raw
     land = ~sea
     for b in bands:
@@ -166,16 +212,17 @@ def scene_labels(
 def coarse_masks(
     product_dir: Path, interim_dir: Path, band: str, factor: int
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Coarse (sea fraction, ice fraction) grids for crop planning, `factor` px per cell."""
+    """Coarse (sea fraction, ice fraction) grids for crop planning, `factor` px per cell.
+
+    Sea comes from the sea mask (pack ice counts as sea); ice uses the unbuffered core.
+    """
     name = product_dir.name
-    with rasterio.open(interim_dir / f"{name}_{band}_masked.tif") as src:
+    with rasterio.open(sea_mask_path(interim_dir, name)) as src:
         shape = (src.height // factor, src.width // factor)
-        valid = np.isfinite(src.read(1, out_shape=shape, resampling=Resampling.nearest))
-        bounds = src.bounds
-    with rasterio.open(interim_dir / f"{name}_seaice_mask.tif") as src:
-        ice = src.read(1, window=src.window(*bounds), out_shape=shape,
-                       resampling=Resampling.nearest, boundless=True, fill_value=ICE_NODATA) == 1
-    return (valid | ice).astype(np.float32), ice.astype(np.float32)
+        sea = src.read(1, out_shape=shape, resampling=Resampling.nearest) == 1
+        bounds = tuple(src.bounds)
+    core = read_ice(interim_dir / f"{name}_seaice_core.tif", bounds, shape)
+    return sea.astype(np.float32), core.astype(np.float32)
 
 
 def crop_fractions(
@@ -280,18 +327,15 @@ def unlabelled_detections(det_rc: np.ndarray, label_rc: np.ndarray, radius_px: f
     return det_rc[d > radius_px]
 
 
-def visible_at(product_dir: Path, interim_dir: Path, band: str, rc: np.ndarray) -> np.ndarray:
+def visible_at(product_dir: Path, interim_dir: Path, rc: np.ndarray) -> np.ndarray:
     """True where a (row, col) is water or pack ice in the preprocessed scene, i.e. not land,
     the land buffer, outside the AOI or nodata. Labels elsewhere can't be seen by the model."""
     name = product_dir.name
     if len(rc) == 0:
         return np.zeros(0, bool)
-    with rasterio.open(interim_dir / f"{name}_{band}_masked.tif") as src, \
-            rasterio.open(interim_dir / f"{name}_seaice_mask.tif") as ice:
+    with rasterio.open(sea_mask_path(interim_dir, name)) as src:
         xy = list(zip(*rasterio.transform.xy(src.transform, rc[:, 0], rc[:, 1]), strict=True))
-        water = np.isfinite([v[0] for v in src.sample(xy)])
-        packed = np.array([v[0] for v in ice.sample(xy)]) == 1
-    return water | packed
+        return np.array([v[0] for v in src.sample(xy)]) == 1
 
 
 def to_local(rc: np.ndarray, r0: int, c0: int, crop_px: int) -> np.ndarray:
@@ -318,9 +362,10 @@ def chip_scene(product_dir: Path, cfg: Config, out_dir: Path) -> pd.DataFrame:
     with rasterio.open(find_rtc_bands(product_dir)[tp.bands[0]]) as src:
         shape, pixel_m = (src.height, src.width), float(src.res[0])
 
+    ensure_scene_masks(product_dir, cfg)
     labels = scene_labels(product_dir, cfg, tgt)
     label_rc = labels[["row", "col"]].to_numpy(np.float64)
-    labels["visible"] = visible_at(product_dir, interim, tp.bands[-1], label_rc)
+    labels["visible"] = visible_at(product_dir, interim, label_rc)
     seen = labels["visible"].to_numpy()
     sea, ice = coarse_masks(product_dir, interim, tp.bands[-1], cp.coarse_factor)
 

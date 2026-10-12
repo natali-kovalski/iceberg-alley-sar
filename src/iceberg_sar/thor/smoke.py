@@ -16,7 +16,7 @@ import rasterio
 
 from iceberg_sar.config import Config
 from iceberg_sar.preprocess import find_rtc_bands, linear_to_db, product_radiometry
-from iceberg_sar.thor.chips import read_crop
+from iceberg_sar.thor.chips import ensure_scene_masks, read_crop
 from iceberg_sar.thor.encoder import (
     ThorParams,
     as_sigma0,
@@ -166,6 +166,7 @@ def run_smoke(product_dir: Path, cfg: Config, center_rc: tuple[int, int] | None 
         r0, c0, crop_info = pick_crop(det_rc_all, ice_coarse, shape, params.crop_px,
                                       tuple(smoke["ice_fraction_range"]))
 
+    ensure_scene_masks(product_dir, cfg)
     bands, inc_deg, ice, land, _ = read_crop(product_dir, interim, r0, c0, params)
     det_rc = det_rc_all - [r0, c0]
     det_rc = det_rc[((det_rc >= 0) & (det_rc < params.crop_px)).all(1)]

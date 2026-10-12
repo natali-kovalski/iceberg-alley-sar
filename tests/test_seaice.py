@@ -99,3 +99,16 @@ def test_distance_to_ice_km_without_ice_is_nan(tmp_path: Path) -> None:
     path = write_mask(np.zeros((5, 5), bool), from_origin(0, 1000, 200, 200), "EPSG:32621",
                       tmp_path / "m.tif")
     assert np.isnan(distance_to_ice_km(path, np.array([100.0]), np.array([900.0]))).all()
+
+
+def test_ice_core_undoes_the_buffer():
+    from scipy import ndimage
+
+    from iceberg_sar.seaice import _disk, ice_core
+
+    core = np.zeros((40, 40), bool)
+    core[10:20, 10:20] = True                     # pack-ice core
+    core[0:6, 30:40] = True                       # core touching the array border
+    buffered = ndimage.binary_dilation(core, structure=_disk(5))
+    np.testing.assert_array_equal(ice_core(buffered, cell_m=200, buffer_m=1000), core)
+    assert not ice_core(np.zeros((5, 5), bool), 200, 1000).any()

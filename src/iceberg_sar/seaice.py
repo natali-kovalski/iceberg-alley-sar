@@ -116,6 +116,31 @@ def detect_ice(
     return ice, water_db
 
 
+def ice_core(mask: np.ndarray, cell_m: float, buffer_m: float) -> np.ndarray:
+    """Undo detect_ice's buffer: erode the buffered mask by the same disk.
+
+    Gives the ice before buffering, except that gaps narrower than ~2 x buffer_m between ice
+    areas stay filled (erosion after dilation is a closing). Cells beyond the array border
+    count as ice so cores touching the scene edge are not eaten away.
+    """
+    r_buf = round(buffer_m / cell_m)
+    if r_buf <= 0 or not mask.any():
+        return mask.copy()
+    return ndimage.binary_erosion(mask, structure=_disk(r_buf), border_value=1)
+
+
+def write_core_mask(mask_path: Path, buffer_m: float, out_path: Path) -> Path:
+    """Unbuffered pack-ice mask next to a buffered one (same grid, 0/1, 255 = nodata)."""
+    with rasterio.open(mask_path) as src:
+        mask = src.read(1) == 1
+        cell_m = abs(src.transform.a)
+        profile = src.profile
+    core = ice_core(mask, cell_m, buffer_m)
+    with rasterio.open(out_path, "w", **profile) as dst:
+        dst.write(core.astype(profile["dtype"]), 1)
+    return out_path
+
+
 def _remove_small(mask: np.ndarray, min_cells: float, connectivity: int = 1) -> np.ndarray:
     """Keep connected components with at least `min_cells` cells."""
     structure = ndimage.generate_binary_structure(2, connectivity)

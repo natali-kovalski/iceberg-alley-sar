@@ -107,6 +107,49 @@ def build_valid_mask(
     return valid
 
 
+def _valid_block(
+    src: rasterio.io.DatasetReader,
+    win: Window,
+    data: np.ndarray,
+    land_geoms: list[BaseGeometry],
+    aoi_geoms: list[BaseGeometry] | None,
+) -> np.ndarray:
+    """Sea pixels of one block: not (buffered) land, inside the AOI, with data."""
+    valid = build_valid_mask(
+        (int(win.height), int(win.width)), src.window_transform(win), land_geoms, aoi_geoms,
+    )
+    valid &= np.isfinite(data) & (data > 0)
+    if src.nodata is not None and not np.isnan(src.nodata):
+        valid &= data != src.nodata
+    return valid
+
+
+def write_sea_mask(
+    src_path: Path,
+    dst_path: Path,
+    land_geoms: list[BaseGeometry],
+    aoi_geoms: list[BaseGeometry] | None,
+    block_rows: int = 1024,
+) -> Path:
+    """uint8 raster, 1 = sea (pack ice included), 0 = land + buffer, outside the AOI, nodata.
+
+    The masked bands blank land and pack ice alike; this keeps them apart, so code that
+    wants to see the ice (THOR) never un-masks land by accident.
+    """
+    dst_path.parent.mkdir(parents=True, exist_ok=True)
+    with rasterio.open(src_path) as src:
+        profile = src.profile.copy()
+        profile.update(dtype="uint8", nodata=None, compress="deflate", tiled=True,
+                       blockxsize=512, blockysize=512, BIGTIFF="IF_SAFER")
+        with rasterio.open(dst_path, "w", **profile) as dst:
+            for row in range(0, src.height, block_rows):
+                win = Window(0, row, src.width, min(block_rows, src.height - row))
+                data = src.read(1, window=win).astype(np.float32)
+                valid = _valid_block(src, win, data, land_geoms, aoi_geoms)
+                dst.write(valid.astype(np.uint8), 1, window=win)
+    return dst_path
+
+
 def mask_band(
     src_path: Path,
     dst_path: Path,
@@ -130,13 +173,7 @@ def mask_band(
             for row in range(0, src.height, block_rows):
                 win = Window(0, row, src.width, min(block_rows, src.height - row))
                 data = src.read(1, window=win).astype(np.float32)
-                valid = build_valid_mask(
-                    (int(win.height), int(win.width)),
-                    src.window_transform(win), land_geoms, aoi_geoms,
-                )
-                valid &= np.isfinite(data) & (data > 0)
-                if src.nodata is not None and not np.isnan(src.nodata):
-                    valid &= data != src.nodata
+                valid = _valid_block(src, win, data, land_geoms, aoi_geoms)
                 data[~valid] = NODATA
                 dst.write(data, 1, window=win)
                 n_total += data.size
@@ -233,6 +270,38 @@ def mask_sea_ice(
     return meta, {"seaice mask": mask_tif, "seaice polys": geojson}
 
 
+def mask_geometries(
+    band_path: Path, land: gpd.GeoDataFrame, cfg: Config
+) -> tuple[list[BaseGeometry], list[BaseGeometry] | None]:
+    """Buffered land and (optionally) AOI geometries in a scene's CRS, as preprocess uses them."""
+    p = cfg.section("preprocess")
+    with rasterio.open(band_path) as src:
+        crs, bounds = src.crs, src.bounds
+    if not crs.is_projected:
+        raise ValueError(f"Expected a projected (metric) CRS, got {crs}")
+    land_geoms = ocean_geometries(land, crs, tuple(bounds), p["land_buffer_m"])
+    aoi_geoms = None
+    if p.get("mask_outside_aoi", True):
+        aoi = gpd.GeoSeries([load_aoi(cfg.path("aoi"))], crs="EPSG:4326").to_crs(crs)
+        aoi_geoms = list(aoi)
+    return land_geoms, aoi_geoms
+
+
+def sea_mask_path(interim: Path, name: str) -> Path:
+    return interim / f"{name}_sea.tif"
+
+
+def ensure_sea_mask(product_dir: Path, land: gpd.GeoDataFrame, cfg: Config) -> Path:
+    """The sea mask for a scene preprocessed before it existed (written by preprocess now)."""
+    name = Path(product_dir).name
+    out = sea_mask_path(cfg.path("interim") / name, name)
+    if not out.is_file():
+        first = next(v for k, v in find_rtc_bands(product_dir).items() if k != "inc")
+        land_geoms, aoi_geoms = mask_geometries(first, land, cfg)
+        write_sea_mask(first, out, land_geoms, aoi_geoms)
+    return out
+
+
 def preprocess_product(product_dir: Path, land: gpd.GeoDataFrame, cfg: Config) -> dict[str, Path]:
     """Mask every polarization in a HyP3 RTC product and write quicklooks + a metadata JSON."""
     p = cfg.section("preprocess")
@@ -245,14 +314,7 @@ def preprocess_product(product_dir: Path, land: gpd.GeoDataFrame, cfg: Config) -
     first = next(v for k, v in bands.items() if k != "inc")
     with rasterio.open(first) as src:
         crs, bounds = src.crs, src.bounds
-    if not crs.is_projected:
-        raise ValueError(f"Expected a projected (metric) CRS, got {crs}")
-
-    land_geoms = ocean_geometries(land, crs, tuple(bounds), p["land_buffer_m"])
-    aoi_geoms = None
-    if p.get("mask_outside_aoi", True):
-        aoi = gpd.GeoSeries([load_aoi(cfg.path("aoi"))], crs="EPSG:4326").to_crs(crs)
-        aoi_geoms = list(aoi)
+    land_geoms, aoi_geoms = mask_geometries(first, land, cfg)
 
     outputs: dict[str, Path] = {}
     meta: dict[str, object] = {
@@ -270,6 +332,7 @@ def preprocess_product(product_dir: Path, land: gpd.GeoDataFrame, cfg: Config) -
         masked[pol] = interim / f"{name}_{pol}_masked.tif"
         meta["bands"][pol] = mask_band(src_path, masked[pol], land_geoms, aoi_geoms)  # type: ignore[index]
         outputs[f"{pol} masked"] = masked[pol]
+    outputs["sea mask"] = write_sea_mask(first, sea_mask_path(interim, name), land_geoms, aoi_geoms)
 
     ice_cfg = cfg.raw.get("seaice", {})
     if ice_cfg.get("enabled", False):

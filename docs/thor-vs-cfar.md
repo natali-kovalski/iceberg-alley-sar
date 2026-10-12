@@ -87,10 +87,25 @@ replaced by the next-ranked ones.
 
 | Split | Frames | Labels | On masked pixels | Visible, in chips | Crops (berg / water / edge / ice edge) |
 |---|---|---|---|---|---|
-| train | 17 | 515 | 75 | 432 | 723 (398 / 198 / 99 / 28) |
+| train | 17 | 515 | 75 | 432 | 713 (398 / 198 / 99 / 18) |
 | val | 3 | 114 | 35 | 78 | 154 (76 / 38 / 20 / 20) |
 
+### Masks in the chips
+- **Validity comes from a separate sea mask** (`<scene>_sea.tif`: 1 = sea incl. pack ice,
+  0 = land + 500 m buffer, outside the AOI, nodata), written by `preprocess` and backfilled for
+  older scenes. The masked bands blank land and pack ice alike. A first version un-masked
+  "anything inside the ice mask" to show the model the ice, and near the coast that let land
+  through (5% of one ice-edge chip was land, 11% land buffer). Fixed; chips re-cut.
+- **The chip `ice` layer is pack ice without the CFAR's 1 km buffer** (`<scene>_seaice_core.tif`,
+  the buffered mask eroded by the same disk). The buffer keeps floes away from the CFAR; THOR
+  sees the real pixels and should learn where the ice actually is. Ice-edge chips are sampled
+  on this core, so they contain real ice (median 12% of the chip), not just buffer water.
+
 ### Caveats
+- **The ice detector may flag coastal water.** On 2020-05-16 it marks a thin band along the
+  coast that looks like open water in HH. With the HV noise floor removed the open-water
+  reference is very low (-36 dB on that scene), so +6 dB is easy to exceed. CFAR-side issue;
+  not fixed here.
 - **The pack-ice mask fails in early-season scenes.** It defines open water from the darkest
   quarter of the scene; when ice covers most of it (Feb-Mar 2019) the reference is ice and the
   pack goes unmasked. The CFAR then fires on floes: 326 of 329 detections on 2019-03-06 have no
