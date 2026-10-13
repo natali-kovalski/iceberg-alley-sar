@@ -329,8 +329,9 @@ def build_czml(scenes: list[Scene], p: ViewerParams, static: gpd.GeoDataFrame | 
         "id": "legend",
         "properties": {
             "near_ice_km": p.near_ice_km,
-            "size_breaks_m": list(p.size_breaks_m),
-            "size_px": list(p.size_px),
+            # CZML reads a bare list as time samples ([t, v, ...] -> v); "array" keeps it a list.
+            "size_breaks_m": {"array": list(p.size_breaks_m)},
+            "size_px": {"array": list(p.size_px)},
         },
     }
     packets: list[dict[str, Any]] = [doc, legend]

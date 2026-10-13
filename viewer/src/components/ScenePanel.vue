@@ -9,9 +9,6 @@ const emit = defineEmits<{ jump: [scene: SceneInfo] }>();
 
 // Ice controls only mean something when the scene on screen has pack ice mapped.
 const hasIce = (s: SceneInfo) => s.iceAreaKm2 > 0;
-// Candidates per 1,000 km² actually observed: comparable between passes of different coverage.
-const density = (s: SceneInfo) =>
-  s.observedKm2 ? ((1000 * s.nOpenWater) / s.observedKm2).toFixed(1) : undefined;
 const hasCoverage = computed(() => props.scenes.some((s) => s.coveragePct !== undefined));
 const sizeClasses = computed(() => {
   const [a, b] = props.legend.sizeBreaksM;
@@ -39,26 +36,12 @@ const currentHasIce = computed(() => {
       <li
         v-for="s in scenes"
         :key="s.id"
-        :class="{ active: s.id === currentId }"
+        :class="{ active: s.id === currentId, compare: s.compare }"
+        :title="s.compare ? 'THOR vs CFAR compared on this pass: click for the recall chart' : undefined"
         @click="emit('jump', s)"
       >
-        <div class="row">
-          <span class="date">{{ s.date }}</span>
-          <span class="sat">{{ s.platform }}<template v-if="s.frames.length > 1"> · {{ s.frames.length }} frames</template></span>
-        </div>
-        <div v-if="s.coveragePct !== undefined" class="coverage" :title="`${s.observedKm2?.toLocaleString()} km² observed`">
-          <div class="bar"><div :style="{ width: `${s.coveragePct}%` }" /></div>
-          <span class="muted">{{ Math.round(s.coveragePct) }}% of AOI</span>
-        </div>
-        <div class="stats">
-          <span><b>{{ s.nOpenWater }}</b> CA-CFAR open water<span v-if="density(s)" class="muted"> · {{ density(s) }} / 1,000 km²</span></span>
-          <span v-if="s.nThor !== undefined"><b>{{ s.nThor }}</b> THOR (open water)</span>
-          <template v-if="hasIce(s)">
-            <span class="muted">{{ s.nNearIce }} near ice</span>
-            <span class="muted">{{ s.iceAreaKm2.toLocaleString() }} km² pack ice</span>
-          </template>
-          <span v-else class="muted">no pack ice</span>
-        </div>
+        <span class="date">{{ s.date }}</span>
+        <span v-if="s.compare" class="badge">THOR vs CFAR</span>
       </li>
     </ul>
 
@@ -121,11 +104,11 @@ h2 { margin: 14px 0 6px; font-size: 12px; text-transform: uppercase; letter-spac
   cursor: pointer;
 }
 .scenes li:hover { background: rgba(255, 255, 255, 0.06); }
+.scenes li.compare { display: flex; justify-content: space-between; align-items: center; border-left: 3px solid rgb(0, 229, 255); }
 .scenes li.active { border-color: #fba238; background: rgba(251, 162, 56, 0.12); }
-.row { display: flex; justify-content: space-between; }
+.badge { font-size: 10px; padding: 1px 6px; border-radius: 8px; color: rgb(0, 229, 255); border: 1px solid rgba(0, 229, 255, 0.6); }
 .date { font-weight: 600; }
-.sat, .muted { color: #8fa3bb; }
-.stats { display: flex; flex-direction: column; margin-top: 2px; }
+.muted { color: #8fa3bb; }
 label { display: block; margin: 4px 0; cursor: pointer; }
 .off { opacity: 0.45; }
 label.off { cursor: default; }
@@ -141,9 +124,6 @@ label.off { cursor: default; }
 .swatch.ice { background: rgba(120, 200, 255, 0.35); border: 1px solid rgb(120, 200, 255); }
 .swatch.footprint { border: 1px solid rgb(255, 210, 60); }
 .swatch.aoi { border: 1px solid #fff; background: rgba(8, 12, 20, 0.6); }
-.coverage { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 11px; }
-.bar { flex: 1; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.12); }
-.bar > div { height: 100%; border-radius: 2px; background: rgb(255, 210, 60); }
 .ring { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 2px solid rgb(0, 229, 255); flex: none; }
 .ring.both { display: inline-flex; align-items: center; justify-content: center; width: 12px; height: 12px; }
 .ring.both .dot { width: 8px; height: 8px; }

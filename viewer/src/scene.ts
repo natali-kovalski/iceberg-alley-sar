@@ -15,6 +15,8 @@ import {
 } from "cesium";
 
 export const CZML_URL = "data/iceberg_alley.czml";
+// Per-scene THOR vs CFAR recall figures, written by `thor-compare` / `czml` (optional).
+export const COMPARE_DIR = "data/compare/";
 
 // Iceberg Alley, Bonavista to St. Anthony and offshore (matches aoi.geojson roughly).
 const HOME = Rectangle.fromDegrees(-57.5, 48.3, -50.5, 52.8);
@@ -41,6 +43,12 @@ export interface SceneInfo {
   nThor?: number; // THOR detections in open water; undefined when THOR wasn't run on the scene
   coveragePct?: number; // share of the AOI the pass observed; undefined without footprints
   observedKm2?: number;
+  compare?: Compare; // THOR vs CFAR head-to-head on this pass (Milestone 5d)
+}
+
+export interface Compare {
+  figureUrl: string;
+  labels: number; // IIP labels compared
 }
 
 export interface Legend {
@@ -159,17 +167,42 @@ export async function loadDetections(viewer: Viewer): Promise<{
     if (f.nThor !== undefined) s.nThor = (s.nThor ?? 0) + f.nThor;
   }
   const scenes = [...byDate.values()];
+  const compare = await loadCompare();
+  for (const s of scenes) s.compare = compare.get(s.date);
   const l = dataSource.entities.getById("legend");
   const legend: Legend = {
     nearIceKm: l ? (prop(l, "near_ice_km") as number) : 5,
-    sizeBreaksM: (l ? (prop(l, "size_breaks_m") as [number, number] | undefined) : undefined) ?? [180, 270],
-    sizePx: (l ? (prop(l, "size_px") as [number, number, number] | undefined) : undefined) ?? [6, 13, 22],
+    sizeBreaksM: arrayProp(l, "size_breaks_m", 2) ?? [180, 270],
+    sizePx: arrayProp(l, "size_px", 3) ?? [6, 13, 22],
     thorScore: frames
       .map((f) => dataSource.entities.getById(`scene/${f.sceneId}`))
       .map((e) => (e ? (prop(e, "thor_score") as number | undefined) : undefined))
       .find((v) => v !== undefined),
   };
   return { dataSource, scenes, legend };
+}
+
+// A list-valued property, or undefined if it isn't one of length n. CZML written as a bare
+// list is read as time samples and comes back as a single number.
+function arrayProp<T extends number[]>(entity: Entity | undefined, name: string, n: number): T | undefined {
+  const v = entity ? prop(entity, name) : undefined;
+  return Array.isArray(v) && v.length === n ? (v as T) : undefined;
+}
+
+async function loadCompare(): Promise<Map<string, Compare>> {
+  try {
+    const res = await fetch(`${COMPARE_DIR}index.json`);
+    if (!res.ok) return new Map();
+    const index = (await res.json()) as Record<string, { figure: string; labels: number }>;
+    return new Map(
+      Object.entries(index).map(([date, c]) => [
+        date,
+        { figureUrl: COMPARE_DIR + c.figure, labels: c.labels },
+      ]),
+    );
+  } catch {
+    return new Map(); // no comparison run: the viewer works without it
+  }
 }
 
 export function applyLayers(dataSource: CzmlDataSource, layers: Layers): void {
