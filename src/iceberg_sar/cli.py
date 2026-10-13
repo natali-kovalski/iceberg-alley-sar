@@ -226,6 +226,10 @@ def czml(
             typer.echo(f"{s['start'][:10]}  {s['scene_id']}  detections={s['n_detections']}  "
                        f"open water={s['n_open_water']}  near ice={s['n_near_ice']}  "
                        f"static removed={s['n_static_removed']}")
+        elif p["id"].startswith("pass/") and "aoi_coverage_pct" in p["properties"]:
+            s = p["properties"]
+            typer.echo(f"{s['date']}  pass: {len(s['frames'].split())} frame(s), "
+                       f"{s['aoi_coverage_pct']:.0f}% of AOI ({s['observed_km2']:,} km²)")
     typer.echo(f"ok  {out}")
 
 

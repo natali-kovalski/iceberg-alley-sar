@@ -17,9 +17,10 @@ export const CZML_URL = "data/iceberg_alley.czml";
 // Iceberg Alley, Bonavista to St. Anthony and offshore (matches aoi.geojson roughly).
 const HOME = Rectangle.fromDegrees(-57.5, 48.3, -50.5, 52.8);
 
+// One satellite pass: the frames acquired seconds apart on one day, shown as one timeline step.
 export interface SceneInfo {
-  id: string;
-  sceneId: string;
+  id: string; // "pass/<date>"
+  frames: string[]; // product names
   platform: string;
   start: JulianDate;
   end: JulianDate;
@@ -29,6 +30,8 @@ export interface SceneInfo {
   nNearIce: number;
   iceAreaKm2: number;
   nThor?: number; // THOR detections in open water; undefined when THOR wasn't run on the scene
+  coveragePct?: number; // share of the AOI the pass observed; undefined without footprints
+  observedKm2?: number;
 }
 
 export interface Legend {
@@ -42,6 +45,7 @@ export interface Layers {
   nearIce: boolean;
   seaIce: boolean;
   footprints: boolean;
+  unobserved: boolean;
   thor: boolean;
 }
 
@@ -93,33 +97,54 @@ export async function loadDetections(viewer: Viewer): Promise<{
   viewer.clockTrackedDataSource = dataSource;
   viewer.timeline.zoomTo(viewer.clock.startTime, viewer.clock.stopTime);
 
-  const scenes = dataSource.entities.values
+  const frames = dataSource.entities.values
     .filter((e) => e.id.startsWith("scene/"))
-    .map((e): SceneInfo => {
-      const start = JulianDate.fromIso8601(prop(e, "start") as string);
-      return {
-        id: e.id,
-        sceneId: prop(e, "scene_id") as string,
-        platform: prop(e, "platform") as string,
-        start,
-        end: JulianDate.fromIso8601(prop(e, "end") as string),
-        date: (prop(e, "start") as string).slice(0, 10),
-        nDetections: prop(e, "n_detections") as number,
-        nOpenWater: prop(e, "n_open_water") as number,
-        // 0 when the scene is ice-free (summer) or no pack-ice mask was built.
-        nNearIce: (prop(e, "n_near_ice") as number | undefined) ?? 0,
-        iceAreaKm2: (prop(e, "ice_area_km2") as number | undefined) ?? 0,
-        nThor: prop(e, "n_thor") as number | undefined,
-      };
-    })
+    .map((e) => ({
+      sceneId: prop(e, "scene_id") as string,
+      platform: prop(e, "platform") as string,
+      start: JulianDate.fromIso8601(prop(e, "start") as string),
+      end: JulianDate.fromIso8601(prop(e, "end") as string),
+      date: (prop(e, "start") as string).slice(0, 10),
+      nDetections: prop(e, "n_detections") as number,
+      nOpenWater: prop(e, "n_open_water") as number,
+      // 0 when the scene is ice-free (summer) or no pack-ice mask was built.
+      nNearIce: (prop(e, "n_near_ice") as number | undefined) ?? 0,
+      iceAreaKm2: (prop(e, "ice_area_km2") as number | undefined) ?? 0,
+      nThor: prop(e, "n_thor") as number | undefined,
+    }))
     .sort((a, b) => JulianDate.compare(a.start, b.start));
+
+  const byDate = new Map<string, SceneInfo>();
+  for (const f of frames) {
+    const s = byDate.get(f.date);
+    if (!s) {
+      const { sceneId, ...first } = f;
+      const pass = dataSource.entities.getById(`pass/${f.date}`);
+      byDate.set(f.date, {
+        ...first,
+        id: `pass/${f.date}`,
+        frames: [sceneId],
+        coveragePct: pass ? (prop(pass, "aoi_coverage_pct") as number | undefined) : undefined,
+        observedKm2: pass ? (prop(pass, "observed_km2") as number | undefined) : undefined,
+      });
+      continue;
+    }
+    s.frames.push(f.sceneId);
+    if (!s.platform.includes(f.platform)) s.platform += `+${f.platform}`;
+    s.nDetections += f.nDetections;
+    s.nOpenWater += f.nOpenWater;
+    s.nNearIce += f.nNearIce;
+    s.iceAreaKm2 += f.iceAreaKm2;
+    if (f.nThor !== undefined) s.nThor = (s.nThor ?? 0) + f.nThor;
+  }
+  const scenes = [...byDate.values()];
   const l = dataSource.entities.getById("legend");
   const legend: Legend = {
     nearIceKm: l ? (prop(l, "near_ice_km") as number) : 5,
     contrastDbMin: l ? (prop(l, "contrast_db_min") as number) : 10,
     contrastDbMax: l ? (prop(l, "contrast_db_max") as number) : 20,
-    thorScore: scenes
-      .map((s) => dataSource.entities.getById(s.id))
+    thorScore: frames
+      .map((f) => dataSource.entities.getById(`scene/${f.sceneId}`))
       .map((e) => (e ? (prop(e, "thor_score") as number | undefined) : undefined))
       .find((v) => v !== undefined),
   };
@@ -133,6 +158,7 @@ export function applyLayers(dataSource: CzmlDataSource, layers: Layers): void {
       e.show = layers.thor && (layers.nearIce || prop(e, "near_ice") !== true);
     else if (e.id.startsWith("seaice/")) e.show = layers.seaIce;
     else if (e.id.startsWith("footprint/")) e.show = layers.footprints;
+    else if (e.id.startsWith("unobserved/")) e.show = layers.unobserved;
   }
 }
 

@@ -8,6 +8,10 @@ spot on several dates, see `static_targets.py`) are left out.
 
 THOR detections (Milestone 5), where a scene has them, are a second layer of `thor/`
 entities: open rings above the score threshold, so the CFAR points stay visible inside them.
+
+One Sentinel-1 frame covers only ~15-40% of the AOI. Frames of one pass (same day) are grouped
+into a `pass/` entity with the AOI share they observe, and the AOI outside them is drawn as an
+`unobserved/` polygon, so an unimaged sea never reads as an empty one.
 """
 
 from __future__ import annotations
@@ -22,6 +26,7 @@ from typing import Any
 import geopandas as gpd
 import numpy as np
 from matplotlib import colormaps
+from shapely import make_valid, union_all
 from shapely.geometry import Polygon
 from shapely.geometry.base import BaseGeometry
 
@@ -32,6 +37,9 @@ NEAR_ICE_RGBA = [150, 150, 150, 200]
 FOOTPRINT_RGBA = [255, 210, 60, 255]
 ICE_RGBA = [120, 200, 255, 90]
 THOR_RGBA = [0, 229, 255, 255]   # cyan ring: off the plasma ramp, readable on dark water
+AOI_RGBA = [255, 255, 255, 220]
+UNOBSERVED_RGBA = [8, 12, 20, 150]  # dims the basemap where no frame of the pass looked
+SEAM_CLOSE_M = 500.0               # closes slivers between frames of one pass
 
 
 @dataclass(frozen=True)
@@ -68,15 +76,38 @@ def _parse(ts: str) -> datetime:
 def scene_intervals(starts: list[datetime], max_days: float) -> list[tuple[datetime, datetime]]:
     """Display interval per scene (`starts` sorted): until the next day's pass, at most `max_days`.
 
-    Frames of one pass (same day) show together; the cap keeps a scene from lingering
+    Frames of one pass (same day, seconds apart) share the pass's first start and end, so
+    jumping to a pass shows all its frames at once. The cap keeps a scene from lingering
     across the months or years between seasons.
     """
     out = []
     for t in starts:
-        cap = t + timedelta(days=max_days)
+        t0 = next(s for s in starts if s.date() == t.date())
+        cap = t0 + timedelta(days=max_days)
         nxt = next((s for s in starts if s.date() > t.date()), None)
-        out.append((t, min(nxt, cap) if nxt else cap))
+        out.append((t0, min(nxt, cap) if nxt else cap))
     return out
+
+
+def pass_coverage(aoi: BaseGeometry, footprints: list[BaseGeometry]
+                  ) -> tuple[BaseGeometry, float, float]:
+    """(AOI part outside all `footprints`, observed km², observed fraction of the AOI).
+
+    All geometries in one metric CRS.
+    """
+    aoi = make_valid(aoi)   # HyP3 footprints can self-touch; overlays then throw
+    union = make_valid(union_all([make_valid(f) for f in footprints]))
+    # Adjacent frames of a pass meet along pixel staircases; close the seam's slivers.
+    union = union.buffer(SEAM_CLOSE_M, join_style="mitre").buffer(-SEAM_CLOSE_M,
+                                                                  join_style="mitre")
+    observed = aoi.intersection(union)
+    return aoi.difference(observed), observed.area / 1e6, observed.area / aoi.area
+
+
+def _footprint(path: Path) -> gpd.GeoDataFrame:
+    """Largest valid-data polygon of a HyP3 `_shape.shp` (the rest are specks), native UTM."""
+    fp = gpd.read_file(path)
+    return fp.iloc[[int(fp.area.argmax())]]
 
 
 def near_ice(distance_km: np.ndarray, threshold_km: float) -> np.ndarray:
@@ -106,9 +137,12 @@ def _ring(coords: Any) -> list[float]:
 
 
 def _polygons(geom: BaseGeometry) -> list[Polygon]:
+    """Polygon parts only: `make_valid` can leave stray lines and points in a collection."""
     if geom.is_empty:
         return []
-    return list(geom.geoms) if hasattr(geom, "geoms") else [geom]  # type: ignore[list-item]
+    if hasattr(geom, "geoms"):
+        return [q for g in geom.geoms for q in _polygons(g)]
+    return [geom] if isinstance(geom, Polygon) else []
 
 
 def _to_wgs84(gdf: gpd.GeoDataFrame, simplify_m: float) -> gpd.GeoDataFrame:
@@ -238,8 +272,10 @@ def polygon_packets(geom: BaseGeometry, id_prefix: str, availability: str,
             polygon["material"] = {"solidColor": {"color": {"rgba": fill_rgba}}}
         if poly.interiors:
             polygon["holes"] = {"cartographicDegrees": [_ring(r.coords) for r in poly.interiors]}
-        packets.append({"id": f"{id_prefix}/{i}", "availability": availability,
-                        "polygon": polygon})
+        packet: dict[str, Any] = {"id": f"{id_prefix}/{i}", "polygon": polygon}
+        if availability:   # "" = always shown
+            packet["availability"] = availability
+        packets.append(packet)
     return packets
 
 
@@ -270,7 +306,8 @@ def find_scenes(cfg: Config, band: str, start: date | None = None,
 
 
 def build_czml(scenes: list[Scene], p: ViewerParams, static: gpd.GeoDataFrame | None = None,
-               sp: StaticParams | None = None) -> list[dict[str, Any]]:
+               sp: StaticParams | None = None, aoi: gpd.GeoDataFrame | None = None
+               ) -> list[dict[str, Any]]:
     if not scenes:
         raise ValueError("No scenes with detections; run `detect` first")
     intervals = scene_intervals([s.start for s in scenes], p.last_interval_days)
@@ -296,6 +333,11 @@ def build_czml(scenes: list[Scene], p: ViewerParams, static: gpd.GeoDataFrame | 
         },
     }
     packets: list[dict[str, Any]] = [doc, legend]
+    metric = aoi.estimate_utm_crs() if aoi is not None else None
+    if aoi is not None:   # no availability: the frame of reference stays put on every date
+        packets += polygon_packets(_to_wgs84(aoi, p.simplify_m).union_all(), "aoi", "", None,
+                                   AOI_RGBA)
+    passes: dict[date, dict[str, Any]] = {}
     for i, (scene, (start, end)) in enumerate(zip(scenes, intervals, strict=True)):
         # CZML intervals include their end; stop 1 s early so two scenes never show at once.
         shown_until = end - timedelta(seconds=1) if i < len(scenes) - 1 else end
@@ -337,17 +379,37 @@ def build_czml(scenes: list[Scene], p: ViewerParams, static: gpd.GeoDataFrame | 
                     "thor_score": p.thor_score} if scene.thor else {}),
             },
         })
+        pas = passes.setdefault(scene.start.date(), {"start": start, "until": shown_until,
+                                                     "frames": [], "footprints": []})
+        pas["frames"].append(scene.name)
         if scene.footprint:
-            fp = gpd.read_file(scene.footprint)   # HyP3 shape: valid-data polygons, UTM
-            fp = _to_wgs84(fp.iloc[[int(fp.area.argmax())]], p.simplify_m)
-            packets += polygon_packets(fp.geometry.iloc[0], f"footprint/{scene.name}", avail, None,
-                                       FOOTPRINT_RGBA)
+            fp = _footprint(scene.footprint)
+            if metric is not None:
+                # Simplified: raw HyP3 outlines are pixel staircases, slow to buffer.
+                pas["footprints"].append(fp.to_crs(metric).geometry.iloc[0]
+                                         .simplify(p.simplify_m))
+            packets += polygon_packets(_to_wgs84(fp, p.simplify_m).geometry.iloc[0],
+                                       f"footprint/{scene.name}", avail, None, FOOTPRINT_RGBA)
         if scene.seaice:
             ice_geom = _to_wgs84(gpd.read_file(scene.seaice), p.simplify_m).union_all()
             packets += polygon_packets(ice_geom, f"seaice/{scene.name}", avail, ICE_RGBA,
                                        ICE_RGBA[:3] + [200])
         packets += detection_packets(gdf, avail, p)
         packets += thor_packets(thor, avail, p)
+    for day, pas in passes.items():
+        avail = f"{_iso(pas['start'])}/{_iso(pas['until'])}"
+        props: dict[str, Any] = {"date": day.isoformat(), "frames": " ".join(pas["frames"])}
+        # Coverage only when every frame has a footprint; a missing one would read as unobserved.
+        if aoi is not None and len(pas["footprints"]) == len(pas["frames"]):
+            gap, km2, frac = pass_coverage(aoi.to_crs(metric).union_all(), pas["footprints"])
+            props |= {"observed_km2": round(km2), "aoi_coverage_pct": round(100 * frac, 1)}
+            gap_wgs = _to_wgs84(gpd.GeoDataFrame(geometry=[gap], crs=metric), p.simplify_m)
+            # simplify can leave the gap invalid
+            packets += polygon_packets(make_valid(gap_wgs.geometry.iloc[0]),
+                                       f"unobserved/{day}", avail, UNOBSERVED_RGBA,
+                                       UNOBSERVED_RGBA[:3] + [0])
+        packets.append({"id": f"pass/{day}", "name": f"Pass {day}", "availability": avail,
+                        "properties": props})
     return packets
 
 
@@ -382,7 +444,9 @@ def export_czml(cfg: Config, band: str = "HV", start: date | None = None,
                 end: date | None = None) -> tuple[Path, list[dict[str, Any]]]:
     static, sp = build_static(cfg, band)
     p = viewer_params(cfg)
-    packets = build_czml(find_scenes(cfg, band, start, end, p.thor_model), p, static, sp)
+    aoi_path = cfg.path("aoi") if "aoi" in cfg.section("paths") else None
+    aoi = gpd.read_file(aoi_path) if aoi_path and aoi_path.is_file() else None
+    packets = build_czml(find_scenes(cfg, band, start, end, p.thor_model), p, static, sp, aoi)
     out = cfg.path("czml")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(packets, separators=(",", ":")), encoding="utf-8")
