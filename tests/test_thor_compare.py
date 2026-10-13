@@ -8,27 +8,20 @@ from iceberg_sar.thor.compare import (
     label_bins,
     open_water,
     pfa_label,
+    pooled,
     score_points,
     shared_drift,
-    thor_thresholds,
-    threshold_for_count,
 )
 
 
-def test_thor_thresholds_log_spaced_counts() -> None:
-    scores = np.linspace(0.1, 0.99, 1000)
-    t = thor_thresholds(scores, n_max=10)
-    counts = [(scores >= x).sum() for x in t]
-    assert counts[0] == 1 and counts[-1] == 1000
-    assert counts == sorted(counts)
-    assert len(t) <= 10
-
-
-def test_threshold_for_count_keeps_n_best() -> None:
-    scores = np.array([0.9, 0.2, 0.5, 0.7, 0.3])
-    assert (scores >= threshold_for_count(scores, 3)).sum() == 3
-    assert (scores >= threshold_for_count(scores, 99)).sum() == 5
-    assert threshold_for_count(np.empty(0), 3) == np.inf
+def test_pooled_sums_counts_and_recomputes_recall() -> None:
+    sweep = pd.DataFrame({"scene": ["a", "a", "b", "b"], "detector": ["cfar", "thor"] * 2,
+                          "setting": [1e-6, 0.5] * 2, "detections": [10, 12, 30, 28],
+                          "matched": [5, 8, 20, 24], "truth": [10, 10, 40, 40]})
+    out = pooled(sweep, ["detector", "setting"], ["detections", "matched", "truth"], "truth")
+    cfar = out[out["detector"] == "cfar"].iloc[0]
+    assert (cfar["detections"], cfar["matched"], cfar["truth"]) == (40, 25, 50)
+    assert cfar["recall"] == 0.5 and (out["scene"] == "all scored scenes").all()
 
 
 def test_open_water_drops_near_ice_keeps_nan() -> None:

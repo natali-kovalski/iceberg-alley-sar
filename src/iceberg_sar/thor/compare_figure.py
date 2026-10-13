@@ -23,11 +23,20 @@ STYLE = {
 
 
 def recall_figure(sweep: pd.DataFrame, p, meta: dict, png: Path) -> Path:
-    """One panel per scene; x = detections in open water (log), y = labels matched."""
+    """One panel per scene (pooled first, if present); x = detections in open water (log),
+    y = recall."""
+    from iceberg_sar.thor.compare import POOLED
+
     scenes = list(dict.fromkeys(sweep["scene"]))
-    fig, axes = plt.subplots(1, len(scenes), figsize=(6.2 * len(scenes), 4.8), squeeze=False,
-                             facecolor=SURFACE)
-    for ax, name in zip(axes[0], scenes, strict=True):
+    if POOLED in scenes:
+        scenes = [POOLED] + [s for s in scenes if s != POOLED]
+    ncols = min(3, len(scenes))
+    nrows = -(-len(scenes) // ncols)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(6.2 * ncols, 4.8 * nrows + 0.4),
+                             squeeze=False, facecolor=SURFACE)
+    for ax in axes.flat[len(scenes):]:
+        ax.set_visible(False)
+    for ax, name in zip(axes.flat, scenes, strict=False):
         s = sweep[sweep["scene"] == name]
         ax.set_facecolor(SURFACE)
         for det, g in s.groupby("detector", sort=False):
@@ -54,15 +63,22 @@ def recall_figure(sweep: pd.DataFrame, p, meta: dict, png: Path) -> Path:
         ax.annotate("ideal: every detection\nis a label", (n_truth * 0.42, 0.42),
                     fontsize=7, color=TEXT_2, ha="right")
         m = meta[name]
-        when = name.split("_")[2][:8]
-        title = f"{when[:4]}-{when[4:6]}-{when[6:]}: {m['labels_compared']} IIP labels"
-        title += " (same pass)" if m["truth"] == "iip-satellite" else \
-            f" ({m['truth']}, drift {'applied' if m['drift']['applied'] else 'unresolved'})"
-        ax.set_title(title, loc="left", fontsize=10, color=TEXT)
+        if name == POOLED:
+            title = (f"All {len(m['scenes'])} scored frames: {m['labels_compared']} IIP labels "
+                     "(pooled)")
+        else:
+            when = name.split("_")[2]
+            title = (f"{when[:4]}-{when[4:6]}-{when[6:8]} {name[:3]} {when[9:15]}: "
+                     f"{m['labels_compared']} IIP labels")
+            title += " (same pass)" if m["truth"] == "iip-satellite" else \
+                f" ({m['truth']}, drift {'applied' if m['drift']['applied'] else 'unresolved'})"
+        ax.set_title(title, loc="left", fontsize=10, color=TEXT,
+                     fontweight="bold" if name == POOLED else "normal")
         ax.set_xscale("log")
-        ax.set_xlim(30, max(3000, s["detections"].max() * 1.2))
+        ax.set_xlim(10, max(3000, s["detections"].max() * 1.2))
         ax.set_ylim(0, 1)
-        ax.set_xlabel("Detections in open water per scene", color=TEXT_2)
+        ax.set_xlabel("Detections in open water" + (", summed over frames" if name == POOLED
+                                                     else " per frame"), color=TEXT_2)
         ax.set_ylabel(f"Recall (match ≤ {meta['radius_m']:.0f} m)", color=TEXT_2)
         ax.grid(True, which="major", color=GRID, lw=0.8)
         for side in ("top", "right"):
@@ -76,7 +92,7 @@ def recall_figure(sweep: pd.DataFrame, p, meta: dict, png: Path) -> Path:
              "with their PFA. Detections within "
              f"{meta['near_ice_km']:g} km of pack ice are dropped for both.",
              fontsize=7.5, color=TEXT_2)
-    fig.tight_layout(rect=(0, 0.06, 1, 1))
+    fig.tight_layout(rect=(0, 0.4 / fig.get_figheight(), 1, 1))
     png.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(png, dpi=150, facecolor=SURFACE)
     plt.close(fig)

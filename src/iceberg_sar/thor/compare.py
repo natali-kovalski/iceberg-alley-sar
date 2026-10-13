@@ -125,20 +125,9 @@ def score_points(
     return m.true_positives, hit
 
 
-def thor_thresholds(scores: np.ndarray, n_max: int = 60) -> np.ndarray:
-    """Score thresholds spaced evenly in log(detection count), so the curve is dense where the
-    CFAR points are (tens to thousands of detections)."""
-    s = np.sort(scores)[::-1]
-    if not len(s):
-        return np.empty(0)
-    counts = np.unique(np.geomspace(1, len(s), n_max).round().astype(int))
-    return s[counts - 1]
-
-
-def threshold_for_count(scores: np.ndarray, n: int) -> float:
-    """The THOR threshold that keeps the `n` best-scoring detections (ties may add a few)."""
-    s = np.sort(scores)[::-1]
-    return float(s[min(max(n, 1), len(s)) - 1]) if len(s) else np.inf
+# THOR thresholds of the sweep: one grid for every scene, so operating points can be pooled
+# (detections and matches summed per threshold). Starts at infer.score_min.
+SCORE_GRID = np.round(np.arange(0.10, 1.0, 0.01), 2)
 
 
 @dataclass
@@ -209,7 +198,7 @@ def sweep_table(s: SceneData, radius_m: float) -> pd.DataFrame:
         rows.append({"detector": CFAR, "setting": pfa, "detections": len(det), "matched": tp})
     for tag, det in s.thor.items():
         d_xy, scores = xy(det, s.crs), det["score"].to_numpy()
-        for t in thor_thresholds(scores):
+        for t in SCORE_GRID:
             keep = scores >= t
             tp, _ = score_points(d_xy[keep], s.truth_xy, radius_m)
             rows.append({"detector": tag, "setting": float(t), "detections": int(keep.sum()),
@@ -222,16 +211,22 @@ def sweep_table(s: SceneData, radius_m: float) -> pd.DataFrame:
     return out
 
 
-def operating_points(s: SceneData, p: CompareParams) -> dict[str, gpd.GeoDataFrame]:
-    """Detections at matched counts: the CFAR at its configured PFA, and each THOR model at
-    the threshold giving the same number of detections. Plus THOR at `view_score`."""
+def operating_points(
+    s: SceneData, p: CompareParams,
+) -> list[tuple[str, str, gpd.GeoDataFrame]]:
+    """(op, label, detections): the CFAR at its configured PFA, each THOR model at the
+    threshold giving the same number of detections in this scene, and THOR at `view_score`.
+    `op` is the same in every scene (for pooling); `label` names this scene's threshold."""
     base = s.cfar[p.cfar_pfa]
-    out = {f"{CFAR} (pfa {p.cfar_pfa:g})": base}
+    out = [(CFAR, f"{CFAR} (pfa {p.cfar_pfa:g})", base)]
     for tag, det in s.thor.items():
-        t = threshold_for_count(det["score"].to_numpy(), len(base))
-        out[f"{tag} (n-matched, score >= {t:.2f})"] = det[det["score"] >= t]
+        # Exactly the CFAR's count: the top-n peaks (a score threshold would keep ties).
+        top = det.sort_values("score", ascending=False, kind="stable").head(len(base))
+        t = float(top["score"].min()) if len(top) else np.inf
+        out.append((f"{tag} matched-count", f"{tag} (n-matched, score >= {t:.2f})", top))
     for tag, det in s.thor.items():
-        out[f"{tag} (score >= {p.view_score:g})"] = det[det["score"] >= p.view_score]
+        out.append((f"{tag} view", f"{tag} (score >= {p.view_score:g})",
+                    det[det["score"] >= p.view_score]))
     return out
 
 
@@ -262,13 +257,13 @@ def breakdown(s: SceneData, p: CompareParams, radius_m: float) -> pd.DataFrame:
     """Recall per label bin at each operating point (long format)."""
     bins = label_bins(s.truth, p)
     rows = []
-    for op, det in operating_points(s, p).items():
+    for op, label, det in operating_points(s, p):
         _, hit = score_points(xy(det, s.crs), s.truth_xy, radius_m)
         for by in bins.columns:
             g = pd.DataFrame({"bin": bins[by], "hit": hit}).groupby("bin")["hit"]
             for b, n, k in zip(g.size().index, g.size(), g.sum(), strict=True):
-                rows.append({"scene": s.name, "operating_point": op, "by": by, "bin": b,
-                             "labels": int(n), "matched": int(k)})
+                rows.append({"scene": s.name, "op": op, "operating_point": label, "by": by,
+                             "bin": b, "labels": int(n), "matched": int(k)})
     out = pd.DataFrame(rows)
     out["recall"] = (out["matched"] / out["labels"]).round(3)
     return out
@@ -278,7 +273,7 @@ def detection_breakdown(s: SceneData, p: CompareParams, radius_m: float) -> pd.D
     """Detections per incidence bin at each operating point, split into matched / unmatched
     (unmatched = unlabelled berg, ship or clutter; a clutter proxy, not a false-alarm count)."""
     rows = []
-    for op, det in operating_points(s, p).items():
+    for op, label, det in operating_points(s, p):
         m = match_points(xy(det, s.crs), s.truth_xy, radius_m)
         matched = np.zeros(len(det), bool)
         matched[m.pairs[:, 0]] = True
@@ -286,22 +281,35 @@ def detection_breakdown(s: SceneData, p: CompareParams, radius_m: float) -> pd.D
                      labels=_bin_labels(p.incidence_bins_deg, "°")).astype(str)
         g = pd.DataFrame({"bin": inc, "matched": matched}).groupby("bin")["matched"]
         for b, n, k in zip(g.size().index, g.size(), g.sum(), strict=True):
-            rows.append({"scene": s.name, "operating_point": op, "incidence_deg": b,
-                         "detections": int(n), "matched": int(k), "unmatched": int(n - k)})
+            rows.append({"scene": s.name, "op": op, "operating_point": label,
+                         "incidence_deg": b, "detections": int(n), "matched": int(k),
+                         "unmatched": int(n - k)})
     return pd.DataFrame(rows)
 
 
 def radius_table(s: SceneData, p: CompareParams) -> pd.DataFrame:
     """Recall vs. matching radius at the matched-count operating points."""
     rows = []
-    for op, det in operating_points(s, p).items():
+    for op, label, det in operating_points(s, p):
         d_xy = xy(det, s.crs)
         for r in p.radii_m:
             tp, _ = score_points(d_xy, s.truth_xy, r)
-            rows.append({"scene": s.name, "operating_point": op, "radius_m": r,
-                         "detections": len(det), "matched": tp,
-                         "recall": round(tp / len(s.truth_xy), 3) if len(s.truth_xy) else np.nan})
-    return pd.DataFrame(rows)
+            rows.append({"scene": s.name, "op": op, "operating_point": label, "radius_m": r,
+                         "detections": len(det), "matched": tp, "labels": len(s.truth_xy)})
+    out = pd.DataFrame(rows)
+    out["recall"] = (out["matched"] / out["labels"]).round(3)
+    return out
+
+
+POOLED = "all scored scenes"
+
+
+def pooled(table: pd.DataFrame, keys: list[str], counts: list[str], total: str) -> pd.DataFrame:
+    """Sum `counts` over scenes per `keys`; recall = matched / `total` (summed too)."""
+    out = table.groupby(keys, as_index=False, sort=False)[counts].sum()
+    out["recall"] = (out["matched"] / out[total]).round(3)
+    out.insert(0, "scene", POOLED)
+    return out
 
 
 def run_compare(cfg: Config, log=print) -> dict[str, Path]:
@@ -336,17 +344,36 @@ def run_compare(cfg: Config, log=print) -> dict[str, Path]:
         bd.append(breakdown(s, p, radius))
         dbd.append(detection_breakdown(s, p, radius))
         rad.append(radius_table(s, p))
+    tables = {key: pd.concat(frames, ignore_index=True) for key, frames in
+              [("sweep", sweeps), ("breakdown", bd), ("detections_by_incidence", dbd),
+               ("radius", rad)]}
+    # Pooled over the scored scenes: per-scene operating points summed (the matched-count
+    # points keep their per-scene match, so the pooled counts are equal too).
+    if len(sweeps) > 1:
+        t = tables
+        t["sweep"] = pd.concat([t["sweep"], pooled(
+            t["sweep"], ["detector", "setting"], ["detections", "matched", "truth"], "truth")],
+            ignore_index=True)
+        t["breakdown"] = pd.concat([t["breakdown"], pooled(
+            t["breakdown"], ["op", "by", "bin"], ["labels", "matched"], "labels")],
+            ignore_index=True)
+        t["radius"] = pd.concat([t["radius"], pooled(
+            t["radius"], ["op", "radius_m"], ["detections", "matched", "labels"], "labels")],
+            ignore_index=True)
     out = {}
-    for key, frames in [("sweep", sweeps), ("breakdown", bd), ("detections_by_incidence", dbd),
-                        ("radius", rad)]:
+    for key, table in tables.items():
         path = p.out_dir / f"{key}.csv"
-        pd.concat(frames, ignore_index=True).to_csv(path, index=False)
+        table.to_csv(path, index=False)
         out[key] = path
+    scored = [n for n in p.scenes if meta[n].get("scored")]
+    if len(scored) > 1:
+        meta[POOLED] = {"truth": "iip-satellite", "scenes": scored,
+                        "labels_compared": sum(meta[n]["labels_compared"] for n in scored)}
     meta.update({"radius_m": radius, "near_ice_km": p.near_ice_km, "cfar_pfa": p.cfar_pfa,
                  "view_score": p.view_score})
     (p.out_dir / "summary.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     out["summary"] = p.out_dir / "summary.json"
-    sweep = pd.concat(sweeps, ignore_index=True)
+    sweep = tables["sweep"]
     img = cfg.root / cfg.section("figures")["out_dir"] / "thor_vs_cfar_recall.png"
     out["figure"] = recall_figure(sweep, p, meta, img)
     return out

@@ -252,6 +252,11 @@ thor:
     scenes:                 # product -> IIP truth (pointval.load_truth)
       S1A_IW_20190429T094108_DHP_RTC10_G_gpuned_671B: iip-satellite   # primary: same-pass analyst labels
       S1A_IW_20190415T095705_DHP_RTC10_G_gpuned_59A9: iip-aircraft    # secondary: ship/air 5.6 h later
+      # Added after the first 5d run: more held-out frames with same-pass labels. HyP3 rejected the
+      # richer open-ocean frames (no DEM coverage); these are the next ones it accepted.
+      S1B_IW_20190423T094026_DHP_RTC10_G_gpuned_A784: iip-satellite
+      S1A_IW_20190424T093305_DHP_RTC10_G_gpuned_132E: iip-satellite
+      S1A_IW_20190417T094107_DHP_RTC10_G_gpuned_EDB4: iip-satellite
     cfar_pfas: [1.0e-3, 1.0e-4, 1.0e-5, 1.0e-6, 1.0e-7, 1.0e-8, 1.0e-10, 1.0e-12]
     thor_models: [thor-linear, thor-centernet]   # detection tags from `thor-detect` (final models)
     view_score: 0.35        # folds' best-F1 threshold: THOR operating point for the viewer
