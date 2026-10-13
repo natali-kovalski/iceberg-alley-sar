@@ -1,12 +1,14 @@
 // Cesium side of the viewer: globe, CZML loading, layer toggles, scene lookup by time.
 // Kept out of Vue reactivity on purpose: Cesium objects must not be wrapped in proxies.
 import {
+  ArcGISTiledElevationTerrainProvider,
   CzmlDataSource,
   Credit,
   ImageryLayer,
   Ion,
   JulianDate,
   Rectangle,
+  Terrain,
   UrlTemplateImageryProvider,
   Viewer,
   type Entity,
@@ -16,6 +18,13 @@ export const CZML_URL = "data/iceberg_alley.czml";
 
 // Iceberg Alley, Bonavista to St. Anthony and offshore (matches aoi.geojson roughly).
 const HOME = Rectangle.fromDegrees(-57.5, 48.3, -50.5, 52.8);
+
+// NL relief is modest (Long Range Mountains ~800 m), so a little exaggeration helps the 3D feel.
+// Detections sit at sea level, where exaggeration changes nothing.
+const TERRAIN_EXAGGERATION = 2.0;
+
+const ESRI_ELEVATION_URL =
+  "https://elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer";
 
 // One satellite pass: the frames acquired seconds apart on one day, shown as one timeline step.
 export interface SceneInfo {
@@ -36,8 +45,8 @@ export interface SceneInfo {
 
 export interface Legend {
   nearIceKm: number;
-  contrastDbMin: number;
-  contrastDbMax: number;
+  sizeBreaksM: [number, number]; // structure_m breaks small | medium | large (CFAR and THOR alike)
+  sizePx: [number, number, number];
   thorScore?: number;
 }
 
@@ -59,12 +68,20 @@ function esriImagery(): ImageryLayer {
   );
 }
 
+// Cesium World Terrain with an ion token; otherwise Esri's World Elevation, which needs no key.
+function worldTerrain(hasIonToken: boolean): Terrain {
+  return hasIonToken
+    ? Terrain.fromWorldTerrain()
+    : new Terrain(ArcGISTiledElevationTerrainProvider.fromUrl(ESRI_ELEVATION_URL));
+}
+
 export function createViewer(container: HTMLElement): Viewer {
   const token = import.meta.env.VITE_CESIUM_ION_TOKEN;
   if (token) Ion.defaultAccessToken = token;
 
   const viewer = new Viewer(container, {
     baseLayer: esriImagery(),
+    terrain: worldTerrain(Boolean(token)),
     baseLayerPicker: false,
     geocoder: false,
     navigationHelpButton: false,
@@ -75,6 +92,10 @@ export function createViewer(container: HTMLElement): Viewer {
     infoBox: true,
     selectionIndicator: true,
   });
+  viewer.scene.verticalExaggeration = TERRAIN_EXAGGERATION;
+  // Detections and polygons are at height 0 (ellipsoid); draw them over the terrain instead
+  // of letting coastal relief hide them. At sea the terrain is within ~20 m of the ellipsoid.
+  viewer.scene.globe.depthTestAgainstTerrain = false;
   viewer.camera.setView({ destination: HOME });
   viewer.homeButton.viewModel.command.beforeExecute.addEventListener((e) => {
     e.cancel = true;
@@ -141,8 +162,8 @@ export async function loadDetections(viewer: Viewer): Promise<{
   const l = dataSource.entities.getById("legend");
   const legend: Legend = {
     nearIceKm: l ? (prop(l, "near_ice_km") as number) : 5,
-    contrastDbMin: l ? (prop(l, "contrast_db_min") as number) : 10,
-    contrastDbMax: l ? (prop(l, "contrast_db_max") as number) : 20,
+    sizeBreaksM: (l ? (prop(l, "size_breaks_m") as [number, number] | undefined) : undefined) ?? [180, 270],
+    sizePx: (l ? (prop(l, "size_px") as [number, number, number] | undefined) : undefined) ?? [6, 13, 22],
     thorScore: frames
       .map((f) => dataSource.entities.getById(`scene/${f.sceneId}`))
       .map((e) => (e ? (prop(e, "thor_score") as number | undefined) : undefined))

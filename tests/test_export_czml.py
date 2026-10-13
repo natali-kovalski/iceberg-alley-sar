@@ -119,9 +119,10 @@ def test_find_scenes_date_range_is_inclusive(cfg: Config) -> None:
 
 def test_point_size_grows_with_structure() -> None:
     p = ViewerParams()
-    assert point_px(0, p) == p.point_px_range[0]
-    assert point_px(1e6, p) == p.point_px_range[1]
-    assert point_px(60, p) < point_px(240, p)
+    small, medium, large = p.size_px
+    assert point_px(0, p) == point_px(179, p) == point_px(float("nan"), p) == small
+    assert point_px(180, p) == point_px(269, p) == medium
+    assert point_px(270, p) == point_px(1e6, p) == large
 
 
 def test_find_scenes_sorted_with_optional_layers(cfg: Config) -> None:
@@ -194,6 +195,10 @@ def test_thor_layer_threshold_and_counts(cfg: Config) -> None:
     assert rings[1]["properties"]["score"] == 0.5
     by_id = {p["id"]: p for p in packets}
     assert by_id[f"scene/{name}"]["properties"]["n_thor"] == 1     # open water only
+    # Same size scale for both detectors: a THOR ring just encloses the CFAR dot of equal extent.
+    dot = next(p for p in packets if p["id"] == f"det/{thor['id'].iloc[1][1:]}")
+    assert dot["point"]["color"]["rgba"][:3] == [251, 162, 56]
+    assert rings[1]["point"]["pixelSize"] == dot["point"]["pixelSize"] + 4
     assert "n_thor" not in by_id[f"scene/{next(reversed(SCENES))}"]["properties"]
 
 

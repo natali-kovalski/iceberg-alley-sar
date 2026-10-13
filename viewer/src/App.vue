@@ -16,7 +16,7 @@ import {
 const container = ref<HTMLDivElement>();
 const scenes = shallowRef<SceneInfo[]>([]);
 const currentId = ref<string>();
-const legend = ref<Legend>({ nearIceKm: 5, contrastDbMin: 10, contrastDbMax: 20 });
+const legend = ref<Legend>({ nearIceKm: 5, sizeBreaksM: [180, 270], sizePx: [6, 13, 22] });
 const error = ref<string>();
 const layers = reactive<Layers>({ nearIce: true, seaIce: true, footprints: true, unobserved: true, thor: true });
 

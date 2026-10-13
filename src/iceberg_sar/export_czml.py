@@ -7,7 +7,10 @@ the viewer greys out or hides instead of deleting them. Static targets (seen at 
 spot on several dates, see `static_targets.py`) are left out.
 
 THOR detections (Milestone 5), where a scene has them, are a second layer of `thor/`
-entities: open rings above the score threshold, so the CFAR points stay visible inside them.
+entities: open rings above the score threshold. Both detectors are drawn on one footing: one
+colour per detector, size from the grown target extent (`structure_m`, measured the same way
+for both). A THOR ring is drawn just outside a CFAR dot of the same extent, so a berg both
+detectors found reads as a dot inside a ring.
 
 One Sentinel-1 frame covers only ~15-40% of the AOI. Frames of one pass (same day) are grouped
 into a `pass/` entity with the AOI share they observe, and the AOI outside them is drawn as an
@@ -25,7 +28,6 @@ from typing import Any
 
 import geopandas as gpd
 import numpy as np
-from matplotlib import colormaps
 from shapely import make_valid, union_all
 from shapely.geometry import Polygon
 from shapely.geometry.base import BaseGeometry
@@ -34,9 +36,11 @@ from iceberg_sar.config import Config
 from iceberg_sar.static_targets import StaticParams, find_static, is_static, static_params
 
 NEAR_ICE_RGBA = [150, 150, 150, 200]
+CFAR_RGBA = [251, 162, 56, 255]  # orange filled dot
 FOOTPRINT_RGBA = [255, 210, 60, 255]
 ICE_RGBA = [120, 200, 255, 90]
-THOR_RGBA = [0, 229, 255, 255]   # cyan ring: off the plasma ramp, readable on dark water
+THOR_RGBA = [0, 229, 255, 255]   # cyan ring: distinct from the CFAR orange, readable on dark water
+THOR_RING_PX = 2                 # ring width; the ring sits just outside a same-size CFAR dot
 AOI_RGBA = [255, 255, 255, 220]
 UNOBSERVED_RGBA = [8, 12, 20, 150]  # dims the basemap where no frame of the pass looked
 SEAM_CLOSE_M = 500.0               # closes slivers between frames of one pass
@@ -46,10 +50,9 @@ SEAM_CLOSE_M = 500.0               # closes slivers between frames of one pass
 class ViewerParams:
     near_ice_km: float = 5.0
     last_interval_days: float = 7.0   # max display time per scene (S1A+S1C revisit is 6 d)
-    contrast_db_range: tuple[float, float] = (10.0, 20.0)
-    colormap: str = "plasma"
-    point_px_range: tuple[float, float] = (6.0, 16.0)
-    structure_m_max: float = 300.0    # = detections.max_structure_m
+    # Size classes by grown target extent, shared by CFAR and THOR: small / medium / large.
+    size_breaks_m: tuple[float, float] = (180.0, 270.0)   # pooled terciles of both detectors
+    size_px: tuple[float, float, float] = (6.0, 13.0, 22.0)
     simplify_m: float = 100.0         # polygon simplification before reprojecting
     thor_model: str = "thor-linear"   # THOR detection tag shown as its own layer
     thor_score: float = 0.35          # THOR operating point (thor.compare.view_score)
@@ -116,17 +119,15 @@ def near_ice(distance_km: np.ndarray, threshold_km: float) -> np.ndarray:
     return np.nan_to_num(d, nan=np.inf) < threshold_km
 
 
-def contrast_rgba(contrast_db: float, p: ViewerParams) -> list[int]:
-    lo, hi = p.contrast_db_range
-    t = 0.0 if not math.isfinite(contrast_db) else min(max((contrast_db - lo) / (hi - lo), 0), 1)
-    r, g, b, _ = colormaps[p.colormap](0.15 + 0.85 * t)   # skip the near-black end
-    return [round(255 * r), round(255 * g), round(255 * b), 255]
-
-
 def point_px(structure_m: float, p: ViewerParams) -> float:
-    lo, hi = p.point_px_range
-    t = 0.0 if not math.isfinite(structure_m) else min(max(structure_m / p.structure_m_max, 0), 1)
-    return round(lo + (hi - lo) * math.sqrt(t), 1)
+    """Marker diameter from the size class of the grown target extent; same for CFAR and THOR.
+
+    Three discrete classes instead of a continuous ramp: most targets fall within ~100-330 m,
+    where a ramp gives sizes too close to tell apart. Missing extent counts as small.
+    """
+    if not math.isfinite(structure_m):
+        return p.size_px[0]
+    return p.size_px[int(np.searchsorted(p.size_breaks_m, structure_m, side="right"))]
 
 
 def _ring(coords: Any) -> list[float]:
@@ -205,17 +206,16 @@ def detection_packets(gdf: gpd.GeoDataFrame, availability: str, p: ViewerParams
         raw["near_ice"] = bool(flag)
         # Cesium's CZML loader throws on null property values, so missing ones are left out.
         props = {k: c for k, v in raw.items() if (c := _clean(v)) is not None}
-        rgba = NEAR_ICE_RGBA if flag else contrast_rgba(float(row["contrast_db"]), p)
-        size = p.point_px_range[0] if flag else point_px(float(row["structure_m"]), p)
+        rgba = NEAR_ICE_RGBA if flag else CFAR_RGBA
         packets.append({
             "id": f"det/{row['id']}",
-            "name": f"Candidate {row['id']}",
+            "name": f"CA-CFAR {row['id']}",
             "parent": f"scene/{row['scene_id']}",
             "availability": availability,
             "description": _description(raw),
             "position": {"cartographicDegrees": [float(row["lon"]), float(row["lat"]), 0.0]},
             "point": {
-                "pixelSize": size,
+                "pixelSize": point_px(float(row["structure_m"]), p),
                 "color": {"rgba": rgba},
                 "outlineColor": {"rgba": [0, 0, 0, 255]},
                 "outlineWidth": 1,
@@ -227,7 +227,7 @@ def detection_packets(gdf: gpd.GeoDataFrame, availability: str, p: ViewerParams
 
 def thor_packets(gdf: gpd.GeoDataFrame, availability: str, p: ViewerParams
                  ) -> list[dict[str, Any]]:
-    """THOR detections as open rings; `near_ice` flagged as for the CFAR points."""
+    """THOR detections as open rings sized like the CFAR dots; `near_ice` flagged the same way."""
     if gdf.empty:
         return []
     flags = near_ice(gdf["distance_to_ice_km"].to_numpy(), p.near_ice_km)
@@ -246,10 +246,11 @@ def thor_packets(gdf: gpd.GeoDataFrame, availability: str, p: ViewerParams
             "description": _description(raw),
             "position": {"cartographicDegrees": [float(row["lon"]), float(row["lat"]), 0.0]},
             "point": {
-                "pixelSize": 14,
+                # Inner diameter = the CFAR dot (plus its 1 px outline) for the same extent.
+                "pixelSize": point_px(float(row["structure_m"]), p) + 2 + THOR_RING_PX,
                 "color": {"rgba": [0, 0, 0, 1]},   # near-transparent fill keeps it clickable
                 "outlineColor": {"rgba": rgba},
-                "outlineWidth": 2,
+                "outlineWidth": THOR_RING_PX,
             },
             "properties": props,
         })
@@ -328,8 +329,8 @@ def build_czml(scenes: list[Scene], p: ViewerParams, static: gpd.GeoDataFrame | 
         "id": "legend",
         "properties": {
             "near_ice_km": p.near_ice_km,
-            "contrast_db_min": p.contrast_db_range[0],
-            "contrast_db_max": p.contrast_db_range[1],
+            "size_breaks_m": list(p.size_breaks_m),
+            "size_px": list(p.size_px),
         },
     }
     packets: list[dict[str, Any]] = [doc, legend]
@@ -419,10 +420,8 @@ def viewer_params(cfg: Config) -> ViewerParams:
     return ViewerParams(
         near_ice_km=float(v.get("near_ice_km", d.near_ice_km)),
         last_interval_days=float(v.get("last_interval_days", d.last_interval_days)),
-        contrast_db_range=tuple(v.get("contrast_db_range", d.contrast_db_range)),  # type: ignore[arg-type]
-        colormap=str(v.get("colormap", d.colormap)),
-        point_px_range=tuple(v.get("point_px_range", d.point_px_range)),  # type: ignore[arg-type]
-        structure_m_max=float(v.get("structure_m_max", d.structure_m_max)),
+        size_breaks_m=tuple(v.get("size_breaks_m", d.size_breaks_m)),  # type: ignore[arg-type]
+        size_px=tuple(v.get("size_px", d.size_px)),  # type: ignore[arg-type]
         simplify_m=float(v.get("simplify_m", d.simplify_m)),
         thor_model=str(v.get("thor_model", d.thor_model)),
         thor_score=float(cfg.raw.get("thor", {}).get("compare", {}).get("view_score",
