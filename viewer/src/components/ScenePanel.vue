@@ -31,6 +31,24 @@ const currentHasIce = computed(() => {
     <h1>Iceberg Alley SAR</h1>
     <p class="sub">Sentinel-1 HH/HV, CA-CFAR candidates<template v-if="hasThor"> + THOR</template></p>
 
+    <h2>Legend</h2>
+    <div class="key"><span class="dot cfar" /> CA-CFAR candidate</div>
+    <div v-if="hasThor" class="key"><span class="ring" /> THOR candidate, score ≥ {{ legend.thorScore ?? 0.35 }}</div>
+    <div v-if="hasThor" class="key"><span class="ring both"><span class="dot cfar" /></span> found by both</div>
+    <div class="sizes-title">Size = target extent, same classes for both</div>
+    <div class="sizes">
+      <div v-for="c in sizeClasses" :key="c.label" class="size">
+        <span class="slot"><span class="dot cfar" :style="{ width: `${c.px}px`, height: `${c.px}px` }" /></span>
+        <span>{{ c.label }}</span><span class="muted">{{ c.range }}</span>
+      </div>
+    </div>
+    <div class="key" :class="{ off: !currentHasIce }"><span class="dot grey" /> within {{ legend.nearIceKm }} km of pack ice (either detector)</div>
+    <div class="key" :class="{ off: !currentHasIce }"><span class="swatch ice" /> pack-ice mask</div>
+    <div class="key"><span class="swatch footprint" /> scene footprint</div>
+    <div v-if="hasCoverage" class="key"><span class="swatch aoi" /> AOI, dimmed where the pass didn't image it</div>
+    <p class="note">Click a point for its attributes. Candidates are not verified icebergs; ships also
+      appear as bright targets.</p>
+
     <h2>Scenes</h2>
     <ul class="scenes">
       <li
@@ -56,24 +74,6 @@ const currentHasIce = computed(() => {
     <label><input v-model="layers.footprints" type="checkbox" /> Scene footprint</label>
     <label v-if="hasCoverage"><input v-model="layers.unobserved" type="checkbox" /> Dim area not imaged</label>
     <label v-if="hasThor"><input v-model="layers.thor" type="checkbox" /> THOR detections (foundation model)</label>
-
-    <h2>Legend</h2>
-    <div class="key"><span class="dot cfar" /> CA-CFAR candidate</div>
-    <div v-if="hasThor" class="key"><span class="ring" /> THOR candidate, score ≥ {{ legend.thorScore ?? 0.35 }}</div>
-    <div v-if="hasThor" class="key"><span class="ring both"><span class="dot cfar" /></span> found by both</div>
-    <div class="sizes-title">Size = target extent, same classes for both</div>
-    <div class="sizes">
-      <div v-for="c in sizeClasses" :key="c.label" class="size">
-        <span class="slot"><span class="dot cfar" :style="{ width: `${c.px}px`, height: `${c.px}px` }" /></span>
-        <span>{{ c.label }}</span><span class="muted">{{ c.range }}</span>
-      </div>
-    </div>
-    <div class="key" :class="{ off: !currentHasIce }"><span class="dot grey" /> within {{ legend.nearIceKm }} km of pack ice (either detector)</div>
-    <div class="key" :class="{ off: !currentHasIce }"><span class="swatch ice" /> pack-ice mask</div>
-    <div class="key"><span class="swatch footprint" /> scene footprint</div>
-    <div v-if="hasCoverage" class="key"><span class="swatch aoi" /> AOI, dimmed where the pass didn't image it</div>
-    <p class="note">Click a point for its attributes. Candidates are not verified icebergs; ships also
-      appear as bright targets.</p>
   </aside>
 </template>
 
