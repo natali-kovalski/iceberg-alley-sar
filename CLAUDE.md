@@ -233,3 +233,83 @@ New code lives in `src/iceberg_sar/thor/` (`encoder.py`, `chips.py`, `targets.py
 - If there are too few HH/HV scenes with IIP labels: add VV/VH crops to training
   (the paper's setup) and accept the cross-polarization shift?
 - Whether a 4×4 run is worth the GPU cost after seeing the 8×8 results.
+
+
+### Milestone 6: Live viewer on GitHub Pages
+
+Goal: a public, stable URL for the Cesium viewer, updated by
+`cli.py run` → `cli.py publish` → `git push`. Static hosting only, no backend.
+
+#### 6a: Data-driven viewer + publish command (local)
+- Make the viewer data-driven. At startup it fetches `data/manifest.json` and loads
+  every CZML and quicklook listed there. No scene lists hardcoded in Vue code.
+- Build all data URLs from `import.meta.env.BASE_URL`, so the viewer works both
+  at `/` locally and under `/iceberg-alley-sar/` on Pages.
+- Manifest schema (keep it small, validate it with a pydantic model or a JSON Schema test):
+  - `generated` (ISO timestamp), `scenes`: list of
+    `{scene_id, date, polarization, detector, czml, quicklook, quicklook_bounds [W,S,E,N], n_detections}`.
+  - `detector` is `"cfar"` or `"thor"`, so the THOR layer from Milestone 5 slots in.
+- New command `cli.py publish`, a new module `publish.py`:
+  - Copies CZML from `data/outputs/` into `viewer/public/data/`.
+  - Writes web quicklooks: PNG or WebP, longest side ≤ `publish.quicklook_max_px`,
+    EPSG:4326 bounds recorded in the manifest.
+  - Writes `manifest.json`.
+  - Fails loudly if any single file > `publish.max_file_mb` or the folder total > `publish.max_total_mb`.
+  - Publishes derived products only: never raw/interim rasters, Kaggle chips, model weights or cached features.
+  - Is idempotent: it rebuilds `viewer/public/data/` from scratch on each run.
+- `.gitignore`: keep `data/` ignored, and explicitly allow `viewer/public/data/`.
+- config.yaml:
+```yaml
+  publish:
+    out_dir: viewer/public/data
+    scenes: all            # or a list of scene_ids
+    detectors: [cfar]      # add thor after Milestone 5
+    quicklook_max_px: 4096
+    quicklook_format: webp
+    max_file_mb: 25
+    max_total_mb: 300
+```
+- Tests: manifest round-trip and schema, the size-limit check fires, and publish
+  never copies anything from `data/raw`, `data/interim`, `data/kaggle` or `data/models`.
+- **Done when:** `cli.py publish` followed by `npm run build && npm run preview` (with the
+  production base path) shows all published scenes, with no hardcoded scene names left in the viewer.
+
+#### 6b: GitHub Actions → Pages
+- Vite: set `base: '/iceberg-alley-sar/'` for production builds (env-driven, `/` in dev).
+  Make sure Cesium's static assets (Workers, Assets, Widgets, ThirdParty) are copied
+  into the build and `CESIUM_BASE_URL` points under the base path.
+  Check this in `npm run preview` before pushing.
+- Workflow `.github/workflows/pages.yml`:
+  - Triggers: push to `main` touching `viewer/**` or the workflow file; plus `workflow_dispatch`.
+  - Permissions: `contents: read`, `pages: write`, `id-token: write`.
+  - Concurrency: group `pages`, cancel in progress.
+  - Job `build`: checkout, setup-node (pinned LTS, npm cache on `viewer/package-lock.json`),
+    `npm ci`, `npm run build` in `viewer/`, `actions/configure-pages`,
+    `actions/upload-pages-artifact` with `viewer/dist`.
+  - Job `deploy`: `actions/deploy-pages`, environment `github-pages`, output the page URL.
+  - Pin every action to a major version tag.
+  - Python does not run in CI. Data is produced locally by `publish` and committed.
+- Repo settings (manual, I do this): Settings → Pages → Source: GitHub Actions.
+- **Done when:** a push to `main` deploys, and the Pages URL loads the globe, the
+  timeline steps through scenes, and clicking a detection shows its attributes.
+
+#### 6c: Make it shareable
+- Before the repo goes public: scan the full git history for `.env`, credentials,
+  data files and the LinkedIn drafts (`gitleaks` or `git log --all -- <path>`).
+  Fix this before flipping the visibility, not after.
+- Check that the Esri basemap loads on the deployed domain. Check the browser
+  console for CORS or 404 errors on Cesium workers.
+- Add a short "About" panel or overlay to the viewer: what the points are, data
+  sources (Sentinel-1/Copernicus, IIP), method (CA-CFAR on HV), a link to the repo.
+- README: "Live demo" link at the top, and a "Updating the live viewer" section
+  with the three commands.
+- **Done when:** the link works in a fresh incognito window on desktop and on a phone.
+
+#### Milestone 6 decisions
+- GitHub Pages: free, static, and lives next to the portfolio repo. Railway is unnecessary (no backend).
+- Published data is committed to `viewer/public/data/`. This is fine while it stays under the size limits.
+
+#### Milestone 6 open questions
+- If quicklooks outgrow the limits: move `viewer/public/data/` to a Cloudflare R2
+  or S3 bucket with CORS, and have `publish` upload there (no redeploy needed).
+- Whether to show the experimental `iceberg_prob` in the public viewer or hide it.
