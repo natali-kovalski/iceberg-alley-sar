@@ -37,12 +37,12 @@ from iceberg_sar.static_targets import StaticParams, find_static, is_static, sta
 
 NEAR_ICE_RGBA = [150, 150, 150, 200]
 CFAR_RGBA = [251, 162, 56, 255]  # orange filled dot
-FOOTPRINT_RGBA = [255, 210, 60, 255]
+FOOTPRINT_RGBA = [255, 255, 0, 255]   # bright yellow: stands out on imagery and water
 ICE_RGBA = [120, 200, 255, 90]
 THOR_RGBA = [0, 229, 255, 255]   # cyan ring: distinct from the CFAR orange, readable on dark water
 THOR_RING_PX = 2                 # ring width; the ring sits just outside a same-size CFAR dot
 AOI_RGBA = [255, 255, 255, 220]
-UNOBSERVED_RGBA = [8, 12, 20, 150]  # dims the basemap where no frame of the pass looked
+UNOBSERVED_RGBA = [8, 12, 20, 90]   # lightly dims the basemap where no frame of the pass looked
 SEAM_CLOSE_M = 500.0               # closes slivers between frames of one pass
 
 

@@ -11,6 +11,7 @@ from shapely.geometry import Point, box
 
 from iceberg_sar.config import Config
 from iceberg_sar.export_czml import (
+    CFAR_RGBA,
     ViewerParams,
     build_czml,
     export_czml,
@@ -197,7 +198,7 @@ def test_thor_layer_threshold_and_counts(cfg: Config) -> None:
     assert by_id[f"scene/{name}"]["properties"]["n_thor"] == 1     # open water only
     # Same size scale for both detectors: a THOR ring just encloses the CFAR dot of equal extent.
     dot = next(p for p in packets if p["id"] == f"det/{thor['id'].iloc[1][1:]}")
-    assert dot["point"]["color"]["rgba"][:3] == [251, 162, 56]
+    assert dot["point"]["color"]["rgba"] == CFAR_RGBA
     assert rings[1]["point"]["pixelSize"] == dot["point"]["pixelSize"] + 4
     assert "n_thor" not in by_id[f"scene/{next(reversed(SCENES))}"]["properties"]
 

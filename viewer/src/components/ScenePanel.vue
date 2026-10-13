@@ -122,8 +122,8 @@ label.off { cursor: default; }
 .slot { display: flex; align-items: center; justify-content: center; height: 26px; }
 .swatch { display: inline-block; width: 14px; height: 10px; }
 .swatch.ice { background: rgba(120, 200, 255, 0.35); border: 1px solid rgb(120, 200, 255); }
-.swatch.footprint { border: 1px solid rgb(255, 210, 60); }
-.swatch.aoi { border: 1px solid #fff; background: rgba(8, 12, 20, 0.6); }
+.swatch.footprint { border: 1px solid rgb(255, 255, 0); }
+.swatch.aoi { border: 1px solid #fff; background: rgba(8, 12, 20, 0.35); }
 .ring { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 2px solid rgb(0, 229, 255); flex: none; }
 .ring.both { display: inline-flex; align-items: center; justify-content: center; width: 12px; height: 12px; }
 .ring.both .dot { width: 8px; height: 8px; }
