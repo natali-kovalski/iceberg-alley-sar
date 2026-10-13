@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from "vue";
 import type { CzmlDataSource, Viewer } from "cesium";
+import ComparePanel from "./components/ComparePanel.vue";
 import ScenePanel from "./components/ScenePanel.vue";
 import {
   applyLayers,
@@ -16,8 +17,9 @@ import {
 const container = ref<HTMLDivElement>();
 const scenes = shallowRef<SceneInfo[]>([]);
 const currentId = ref<string>();
-const legend = ref<Legend>({ nearIceKm: 5, contrastDbMin: 10, contrastDbMax: 20 });
+const legend = ref<Legend>({ nearIceKm: 5, sizeBreaksM: [180, 270], sizePx: [6, 13, 22] });
 const error = ref<string>();
+const compareScene = ref<SceneInfo>(); // scene whose THOR vs CFAR chart is open
 const layers = reactive<Layers>({ nearIce: true, seaIce: true, footprints: true, unobserved: true, thor: true });
 
 // Plain variables, not refs: Cesium objects must stay out of Vue's reactivity.
@@ -45,12 +47,14 @@ watch(layers, () => dataSource && applyLayers(dataSource, layers));
 
 function jump(scene: SceneInfo): void {
   if (viewer) jumpTo(viewer, scene);
+  compareScene.value = scene.compare ? scene : undefined;
 }
 </script>
 
 <template>
   <div ref="container" class="globe" />
   <ScenePanel v-model:layers="layers" :scenes="scenes" :legend="legend" :current-id="currentId" @jump="jump" />
+  <ComparePanel v-if="compareScene" :scene="compareScene" @close="compareScene = undefined" />
   <div v-if="error" class="error">{{ error }}</div>
 </template>
 

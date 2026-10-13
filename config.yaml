@@ -10,6 +10,7 @@ paths:
   land_mask: data/land/osm_land_aoi.gpkg  # OSM land polygons clipped to AOI (built by `land-mask`)
   ground_truth: data/ground_truth   # NAIS iceberg chart GIFs (downloaded)
   czml: viewer/public/data/iceberg_alley.czml   # written by `czml`, served by the Vue viewer (gitignored)
+  compare_figures: viewer/public/data/compare   # per-scene THOR vs CFAR recall figures (`thor-compare`, `czml`)
   kaggle: data/kaggle/train.json   # Statoil/C-CORE iceberg classifier challenge (Kaggle terms: don't redistribute)
   models: data/models              # trained weights (gitignored)
 
@@ -125,10 +126,9 @@ viewer:
   # CZML styling. Nothing is dropped: near-ice candidates are greyed out and can be hidden.
   near_ice_km: 5            # closer than this to pack ice = likely floe (88% of 2025-05-02 detections)
   last_interval_days: 7     # max days a scene stays on the timeline before the next pass (6 d revisit + slack)
-  contrast_db_range: [10, 20]   # colour ramp for contrast over background (~p10-p90 at sea)
-  colormap: plasma
-  point_px_range: [6, 16]   # point size from structure_m (0 .. structure_m_max)
-  structure_m_max: 300
+  # CFAR (orange dot) and THOR (cyan ring) share one size scale; colour only tells the detectors apart.
+  size_breaks_m: [180, 270] # structure_m class breaks: small < 180 <= medium < 270 <= large (pooled terciles)
+  size_px: [6, 13, 22]      # point diameter per class
   simplify_m: 100           # footprint / pack-ice outline simplification
   thor_model: thor-linear   # THOR layer (Milestone 5): `thor-detect` tag; shown at thor.compare.view_score
 

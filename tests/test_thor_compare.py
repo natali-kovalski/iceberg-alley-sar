@@ -73,3 +73,25 @@ def test_label_bins() -> None:
 
 def test_pfa_label() -> None:
     assert pfa_label(1e-6) == "pfa_1e-06"
+
+
+def test_scene_figures_one_per_scene_by_date(tmp_path) -> None:
+    import json
+    from types import SimpleNamespace
+
+    from iceberg_sar.thor.compare import POOLED
+    from iceberg_sar.thor.compare_figure import scene_figures
+
+    name = "S1A_IW_20190429T094108_DHP_RTC10_G_gpuned_671B"
+    rows = [(s, d, st, n, m, 20) for s in (name, POOLED)
+            for d, st, n, m in [("cfar", 1e-6, 50, 10), ("cfar", 1e-4, 200, 15),
+                                ("thor-linear", 0.35, 60, 14), ("thor-linear", 0.2, 150, 18)]]
+    sweep = pd.DataFrame(rows, columns=["scene", "detector", "setting", "detections",
+                                        "matched", "truth"])
+    sweep["recall"] = sweep["matched"] / sweep["truth"]
+    meta = {name: {"truth": "iip-satellite", "labels_compared": 20},
+            "radius_m": 500.0, "near_ice_km": 5.0}
+    index = scene_figures(sweep, SimpleNamespace(cfar_pfa=1e-6, view_score=0.35), meta, tmp_path)
+    entries = json.loads(index.read_text(encoding="utf-8"))
+    assert list(entries) == ["2019-04-29"] and entries["2019-04-29"]["labels"] == 20
+    assert (tmp_path / "2019-04-29.png").stat().st_size > 0

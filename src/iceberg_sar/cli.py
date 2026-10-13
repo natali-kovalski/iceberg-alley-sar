@@ -230,6 +230,10 @@ def czml(
             s = p["properties"]
             typer.echo(f"{s['date']}  pass: {len(s['frames'].split())} frame(s), "
                        f"{s['aoi_coverage_pct']:.0f}% of AOI ({s['observed_km2']:,} km²)")
+    from iceberg_sar.thor.compare import viewer_figures
+
+    if figures := viewer_figures(cfg):
+        typer.echo(f"ok  {figures}")
     typer.echo(f"ok  {out}")
 
 

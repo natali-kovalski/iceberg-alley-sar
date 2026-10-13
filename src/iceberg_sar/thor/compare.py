@@ -376,4 +376,18 @@ def run_compare(cfg: Config, log=print) -> dict[str, Path]:
     sweep = tables["sweep"]
     img = cfg.root / cfg.section("figures")["out_dir"] / "thor_vs_cfar_recall.png"
     out["figure"] = recall_figure(sweep, p, meta, img)
+    out["viewer figures"] = viewer_figures(cfg)
     return out
+
+
+def viewer_figures(cfg: Config) -> Path | None:
+    """Per-scene recall figures for the viewer (paths.compare_figures), from the saved 5d
+    tables; None if `thor-compare` hasn't been run."""
+    from iceberg_sar.thor.compare_figure import scene_figures
+
+    p = CompareParams.from_config(cfg)
+    sweep, summary = p.out_dir / "sweep.csv", p.out_dir / "summary.json"
+    if not (sweep.exists() and summary.exists()):
+        return None
+    meta = json.loads(summary.read_text(encoding="utf-8"))
+    return scene_figures(pd.read_csv(sweep), p, meta, cfg.path("compare_figures"))
