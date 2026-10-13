@@ -9,8 +9,8 @@ paths:
   outputs: data/outputs    # detections, quicklooks, CZML
   land_mask: data/land/osm_land_aoi.gpkg  # OSM land polygons clipped to AOI (built by `land-mask`)
   ground_truth: data/ground_truth   # NAIS iceberg chart GIFs (downloaded)
-  czml: viewer/public/data/iceberg_alley.czml   # written by `czml`, served by the Vue viewer (gitignored)
-  compare_figures: viewer/public/data/compare   # per-scene THOR vs CFAR recall figures (`thor-compare`, `czml`)
+  czml: data/outputs/iceberg_alley.czml   # written by `czml`; `publish` splits it into publish.out_dir
+  compare_figures: data/outputs/compare   # per-scene THOR vs CFAR recall figures (`thor-compare`, `czml`); copied by `publish`
   kaggle: data/kaggle/train.json   # Statoil/C-CORE iceberg classifier challenge (Kaggle terms: don't redistribute)
   models: data/models              # trained weights (gitignored)
 
@@ -136,6 +136,14 @@ viewer:
     - S1A_IW_20190228T094106_DHP_RTC10_G_spuned_6EBF
     - S1B_IW_20190306T094024_DHP_RTC10_G_spuned_3600
     - S1A_IW_20190317T094903_DHP_RTC10_G_spuned_3AF7
+
+publish:
+  # `publish` rebuilds out_dir (committed, served by GitHub Pages) from data/outputs/ only.
+  out_dir: viewer/public/data
+  scenes: all            # or a list of scene_ids
+  detectors: [cfar, thor]
+  max_file_mb: 25        # GitHub warns at 50 MB per file
+  max_total_mb: 300
 
 chips:
   # Chips around detections for the iceberg/ship CNN, matched to the Kaggle chips.

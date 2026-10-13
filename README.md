@@ -2,9 +2,11 @@
 
 Detecting icebergs off Newfoundland & Labrador in Sentinel-1 radar imagery, and putting them on an interactive CesiumJS globe with a timeline.
 
+**Live demo:** https://natali-kovalski.github.io/iceberg-alley-sar/
+
 ![Cesium viewer: spring 2025 detections off NE Newfoundland](docs/img/viewer.png)
 
-**In short:** a CFAR detector on Sentinel-1 cross-pol (HV) imagery finds **78% of the icebergs that International Ice Patrol analysts marked** on the same satellite pass (207 of 267, median position difference 67 m). It runs end to end with one command, from scene search to a time-dynamic CZML file for the viewer.
+**In short:** a CFAR detector on Sentinel-1 cross-pol (HV) imagery finds **78% of the icebergs that International Ice Patrol analysts marked** on the same satellite pass (207 of 267, median position difference 67 m). It runs end to end with one command, from scene search to a time-dynamic CZML file for the viewer. A second detector, the frozen **THOR** SAR foundation model with a 769-parameter linear head, finds **10 points more of the labelled bergs at the same number of detections** (0.84 vs. 0.74 on four held-out frames, 512 bergs). It also finds most of the large bergs that the CFAR rejects.
 
 ## The problem
 
@@ -24,7 +26,7 @@ This project builds that pipeline on free Copernicus Sentinel-1 data, for the co
 
 ![Detections vs. IIP labels, 2019-04-29](docs/img/validation_20190429.png)
 
-The viewer shows three spring 2025 passes (2025-05-02, 05-08, 05-14). In the 1° squares each scene covers, open-water detections are within 2–4× of the North American Ice Service chart estimate (106 vs. 26, 98 vs. 31, 137 vs. 71). The chart is per 1° square and partly modelled, so this is a sanity check, not a measurement. The full validation story, including the sources that didn't work, is in [docs/validation-findings.md](docs/validation-findings.md).
+The viewer shows 32 passes from spring 2019, 2020 and 2025 and autumn 2026, with CFAR and THOR as separate layers. For the three spring 2025 passes (2025-05-02, 05-08, 05-14), in the 1° squares each scene covers, open-water detections are within 2–4× of the North American Ice Service chart estimate (106 vs. 26, 98 vs. 31, 137 vs. 71). The chart is per 1° square and partly modelled, so this is a sanity check, not a measurement. The full validation story, including the sources that didn't work, is in [docs/validation-findings.md](docs/validation-findings.md).
 
 ## Data
 
@@ -91,6 +93,7 @@ Run the whole pipeline for the demo dates, then open the viewer:
 ```powershell
 python -m iceberg_sar.cli run --start 2025-05-01 --end 2025-05-15 --dry-run   # plan + credit estimate
 python -m iceberg_sar.cli run --start 2025-05-01 --end 2025-05-15
+python -m iceberg_sar.cli publish  # per-scene CZML + manifest -> viewer/public/data/
 cd viewer
 npm install
 npm run dev                        # http://localhost:5173
@@ -99,15 +102,28 @@ npm run dev                        # http://localhost:5173
 `run` does the following:
 1. Searches ASF for HH+HV scenes over [aoi.geojson](aoi.geojson) and keeps the `run.max_scenes` (default 3) that cover the AOI best.
 2. Orders HyP3 RTC jobs, waits for them (often 30–60 min) and downloads them. Each 10 m scene costs 60 of the monthly HyP3 credits, and `--dry-run` shows the total first.
-3. Builds the land mask (one-time ~900 MB OSM download), preprocesses each scene, runs detection, and writes `viewer/public/data/iceberg_alley.czml`. The CZML holds every scene processed so far, not just this run's dates, so the viewer accumulates seasons.
+3. Builds the land mask (one-time ~900 MB OSM download), preprocesses each scene, runs detection, and writes `data/outputs/iceberg_alley.czml`. The CZML holds every scene processed so far, not just this run's dates, so the viewer accumulates seasons. `publish` then splits it into one CZML per scene and detector plus a `manifest.json` in `viewer/public/data/` (committed; the viewer loads whatever the manifest lists).
 
 Re-runs reuse everything on disk: downloaded products, masked rasters and detections. Use `--force` to redo preprocessing and detection after changing parameters. Without `--start`/`--end`, the dates come from `search` in `config.yaml`.
 
 In the viewer:
 - Scrub the timeline to step through passes, and click a target to see its attributes.
 - Open-water targets are coloured by contrast and sized by structure length. Targets within 5 km of pack ice are grey (likely ice floes), and a checkbox hides them.
+- THOR detections are cyan rings (score ≥ 0.35), CFAR detections orange dots. Both share one size scale, and the THOR layer can be toggled.
 - Toggle the scene footprint and the pack-ice mask.
-- The basemap is Esri World Imagery, so no Cesium ion token is needed. `npm run build` gives a static site in `viewer/dist/`.
+- The basemap is Esri World Imagery, so no Cesium ion token is needed. `npm run build` gives a static site in `viewer/dist/` for `/iceberg-alley-sar/` (GitHub Pages); set `VIEWER_BASE=/` to host it at a root.
+
+## Updating the live viewer
+
+The live viewer is a static site on GitHub Pages. Python never runs in CI: the data is built locally and committed.
+
+```powershell
+python -m iceberg_sar.cli run --start <date> --end <date>   # process new scenes
+python -m iceberg_sar.cli publish                           # rebuild viewer/public/data/
+git add viewer/public/data; git commit -m "Viewer: add <dates>"; git push
+```
+
+A push to `main` that touches `viewer/**` triggers [.github/workflows/pages.yml](.github/workflows/pages.yml), which builds the viewer and deploys it. `publish` rebuilds `viewer/public/data/` from scratch on each run and copies derived products only: CZML, web quicklooks and `manifest.json`, never raw rasters, Kaggle chips, model weights or cached features. It fails if a file exceeds `publish.max_file_mb` (25) or the folder exceeds `publish.max_total_mb` (300). The viewer loads whatever the manifest lists, so no scene names are hardcoded.
 
 ## Individual steps
 
@@ -121,6 +137,7 @@ python -m iceberg_sar.cli land-mask                          # --force rebuilds 
 python -m iceberg_sar.cli preprocess data\raw\<product_dir>  # masked linear rasters + dB quicklooks
 python -m iceberg_sar.cli detect data\raw\<product_dir>      # CFAR on HV; --band HH to compare
 python -m iceberg_sar.cli czml --start 2025-05-01 --end 2025-05-15
+python -m iceberg_sar.cli publish                            # viewer/public/data/ from data/outputs/ only
 python -m iceberg_sar.cli figures                            # regenerate docs/img (scenes in `figures:` in config.yaml)
 ```
 
@@ -147,11 +164,51 @@ python -m iceberg_sar.cli validate-points data\raw\<product_dir> --truth s2
 
 The headline number uses IIP sightings marked on the same Sentinel-1 pass. That has no drift, but it is not independent: the analysts looked at the same radar image. Aircraft sightings (5–7 h later) and Sentinel-2 (loose sea ice in April, bergs mostly inshore in June) were inconclusive. The details are in [docs/validation-findings.md](docs/validation-findings.md).
 
+## THOR foundation model vs. CFAR
+
+[THOR](https://huggingface.co/FM4CS) (FM4CS, Apache 2.0) is a remote-sensing foundation model pretrained on Sentinel-1 among other sensors. Following Forgaard et al. (IGARSS 2026), its encoder stays **frozen**. Only a small head is trained on top, to turn its features into an iceberg heatmap.
+
+- **Input.** THOR has native HH/HV embeddings and was pretrained on sigma0 in dB. HyP3 gives gamma0, so the pipeline converts it with sigma0 = gamma0 · cos(incidence) and normalizes with THOR's statistics. THOR Tiny, 8×8 patches: one 512×512 crop gives 64×64 tokens × 192 features.
+- **Training data.** IIP same-pass analyst labels on 20 HH/HV frames from 2019–2020, with **all of April 2019 held out** (the same bergs show up on nearby passes). Labels are moved to their 0.1' cell centre, snapped to the HH peak and drawn as Gaussians: 723 train / 154 val crops.
+- **Heads.** A linear head (769 parameters) and a CenterNet-style MLP, picked on year folds (2019 ↔ 2020), never on the test frames. The linear head matched or beat CenterNet, so it is the main model.
+- **Inference.** Sliding window with overlap over a full scene, peak extraction, and the same GeoJSON schema as the CFAR plus `detector` and `score`. Peaks must fall on the CFAR's masked raster, so both detectors use identical land and pack-ice masks.
+
+**Head-to-head.** Both detectors ran on four held-out April 2019 frames with same-pass labels (512 bergs), with identical masks and the same 500 m one-to-one matching. Precision can't be measured without AIS, so the comparison is **recall at a matched number of detections**: the CFAR is swept over PFA 10⁻³ to 10⁻¹², THOR over its score.
+
+![Recall vs. detections per frame, THOR vs. CFAR](docs/img/thor_vs_cfar_recall.png)
+
+| At the CFAR's detection count (PFA 10⁻⁶) | CFAR | THOR linear |
+|---|---|---|
+| Pooled, 4 frames, 512 labels | 0.74 | **0.84** |
+| 2019-04-29 (267 labels) | 0.74 | **0.89** |
+| Large bergs > 120 m (14) | 0.29 | **0.79** |
+| Medium 61–120 m (425) | 0.76 | **0.87** |
+| Small 15–60 m (73) | 0.71 | 0.71 |
+
+- THOR leads on every frame, by 0 to 15 points. It reaches the CFAR's pooled recall with about 28% fewer detections.
+- The CFAR saturates: loosening the PFA from 10⁻⁵ to 10⁻³ adds thousands of detections and few labels. THOR keeps climbing to 0.92.
+- Caveats: one month of one year, and THOR learned from IIP analyst labels, so part of the gap may be agreement with their labelling style.
+
+Commands (needs a CUDA GPU and `pip install -e .[ml,thor]`, see `pyproject.toml`):
+
+```powershell
+python -m iceberg_sar.cli thor-smoke                      # PCA of frozen features on one crop
+python -m iceberg_sar.cli thor-scenes; python -m iceberg_sar.cli thor-order; python -m iceberg_sar.cli thor-download
+python -m iceberg_sar.cli thor-chips                      # crops + Gaussian targets -> data/thor/chips/
+python -m iceberg_sar.cli thor-features                   # cache frozen-encoder features
+python -m iceberg_sar.cli thor-train                      # linear + CenterNet heads
+python -m iceberg_sar.cli thor-detect data\raw\<product_dir> --head linear
+python -m iceberg_sar.cli thor-compare --sweep            # recall-vs-detections figure + tables
+```
+
+The full write-up, including where THOR doesn't beat the CFAR, is in [docs/thor-vs-cfar.md](docs/thor-vs-cfar.md).
+
 ## Limitations
 
 - **Precision is unknown.** 324 of 531 detections on the validation pass have no IIP label. They are a mix of unrecorded bergs, fishing vessels and false alarms, in unknown proportions. Separating them needs AIS vessel positions.
-- **Large bergs are missed** (0 of 4 over 120 m). The 300 m strip filter and a guard window smaller than the berg are the likely causes.
-- **Small bergs are harder** (65% recall), and single-pixel targets are removed by the 2 px minimum.
+- **The CFAR misses large bergs** (4 of 14 over 120 m on the four test frames). They are 30+ dB above the sea, but their grown blobs (340–470 m) exceed the 300 m ice-strip rule (`detections.max_structure_m`). THOR finds 11 of the 14. A shape-based strip test could fix the CFAR.
+- **Small bergs are harder** (65% recall), and single-pixel targets are removed by the 2 px minimum. THOR doesn't help here: its 8×8 patch is 80 m.
+- **THOR depends on the CFAR pipeline.** On its own it fires on pack ice (34–82% of its peaks on icy frames fall in the pack-ice mask), and it needs a GPU (8–15 min per scene on a laptop RTX 3070).
 - **Sea state matters.** On rougher days the HV background rises 3–4 dB and small bergs lose contrast.
 - **Near pack ice, many detections are ice floes.** They are flagged by distance to ice, not removed.
 - **CA-CFAR with gamma speckle** understates the heavy tails of real sea clutter, so the actual false-alarm rate is higher than 10⁻⁶. OS-CFAR or K-distribution CFAR is the obvious next step (`cfar.variant` has a slot for it).
@@ -185,15 +242,17 @@ python -m iceberg_sar.cli classify data\raw\<product_dir>
 ## Repository layout
 
 - `config.yaml`: all parameters. `aoi.geojson`: the area of interest (EPSG:4326).
-- `src/iceberg_sar/`: the pipeline. `pipeline.py` is the end-to-end `run`, `cfar.py` + `detections.py` the detector, `seaice.py` the pack-ice mask, `export_czml.py` the viewer export, `classify/` the experimental CNN.
-- `viewer/`: Vue 3 + Vite + CesiumJS (`src/scene.ts` holds the Cesium logic).
+- `src/iceberg_sar/`: the pipeline. `pipeline.py` is the end-to-end `run`, `cfar.py` + `detections.py` the detector, `seaice.py` the pack-ice mask, `export_czml.py` the viewer export, `publish.py` the web data for the viewer, `thor/` the THOR detector, `classify/` the experimental CNN.
+- `viewer/`: Vue 3 + Vite + CesiumJS (`src/scene.ts` holds the Cesium logic). `viewer/public/data/` is the published data (committed).
+- `.github/workflows/pages.yml`: builds and deploys the viewer to GitHub Pages.
 - `docs/`: findings write-ups and figures. `validation/`: transcribed NAIS chart counts.
 - `tests/`: pytest suite (`pytest`). `data/`: everything downloaded or generated (gitignored).
 
 ## Data terms
 
-- Contains modified Copernicus Sentinel data (2019–2025), via ASF DAAC and Earth Search (Element 84).
+- Contains modified Copernicus Sentinel data (2019–2026), via ASF DAAC and Earth Search (Element 84).
 - Iceberg charts: North American Ice Service (International Ice Patrol + Canadian Ice Service).
 - Iceberg sightings: International Ice Patrol Iceberg Sightings Database, NSIDC G00807.
 - Land polygons: © OpenStreetMap contributors, ODbL.
 - Kaggle Statoil/C-CORE chips: used under the competition terms and not redistributed.
+- THOR weights: FM4CS, Apache 2.0, downloaded from Hugging Face at run time (not redistributed).

@@ -1,0 +1,22 @@
+{
+  "2019-04-29": {
+    "figure": "2019-04-29.png",
+    "scene": "S1A_IW_20190429T094108_DHP_RTC10_G_gpuned_671B",
+    "labels": 267
+  },
+  "2019-04-23": {
+    "figure": "2019-04-23.png",
+    "scene": "S1B_IW_20190423T094026_DHP_RTC10_G_gpuned_A784",
+    "labels": 150
+  },
+  "2019-04-24": {
+    "figure": "2019-04-24.png",
+    "scene": "S1A_IW_20190424T093305_DHP_RTC10_G_gpuned_132E",
+    "labels": 49
+  },
+  "2019-04-17": {
+    "figure": "2019-04-17.png",
+    "scene": "S1A_IW_20190417T094107_DHP_RTC10_G_gpuned_EDB4",
+    "labels": 46
+  }
+}
