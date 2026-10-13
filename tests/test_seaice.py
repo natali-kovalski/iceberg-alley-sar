@@ -99,3 +99,29 @@ def test_distance_to_ice_km_without_ice_is_nan(tmp_path: Path) -> None:
     path = write_mask(np.zeros((5, 5), bool), from_origin(0, 1000, 200, 200), "EPSG:32621",
                       tmp_path / "m.tif")
     assert np.isnan(distance_to_ice_km(path, np.array([100.0]), np.array([900.0]))).all()
+
+
+def test_ice_core_undoes_the_buffer():
+    from scipy import ndimage
+
+    from iceberg_sar.seaice import _disk, ice_core
+
+    core = np.zeros((40, 40), bool)
+    core[10:20, 10:20] = True                     # pack-ice core
+    core[0:6, 30:40] = True                       # core touching the array border
+    buffered = ndimage.binary_dilation(core, structure=_disk(5))
+    np.testing.assert_array_equal(ice_core(buffered, cell_m=200, buffer_m=1000), core)
+    assert not ice_core(np.zeros((5, 5), bool), 200, 1000).any()
+
+
+def test_min_db_drops_faint_coastal_water_but_keeps_ice() -> None:
+    # Calm day: noise-floor-removed water at -40 dB, a band of slightly brighter water at
+    # -31 dB (passes +6 dB alone), and real pack ice at -22 dB.
+    mean = np.full((100, 100), 10 ** (-40 / 10))
+    cv = np.full((100, 100), 1.1)
+    mean[:, 0:4], cv[:, 0:4] = 10 ** (-31 / 10), 0.5      # coastal band, 80 km2
+    mean[40:60, 40:60], cv[40:60, 40:60] = 10 ** (-22 / 10), 0.5
+    loose, _ = detect_ice(mean, cv, **KW)
+    strict, _ = detect_ice(mean, cv, **{**KW, "min_db": -30})
+    assert loose[:, 0:4].all() and loose[40:60, 40:60].all()
+    assert not strict[:, 0:4].any() and strict[40:60, 40:60].all()

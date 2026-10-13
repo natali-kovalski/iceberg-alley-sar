@@ -124,6 +124,15 @@ def scene_footprint(raw_dir: Path, name: str) -> gpd.GeoSeries:
     return fp.iloc[[int(fp.area.argmax())]].geometry.to_crs("EPSG:4326")
 
 
+def at_cell_centres(pts: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """IIP sightings with truncated positions moved to their 0.1' cell centre."""
+    from iceberg_sar.iip import cell_centres
+
+    lat, lon = cell_centres(pts["lat"].to_numpy(), pts["lon"].to_numpy())
+    return gpd.GeoDataFrame(pts.assign(lat=lat, lon=lon),
+                            geometry=gpd.points_from_xy(lon, lat), crs=pts.crs)
+
+
 def load_truth(
     cfg: Config, name: str, sar_time: pd.Timestamp, kind: str
 ) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame | None]:
@@ -149,9 +158,11 @@ def load_truth(
     area = scene_footprint(cfg.path("raw"), name).iloc[0]
     if kind == "iip-satellite":
         w = pd.Timedelta(minutes=float(v["satellite_window_min"]))
-        return select_sightings(sightings, area, sar_time - w, sar_time + w, satellite=True), None
+        return at_cell_centres(
+            select_sightings(sightings, area, sar_time - w, sar_time + w, satellite=True)), None
     w = pd.Timedelta(hours=float(v["aircraft_window_h"]))
-    return select_sightings(sightings, area, sar_time, sar_time + w, satellite=False), None
+    return at_cell_centres(
+        select_sightings(sightings, area, sar_time, sar_time + w, satellite=False)), None
 
 
 def point_val_params(cfg: Config) -> PointValParams:
@@ -159,3 +170,19 @@ def point_val_params(cfg: Config) -> PointValParams:
     return PointValParams(max_dist_m=float(v["max_dist_m"]),
                           offset_search_m=float(v["offset_search_m"]),
                           offset_step_m=float(v["offset_step_m"]))
+
+
+def run_point_validation(
+    cfg: Config, name: str, truth_kind: str, band: str = "HV", open_water: bool = True
+) -> tuple[dict, gpd.GeoDataFrame, gpd.GeoDataFrame]:
+    """Validate a scene's saved detections against one truth source (as `validate-points`)."""
+    from iceberg_sar.detections import scene_timestamp
+
+    sar_time = pd.Timestamp(scene_timestamp(name)).tz_localize(None)
+    det = gpd.read_file(cfg.path("outputs") / "detections" / f"{name}_{band}_detections.geojson")
+    if open_water:
+        near_km = float(cfg.raw.get("viewer", {}).get("near_ice_km", 5))
+        det = det[~(det["distance_to_ice_km"] < near_km)]
+    pts, area = load_truth(cfg, name, sar_time, truth_kind)
+    masked = cfg.path("interim") / name / f"{name}_{band}_masked.tif"
+    return validate_points(det, pts, masked, sar_time, point_val_params(cfg), area)

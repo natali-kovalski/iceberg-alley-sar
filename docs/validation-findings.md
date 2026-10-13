@@ -1,8 +1,8 @@
 # Validation: how accurate is the detector?
 
 **Headline:** on a Sentinel-1 pass where International Ice Patrol (IIP) analysts marked every
-iceberg they identified, the detector found **77% of them (207 of 268)**, with a median
-position difference of **137 m**. Small bergs (15-60 m) are found 65% of the time, medium
+iceberg they identified, the detector found **78% of them (207 of 267)**, with a median
+position difference of **67 m**. Small bergs (15-60 m) are found 65% of the time, medium
 bergs (61-120 m) 81%.
 
 ![Detections vs. IIP labels, 2019-04-29](img/validation_20190429.png)
@@ -25,16 +25,16 @@ parameters.
 ## Headline result: 2019-04-29
 
 Scene: Sentinel-1A IW, 2019-04-29 09:41 UTC, HH/HV, HyP3 RTC 10 m. IIP lists 276 sightings
-from this pass (source `SNL1`, all high confidence); 268 fall on unmasked water and are compared.
+from this pass (source `SNL1`, all high confidence); 267 fall on unmasked water and are compared.
 A detection matches a sighting within 500 m, one-to-one. CFAR cores that belong to one bright
 blob are merged into a single target (`merge_by_structure`); before this, ships and some bergs
 split into two detections ~50 m apart, which inflated the count from 534 to 687 for one lost match.
 
 | | Value |
 |---|---|
-| Recall, all detections | **77%** (207 / 268) |
-| Recall, open-water detections only (> 5 km from pack ice) | 74% (197 / 268) |
-| Median match distance | 137 m |
+| Recall, all detections | **78%** (207 / 267) |
+| Recall, open-water detections only (> 5 km from pack ice) | 74% (197 / 267) |
+| Median match distance | 67 m (137 m before correcting IIP positions, see method notes) |
 | Detections without an IIP label (in the labelled area) | 324 of 531 |
 
 **Recall by distance from the coast is stable** (73-84% from 0 to 100 km), so the detector is
@@ -95,8 +95,15 @@ now reports "drift unresolved" instead of scoring against a chance alignment.
 - When truth is not simultaneous, a common drift offset is estimated (the shift that aligns the
   most points) and compared with what a random shift achieves. Weak peaks are rejected.
 - Matching is one-to-one (Hungarian assignment), so one detection cannot claim two bergs.
+- **IIP positions are truncated, not rounded,** to 0.1 arc-minute (all satellite sightings and
+  72-92% of aircraft/ship ones lie on that grid). On 2019-04-29 the bergs sat on average 101 m
+  north and 67 m west of their IIP positions: half a grid step (93 m / 60 m at 49.5 N).
+  `load_truth` moves on-grid positions to their cell centre, which halves the median match
+  distance (137 m to 67 m). Recall does not change: the 500 m match radius already absorbed it.
 
 ## Reproduce
+
+The figure above is regenerated from current outputs with `python -m iceberg_sar.cli figures`.
 
 ```powershell
 python -m iceberg_sar.cli order S1A_IW_GRDH_1SDH_20190429T094108_20190429T094133_027003_030A4E_8BD8

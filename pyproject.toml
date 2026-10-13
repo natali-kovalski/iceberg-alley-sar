@@ -30,6 +30,13 @@ ml = [
     "scikit-learn>=1.4",
     "py7zr>=0.20",
 ]
+# Milestone 5. Install with the CUDA torch already in place:
+#   pip install -e .[ml,thor] --extra-index-url https://download.pytorch.org/whl/cu124
+thor = [
+    "terratorch==1.2.5",
+    "thor @ git+https://github.com/FM4CS/THOR@fused_alibi",
+    "thor-terratorch-ext @ git+https://github.com/FM4CS/thor_terratorch_ext",
+]
 dev = [
     "pytest>=8.0",
     "ruff>=0.4",

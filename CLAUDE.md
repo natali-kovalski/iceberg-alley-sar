@@ -80,10 +80,25 @@ iceberg-alley-sar/
 ## Current status (as of 2026-10-05)
 - **Milestones 0–3: done.** Search, HyP3 RTC (10 m), land + pack-ice masks, CA-CFAR on HV with strip rejection and an HH co-pol check, GeoJSON detections, and the Vue + Cesium viewer.
 - **Scenes:** spring 2025 (2025-05-02, 05-08, 05-14) in the viewer, checked against NAIS charts. Spring 2019 (2019-04-15, 04-29) and 2020-06-10 for point-level validation.
-- **Validation (beyond the plan):** 77% recall (207/268) against same-pass IIP analyst labels on 2019-04-29, median offset 137 m. Precision is not measurable without AIS. Large bergs (>120 m) are missed. See `docs/validation-findings.md`.
+- **Validation (beyond the plan):** 78% recall (207/267) against same-pass IIP analyst labels on 2019-04-29, median offset 67 m (IIP positions are truncated to 0.1'; corrected to cell centres). Precision is not measurable without AIS. Large bergs (>120 m) are missed: their grown blobs exceed `max_structure_m` (the ice-strip rule). See `docs/validation-findings.md`.
 - **Experimental:** iceberg vs. ship CNN trained on Kaggle chips (`iceberg_prob`). Use it as a review hint only; see the README.
 - **Milestone 4: done.** Portfolio README with screenshots, `cli.py run` end to end for a date range (`pipeline.py`, scene selection in `run:` in `config.yaml`), and two LinkedIn post drafts in `docs/linkedin-posts.md` (local only, excluded via `.git/info/exclude`, never commit). Not done: Dockerfile, deployed static viewer.
 - **Stretch not done:** OS-CFAR / K-distribution (`cfar.variant` has a slot for it).
+- **Milestone 5 (branch `milestone5-thor`):** 5a and 5b done (`thor-smoke`, `thor-scenes/order/download/chips`, `src/iceberg_sar/thor/`). 20 sigma0 training frames, 723 train / 154 val chips, 432 / 78 visible labelled bergs. THOR takes HH/HV natively; frozen features separate bergs and ice strips from water. See `docs/thor-vs-cfar.md`. Local GPU (CUDA) works; no Triton on Windows, so dynamo is disabled.
+  5c done: cached features (blocks 2/5/8/11), linear + CenterNet heads (`thor-features`,
+  `thor-train`, `thor-overlays`, `thor-detect`). Val moved to two year folds (2019 <-> 2020; the
+  Feb-Mar 2019 chips are pack ice, kept as a separate stress set). Linear F1 0.72 / 0.83 on the
+  folds, CenterNet no better (overfits). Final 5d models: linear refit on both years (150 epochs),
+  CenterNet = ensemble of the two fold models.
+  5d done (`thor-compare [--sweep]`, `thor/compare.py`): 4 held-out same-pass frames (2019-04-17,
+  04-23, 04-24, 04-29; 512 labels). Pooled at matched detection counts THOR linear 0.84 vs CFAR
+  0.74 (04-29 alone: 0.89 vs 0.74); CenterNet equal; small bergs a tie. HyP3 rejects open-ocean
+  frames (no DEM), so richer April frames couldn't be added (`data/thor/test_candidates.csv`).
+  CFAR misses large bergs (4/14 vs THOR 11/14): grown blobs (340-470 m) exceed `max_structure_m`.
+  THOR needs the CFAR's pack-ice mask (47-59% of its peaks on 04-15 fall in it). 2019-04-15 is
+  unscored (aircraft truth, drift unresolved). THOR is a toggleable viewer layer.
+  PFA sweep runs in one pass (`detect_raster_multi`); `component_table` stats now reduce over
+  labelled pixels only (same output, much faster). Not done: 4x4 patches, AIS precision.
 
 ## Milestones
 
@@ -165,7 +180,8 @@ New code lives in `src/iceberg_sar/thor/` (`encoder.py`, `chips.py`, `targets.py
 - Extract 512×512 crops: crops around labelled bergs, plus negative crops sampled
   from open water, the pack-ice edge and coastal areas. Apply the land/ice masks as
   for the CFAR.
-- Targets: apply the drift offset from `matching.py`, then render each sighting as
+- Targets: same-pass labels need no drift; move IIP positions to their 0.1' cell centre, snap
+  to the HH peak (done: `targets.py`), then render each sighting as
   a Gaussian on a heatmap (sigma in metres in config). Point labels, no masks.
 - Save the chips under `data/thor/chips/`.
 - **Done when:** I can see a contact sheet of ~20 crops with target Gaussians
@@ -200,7 +216,11 @@ New code lives in `src/iceberg_sar/thor/` (`encoder.py`, `chips.py`, `targets.py
 - Start with THOR Tiny at 8×8 patches. The paper reports Tiny ≈ Base, and 8×8 is close to
   4×4 at a quarter of the tokens. Try 4×4 only if small bergs are being missed.
 - Encoder stays frozen. No fine-tuning of THOR itself.
-- CenterNet head is primary, linear head is the sanity baseline.
+- CenterNet head is primary, linear head is the sanity baseline. (Revised in 5c: linear matched or
+  beat CenterNet on both folds, so linear is the main THOR curve, CenterNet the second.)
+- Head selection on year folds, never on April 2019. Final models train without a val set
+  (linear: fixed-epoch refit; CenterNet: fold ensemble), see `docs/thor-vs-cfar.md`. Nothing is
+  tuned on the 5d test scenes; if something must change after 5d, change it on the folds and say so.
 
 #### Milestone 5 pitfalls
 - Radiometry: gamma0 RTC ≠ sigma0. Use sigma0 products or convert with incidence angle.

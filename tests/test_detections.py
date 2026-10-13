@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 import rasterio
 from rasterio.transform import from_origin
@@ -11,6 +12,7 @@ from iceberg_sar.cfar import CfarParams
 from iceberg_sar.detections import (
     DetectionParams,
     detect_raster,
+    detect_raster_multi,
     scene_timestamp,
     to_geodataframe,
 )
@@ -142,3 +144,25 @@ def test_scene_timestamp() -> None:
     assert scene_timestamp(NAME) == "2025-05-08T09:49:25Z"
     with pytest.raises(ValueError):
         scene_timestamp("no_time_here")
+
+
+def test_multi_threshold_equals_separate_runs(scene: dict[str, Path]) -> None:
+    """A PFA sweep in one pass gives exactly what separate runs give."""
+    p = DetectionParams(min_area_px=2, max_area_px=500, edge_buffer_px=10, max_extent_px=20,
+                        max_structure_px=15, copol_min_contrast_db=6, block_rows=50)
+    cfars = [CfarParams(guard_px=3, background_px=10, pfa=pfa, enl=4.0)
+             for pfa in (1e-3, 1e-6, 1e-9)]
+    multi, _, _ = detect_raster_multi(scene, "HV", cfars, p)
+    for c, table in zip(cfars, multi, strict=True):
+        single, _, _ = detect_raster(scene, "HV", c, p)
+        assert len(single) > 0
+        pd.testing.assert_frame_equal(table.reset_index(drop=True),
+                                      single.reset_index(drop=True))
+    assert len(multi[0]) >= len(multi[2])
+
+
+def test_multi_threshold_needs_same_windows(scene: dict[str, Path]) -> None:
+    p = DetectionParams(min_area_px=2, max_area_px=500, edge_buffer_px=10)
+    with pytest.raises(ValueError):
+        detect_raster_multi(scene, "HV", [CfarParams(3, 10, 1e-6, 4.0),
+                                          CfarParams(3, 12, 1e-6, 4.0)], p)

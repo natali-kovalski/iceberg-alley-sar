@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from iceberg_sar.chips import (  # noqa: E402
 )
 from iceberg_sar.classify.predict import Ensemble, load_ensemble  # noqa: E402
 from iceberg_sar.config import Config  # noqa: E402
+from iceberg_sar.preprocess import product_radiometry  # noqa: E402
 
 
 def chip_params(cfg: Config) -> ChipParams:
@@ -88,8 +90,11 @@ def classify_product(product_dir: Path, cfg: Config, band: str = "HV") -> dict[s
         utm = det.to_crs(_raster_crs(bands["HH"]))
         inc = np.where(np.isnan(inc), sample_incidence_deg(bands["inc"], utm.geometry.x.to_numpy(),
                                                            utm.geometry.y.to_numpy()), inc)
+    params = chip_params(cfg)
+    if product_radiometry(name) == "sigma0":  # already what Kaggle has
+        params = dataclasses.replace(params, to_sigma0=False)
     chips, valid = extract_chips(bands, det["row"].to_numpy(), det["col"].to_numpy(), inc,
-                                 chip_params(cfg), curve)
+                                 params, curve)
     for v, ens in variants.items():
         p = ens.predict(chips, inc) if len(det) else np.empty(0)
         det[f"iceberg_prob_{v}"] = np.round(p, 3)

@@ -85,8 +85,14 @@ def detect_ice(
     strip_min_km2: float = 0.5,
     water_percentile: float = 25.0,
     closing_m: float = 600.0,
+    min_db: float | None = None,
 ) -> tuple[np.ndarray, float]:
     """Boolean ice mask on the coarse grid, plus the open-water reference level (dB).
+
+    A cell is "bright" if it is `min_excess_db` above the open-water reference and, when
+    `min_db` is set, also above that absolute level. HyP3 removes the HV noise floor, so on
+    calm days the reference can sit near -40 dB and slightly brighter water by coasts and
+    swath edges passes the relative test alone.
 
     Two rules, OR-ed, then buffered:
     - pack-ice cores: bright AND uniform (CV < max_cv), closed, >= min_area_km2.
@@ -101,6 +107,8 @@ def detect_ice(
         return np.zeros(mean_lin.shape, dtype=bool), float("nan")
     water_db = float(np.percentile(db[finite], water_percentile))
     bright = finite & (db > water_db + min_excess_db)
+    if min_db is not None:
+        bright &= db > min_db
     cell_km2 = cell_m**2 / 1e6
 
     r_close = max(1, round(closing_m / cell_m))
@@ -114,6 +122,31 @@ def detect_ice(
     if r_buf > 0 and ice.any():
         ice = ndimage.binary_dilation(ice, structure=_disk(r_buf))
     return ice, water_db
+
+
+def ice_core(mask: np.ndarray, cell_m: float, buffer_m: float) -> np.ndarray:
+    """Undo detect_ice's buffer: erode the buffered mask by the same disk.
+
+    Gives the ice before buffering, except that gaps narrower than ~2 x buffer_m between ice
+    areas stay filled (erosion after dilation is a closing). Cells beyond the array border
+    count as ice so cores touching the scene edge are not eaten away.
+    """
+    r_buf = round(buffer_m / cell_m)
+    if r_buf <= 0 or not mask.any():
+        return mask.copy()
+    return ndimage.binary_erosion(mask, structure=_disk(r_buf), border_value=1)
+
+
+def write_core_mask(mask_path: Path, buffer_m: float, out_path: Path) -> Path:
+    """Unbuffered pack-ice mask next to a buffered one (same grid, 0/1, 255 = nodata)."""
+    with rasterio.open(mask_path) as src:
+        mask = src.read(1) == 1
+        cell_m = abs(src.transform.a)
+        profile = src.profile
+    core = ice_core(mask, cell_m, buffer_m)
+    with rasterio.open(out_path, "w", **profile) as dst:
+        dst.write(core.astype(profile["dtype"]), 1)
+    return out_path
 
 
 def _remove_small(mask: np.ndarray, min_cells: float, connectivity: int = 1) -> np.ndarray:
