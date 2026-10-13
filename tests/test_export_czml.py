@@ -269,3 +269,53 @@ def test_pass_coverage_closes_seam_between_frames() -> None:
     gap, _, frac = pass_coverage(aoi, [left, right])
     assert gap.geom_type == "Polygon"
     assert frac == pytest.approx(0.75, abs=1e-3)
+
+
+def test_training_frame_split_and_truth(cfg: Config) -> None:
+    """THOR training frame: split on the scene, visible IIP labels as `truth/` crosses."""
+    import pandas as pd
+    import rasterio
+    from rasterio.transform import from_origin
+
+    first, second = SCENES
+    raw = cfg.path("raw") / first
+    with rasterio.open(raw / f"{first}_HH.tif", "w", driver="GTiff", width=10, height=10,
+                       count=1, dtype="float32", crs="EPSG:32621",
+                       transform=from_origin(600_000, 5_600_000, 10, 10)) as dst:
+        dst.write(np.ones((1, 10, 10), np.float32))
+    chips = cfg.root / "data" / "thor" / "chips"
+    (chips / first).mkdir(parents=True)
+    (chips / first / "scene.json").write_text(json.dumps({"split": "train"}), encoding="utf-8")
+    pd.DataFrame({
+        "season": 2025, "number": [101, 102], "time": "2025-05-02 09:47:00", "method": "SAT-HIGH",
+        "size": ["SM", "MED"], "shape": "GEN", "source": "SNL1", "row": [2.0, 5.0],
+        "col": [3.0, 5.0], "snapped": [True, False], "snap_m": [40.0, 0.0],
+        "visible": [True, False],
+    }).to_csv(chips / first / "labels.csv", index=False)
+
+    scenes = find_scenes(cfg, "HV", chips_dir=chips)
+    assert (scenes[0].split, scenes[1].split) == ("train", None)
+    packets = build_czml(scenes, ViewerParams())
+    truth = [p for p in packets if p["id"].startswith("truth/")]
+    assert len(truth) == 1                                         # masked label left out
+    t = truth[0]
+    assert t["parent"] == f"scene/{first}" and "billboard" in t
+    assert t["properties"]["number"] == 101
+    # Snapped pixel (row 2, col 3), at its centre, in lon/lat.
+    from pyproj import Transformer
+
+    want = Transformer.from_crs(32621, 4326, always_xy=True).transform(600_035, 5_599_975)
+    assert t["position"]["cartographicDegrees"][:2] == pytest.approx(want, abs=1e-7)
+    by_id = {p["id"]: p["properties"] for p in packets if p["id"].startswith("scene/")}
+    assert by_id[f"scene/{first}"]["thor_split"] == "train"
+    assert by_id[f"scene/{first}"]["n_truth"] == 1
+    assert "thor_split" not in by_id[f"scene/{second}"]
+    assert "n_truth" not in by_id[f"scene/{second}"]
+
+
+def test_export_leaves_out_excluded_scenes(cfg: Config) -> None:
+    first, second = SCENES
+    cfg.raw["viewer"] = {"exclude": [first]}
+    _, packets = export_czml(cfg)
+    ids = {p["id"] for p in packets}
+    assert f"scene/{first}" not in ids and f"scene/{second}" in ids

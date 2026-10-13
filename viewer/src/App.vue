@@ -20,7 +20,7 @@ const currentId = ref<string>();
 const legend = ref<Legend>({ nearIceKm: 5, sizeBreaksM: [180, 270], sizePx: [6, 13, 22] });
 const error = ref<string>();
 const compareScene = ref<SceneInfo>(); // scene whose THOR vs CFAR chart is open
-const layers = reactive<Layers>({ nearIce: true, seaIce: true, footprints: true, unobserved: true, thor: true });
+const layers = reactive<Layers>({ nearIce: true, seaIce: true, footprints: true, unobserved: true, thor: true, truth: true });
 
 // Plain variables, not refs: Cesium objects must stay out of Vue's reactivity.
 let viewer: Viewer | undefined;

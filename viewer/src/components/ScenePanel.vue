@@ -20,6 +20,15 @@ const sizeClasses = computed(() => {
   ];
 });
 const hasThor = computed(() => props.scenes.some((s) => s.nThor !== undefined));
+const hasTruth = computed(() => props.scenes.some((s) => s.nTruth !== undefined));
+const SPLIT_BADGE: Record<string, string> = { train: "THOR train", val: "THOR val" };
+function splitTitle(s: SceneInfo): string | undefined {
+  if (!s.split) return undefined;
+  const what = s.split === "train"
+    ? "THOR training frame: the head was fitted on these labels, so THOR results here are in-sample"
+    : "THOR pack-ice validation frame: labelled, never trained on";
+  return `${what}. ${s.nTruth ?? 0} IIP analyst labels shown.`;
+}
 const currentHasIce = computed(() => {
   const s = props.scenes.find((x) => x.id === props.currentId);
   return s ? hasIce(s) : props.scenes.some(hasIce);
@@ -35,6 +44,7 @@ const currentHasIce = computed(() => {
     <div class="key"><span class="dot cfar" /> CA-CFAR candidate</div>
     <div v-if="hasThor" class="key"><span class="ring" /> THOR candidate, score ≥ {{ legend.thorScore ?? 0.35 }}</div>
     <div v-if="hasThor" class="key"><span class="ring both"><span class="dot cfar" /></span> found by both</div>
+    <div v-if="hasTruth" class="key"><span class="cross">✕</span> IIP analyst label, same pass (THOR training frames)</div>
     <div class="sizes-title">Size = target extent, same classes for both</div>
     <div class="sizes">
       <div v-for="c in sizeClasses" :key="c.label" class="size">
@@ -54,12 +64,13 @@ const currentHasIce = computed(() => {
       <li
         v-for="s in scenes"
         :key="s.id"
-        :class="{ active: s.id === currentId, compare: s.compare }"
-        :title="s.compare ? 'THOR vs CFAR compared on this pass: click for the recall chart' : undefined"
+        :class="{ active: s.id === currentId, compare: s.compare, [`split-${s.split}`]: s.split }"
+        :title="s.compare ? 'THOR vs CFAR compared on this pass: click for the recall chart' : splitTitle(s)"
         @click="emit('jump', s)"
       >
         <span class="date">{{ s.date }}</span>
         <span v-if="s.compare" class="badge">THOR vs CFAR</span>
+        <span v-else-if="s.split" class="badge" :class="`badge-${s.split}`">{{ SPLIT_BADGE[s.split] ?? s.split }}</span>
       </li>
     </ul>
 
@@ -74,6 +85,7 @@ const currentHasIce = computed(() => {
     <label><input v-model="layers.footprints" type="checkbox" /> Scene footprint</label>
     <label v-if="hasCoverage"><input v-model="layers.unobserved" type="checkbox" /> Dim area not imaged</label>
     <label v-if="hasThor"><input v-model="layers.thor" type="checkbox" /> THOR detections (foundation model)</label>
+    <label v-if="hasTruth"><input v-model="layers.truth" type="checkbox" /> IIP labels on training frames</label>
   </aside>
 </template>
 
@@ -106,7 +118,12 @@ h2 { margin: 14px 0 6px; font-size: 12px; text-transform: uppercase; letter-spac
 .scenes li:hover { background: rgba(255, 255, 255, 0.06); }
 .scenes li.compare { display: flex; justify-content: space-between; align-items: center; border-left: 3px solid rgb(0, 229, 255); }
 .scenes li.active { border-color: #fba238; background: rgba(251, 162, 56, 0.12); }
+.scenes li.split-train, .scenes li.split-val { display: flex; justify-content: space-between; align-items: center; border-left: 3px solid #1e4fd8; }
+.scenes li.split-val { border-left-style: dashed; }
+.cross { width: 12px; text-align: center; font-size: 12px; font-weight: 700; color: #1e4fd8; flex: none; }
 .badge { font-size: 10px; padding: 1px 6px; border-radius: 8px; color: rgb(0, 229, 255); border: 1px solid rgba(0, 229, 255, 0.6); }
+.badge-train, .badge-val { color: #9db4f0; border-color: #9db4f0; }
+.badge-val { border-style: dashed; }
 .date { font-weight: 600; }
 .muted { color: #8fa3bb; }
 label { display: block; margin: 4px 0; cursor: pointer; }

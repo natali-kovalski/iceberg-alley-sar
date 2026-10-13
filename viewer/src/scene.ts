@@ -44,6 +44,10 @@ export interface SceneInfo {
   coveragePct?: number; // share of the AOI the pass observed; undefined without footprints
   observedKm2?: number;
   compare?: Compare; // THOR vs CFAR head-to-head on this pass (Milestone 5d)
+  // THOR training frame (5b): "train" = the head was fitted on it, "val" = pack-ice set, never
+  // trained on. Undefined for every other pass.
+  split?: string;
+  nTruth?: number; // IIP analyst labels shown on a training frame
 }
 
 export interface Compare {
@@ -64,6 +68,7 @@ export interface Layers {
   footprints: boolean;
   unobserved: boolean;
   thor: boolean;
+  truth: boolean;
 }
 
 function esriImagery(): ImageryLayer {
@@ -140,6 +145,8 @@ export async function loadDetections(viewer: Viewer): Promise<{
       nNearIce: (prop(e, "n_near_ice") as number | undefined) ?? 0,
       iceAreaKm2: (prop(e, "ice_area_km2") as number | undefined) ?? 0,
       nThor: prop(e, "n_thor") as number | undefined,
+      split: prop(e, "thor_split") as string | undefined,
+      nTruth: prop(e, "n_truth") as number | undefined,
     }))
     .sort((a, b) => JulianDate.compare(a.start, b.start));
 
@@ -165,6 +172,8 @@ export async function loadDetections(viewer: Viewer): Promise<{
     s.nNearIce += f.nNearIce;
     s.iceAreaKm2 += f.iceAreaKm2;
     if (f.nThor !== undefined) s.nThor = (s.nThor ?? 0) + f.nThor;
+    if (f.nTruth !== undefined) s.nTruth = (s.nTruth ?? 0) + f.nTruth;
+    s.split ??= f.split;
   }
   const scenes = [...byDate.values()];
   const compare = await loadCompare();
@@ -210,6 +219,7 @@ export function applyLayers(dataSource: CzmlDataSource, layers: Layers): void {
     if (e.id.startsWith("det/")) e.show = layers.nearIce || prop(e, "near_ice") !== true;
     else if (e.id.startsWith("thor/"))
       e.show = layers.thor && (layers.nearIce || prop(e, "near_ice") !== true);
+    else if (e.id.startsWith("truth/")) e.show = layers.truth;
     else if (e.id.startsWith("seaice/")) e.show = layers.seaIce;
     else if (e.id.startsWith("footprint/")) e.show = layers.footprints;
     else if (e.id.startsWith("unobserved/")) e.show = layers.unobserved;

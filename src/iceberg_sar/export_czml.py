@@ -15,10 +15,15 @@ detectors found reads as a dot inside a ring.
 One Sentinel-1 frame covers only ~15-40% of the AOI. Frames of one pass (same day) are grouped
 into a `pass/` entity with the AOI share they observe, and the AOI outside them is drawn as an
 `unobserved/` polygon, so an unimaged sea never reads as an empty one.
+
+THOR training frames (Milestone 5b) carry their split (`train`, or `val` for the pack-ice set
+that was never trained on) and their same-pass IIP analyst labels as `truth/` crosses, at the
+HH peak they were snapped to: the positions the THOR head was trained on.
 """
 
 from __future__ import annotations
 
+import base64
 import json
 import math
 from dataclasses import dataclass
@@ -28,11 +33,15 @@ from typing import Any
 
 import geopandas as gpd
 import numpy as np
+import pandas as pd
+import rasterio
+from pyproj import Transformer
 from shapely import make_valid, union_all
 from shapely.geometry import Polygon
 from shapely.geometry.base import BaseGeometry
 
 from iceberg_sar.config import Config
+from iceberg_sar.preprocess import find_rtc_bands
 from iceberg_sar.static_targets import StaticParams, find_static, is_static, static_params
 
 NEAR_ICE_RGBA = [150, 150, 150, 200]
@@ -44,6 +53,16 @@ THOR_RING_PX = 2                 # ring width; the ring sits just outside a same
 AOI_RGBA = [255, 255, 255, 220]
 UNOBSERVED_RGBA = [8, 12, 20, 90]   # lightly dims the basemap where no frame of the pass looked
 SEAM_CLOSE_M = 500.0               # closes slivers between frames of one pass
+TRUTH_HEX = "#1e4fd8"              # dark blue X: a label, not a detection (dots and rings are)
+TRUTH_PX = 15
+_CROSS = "M2 2L13 13M13 2L2 13"
+TRUTH_IMAGE = "data:image/svg+xml;base64," + base64.b64encode(
+    f'<svg xmlns="http://www.w3.org/2000/svg" width="{TRUTH_PX}" height="{TRUTH_PX}">'
+    f'<path d="{_CROSS}" stroke="{TRUTH_HEX}" stroke-width="2.5" stroke-linecap="round"/></svg>'
+    .encode()).decode()
+# Columns of a chip scene's labels.csv kept as CZML properties.
+TRUTH_PROPS = ("season", "number", "time", "method", "size", "shape", "source", "snapped",
+               "snap_m")
 
 
 @dataclass(frozen=True)
@@ -56,6 +75,7 @@ class ViewerParams:
     simplify_m: float = 100.0         # polygon simplification before reprojecting
     thor_model: str = "thor-linear"   # THOR detection tag shown as its own layer
     thor_score: float = 0.35          # THOR operating point (thor.compare.view_score)
+    exclude: tuple[str, ...] = ()     # products left out of the viewer
 
 
 @dataclass(frozen=True)
@@ -66,6 +86,9 @@ class Scene:
     footprint: Path | None
     seaice: Path | None
     thor: Path | None = None
+    split: str | None = None     # THOR chips split ("train" / "val"); None = not a training frame
+    labels: Path | None = None   # THOR chips labels.csv (snapped same-pass IIP labels)
+    raster: Path | None = None   # HH band: pixel grid of the labels' row / col
 
 
 def _iso(t: datetime) -> str:
@@ -257,6 +280,65 @@ def thor_packets(gdf: gpd.GeoDataFrame, availability: str, p: ViewerParams
     return packets
 
 
+def read_truth(labels: Path, raster: Path) -> pd.DataFrame:
+    """Visible IIP labels of a THOR training frame in lon/lat, at their snapped pixel.
+
+    Labels outside the AOI or within the land buffer (`visible` False) were never targets.
+    """
+    df = pd.read_csv(labels)
+    df = df[df["visible"].astype(bool)].reset_index(drop=True)
+    if df.empty:
+        return df.assign(lon=[], lat=[])
+    with rasterio.open(raster) as src:
+        x, y = rasterio.transform.xy(src.transform, df["row"].to_numpy(), df["col"].to_numpy())
+        crs = src.crs
+    lon, lat = Transformer.from_crs(crs, 4326, always_xy=True).transform(x, y)
+    return df.assign(lon=np.asarray(lon), lat=np.asarray(lat))
+
+
+def _truth_description(props: dict[str, Any], scene_id: str) -> str:
+    g = props.get
+    snap = (f"to the HH peak, {_num(g('snap_m'), '.0f')} m" if g("snapped")
+            else "no (0.1' cell centre)")
+    rows = [
+        ("Scene", scene_id),
+        ("IIP sighting", f"{g('season')} #{g('number')}"),
+        ("Time (UTC)", g("time")),
+        ("Source", f"{g('source')} / {g('method')}"),
+        ("Size / shape", f"{g('size')} / {g('shape')}"),
+        ("Lat / lon", f"{_num(g('lat'), '.4f')}, {_num(g('lon'), '.4f')}"),
+        ("Snapped", snap),
+    ]
+    body = "".join(f"<tr><th>{k}</th><td>{v}</td></tr>" for k, v in rows)
+    return f'<table class="cesium-infoBox-defaultTable"><tbody>{body}</tbody></table>'
+
+
+def truth_packets(truth: pd.DataFrame, scene_id: str, availability: str
+                  ) -> list[dict[str, Any]]:
+    """IIP labels as green crosses, drawn in front of the detector dots and rings."""
+    packets = []
+    for i, row in truth.iterrows():
+        raw = {k: row[k] for k in (*TRUTH_PROPS, "lat", "lon") if k in row}
+        props = {k: c for k, v in raw.items() if (c := _clean(v)) is not None}
+        packets.append({
+            "id": f"truth/{scene_id}/{i}",
+            "name": f"IIP label {row['season']} #{row['number']}",
+            "parent": f"scene/{scene_id}",
+            "availability": availability,
+            "description": _truth_description(props, scene_id),
+            "position": {"cartographicDegrees": [float(row["lon"]), float(row["lat"]), 0.0]},
+            "billboard": {
+                "image": TRUTH_IMAGE,
+                "width": TRUTH_PX,
+                "height": TRUTH_PX,
+                # Toward the camera, so a cross is never hidden under a same-place dot or ring.
+                "eyeOffset": {"cartesian": [0.0, 0.0, -500.0]},
+            },
+            "properties": props,
+        })
+    return packets
+
+
 def polygon_packets(geom: BaseGeometry, id_prefix: str, availability: str,
                     fill_rgba: list[int] | None, outline_rgba: list[int]
                     ) -> list[dict[str, Any]]:
@@ -281,12 +363,14 @@ def polygon_packets(geom: BaseGeometry, id_prefix: str, availability: str,
 
 
 def find_scenes(cfg: Config, band: str, start: date | None = None,
-                end: date | None = None, thor_model: str = "thor-linear") -> list[Scene]:
+                end: date | None = None, thor_model: str = "thor-linear",
+                chips_dir: Path | None = None) -> list[Scene]:
     """Scenes with a detections GeoJSON for `band` at the configured HyP3 resolution, by time.
 
     Filtering on the product's RTC resolution (e.g. `_RTC10_`) keeps a date from showing
     twice when it was processed at both 20 m and 10 m. `start` / `end` (inclusive) keep only
-    scenes acquired in that date range.
+    scenes acquired in that date range. With `chips_dir` (THOR chips), training frames get
+    their split and labels.
     """
     det_dir = cfg.path("outputs") / "detections"
     rtc = f"_RTC{int(cfg.section('hyp3')['resolution'])}_"
@@ -300,9 +384,16 @@ def find_scenes(cfg: Config, band: str, start: date | None = None,
         shp = cfg.path("raw") / name / f"{name}_shape.shp"
         ice = cfg.path("outputs") / "seaice" / f"{name}_seaice.geojson"
         thor = det_dir / f"{name}_{thor_model}_detections.geojson"
+        split = labels = raster = None
+        meta = chips_dir / name / "scene.json" if chips_dir else None
+        if meta and meta.is_file():
+            split = json.loads(meta.read_text(encoding="utf-8"))["split"]
+            if meta.with_name("labels.csv").is_file() and (cfg.path("raw") / name).is_dir():
+                labels = meta.with_name("labels.csv")
+                raster = find_rtc_bands(cfg.path("raw") / name)["HH"]
         scenes.append(Scene(name, _parse(summary["timestamp"]), f,
                             shp if shp.is_file() else None, ice if ice.is_file() else None,
-                            thor if thor.is_file() else None))
+                            thor if thor.is_file() else None, split, labels, raster))
     return sorted(scenes, key=lambda s: s.start)
 
 
@@ -362,6 +453,8 @@ def build_czml(scenes: list[Scene], p: ViewerParams, static: gpd.GeoDataFrame | 
         if scene.seaice:
             ice = gpd.read_file(scene.seaice)
             ice_km2 = float(ice["area_km2"].sum()) if "area_km2" in ice else 0.0
+        truth = (read_truth(scene.labels, scene.raster) if scene.labels and scene.raster
+                 else None)
         packets.append({
             "id": f"scene/{scene.name}",
             "name": scene.name,
@@ -379,6 +472,8 @@ def build_czml(scenes: list[Scene], p: ViewerParams, static: gpd.GeoDataFrame | 
                 **({"n_thor": int((~near_ice(thor["distance_to_ice_km"].to_numpy(),
                                               p.near_ice_km)).sum()) if len(thor) else 0,
                     "thor_score": p.thor_score} if scene.thor else {}),
+                **({"thor_split": scene.split} if scene.split else {}),
+                **({"n_truth": len(truth)} if truth is not None else {}),
             },
         })
         pas = passes.setdefault(scene.start.date(), {"start": start, "until": shown_until,
@@ -398,6 +493,8 @@ def build_czml(scenes: list[Scene], p: ViewerParams, static: gpd.GeoDataFrame | 
                                        ICE_RGBA[:3] + [200])
         packets += detection_packets(gdf, avail, p)
         packets += thor_packets(thor, avail, p)
+        if truth is not None:
+            packets += truth_packets(truth, scene.name, avail)
     for day, pas in passes.items():
         avail = f"{_iso(pas['start'])}/{_iso(pas['until'])}"
         props: dict[str, Any] = {"date": day.isoformat(), "frames": " ".join(pas["frames"])}
@@ -427,6 +524,7 @@ def viewer_params(cfg: Config) -> ViewerParams:
         thor_model=str(v.get("thor_model", d.thor_model)),
         thor_score=float(cfg.raw.get("thor", {}).get("compare", {}).get("view_score",
                                                                          d.thor_score)),
+        exclude=tuple(v.get("exclude") or ()),
     )
 
 
@@ -446,7 +544,11 @@ def export_czml(cfg: Config, band: str = "HV", start: date | None = None,
     p = viewer_params(cfg)
     aoi_path = cfg.path("aoi") if "aoi" in cfg.section("paths") else None
     aoi = gpd.read_file(aoi_path) if aoi_path and aoi_path.is_file() else None
-    packets = build_czml(find_scenes(cfg, band, start, end, p.thor_model), p, static, sp, aoi)
+    thor = cfg.raw.get("thor", {}).get("training", {})
+    chips_dir = cfg.root / thor["dir"] / "chips" if "dir" in thor else None
+    scenes = [s for s in find_scenes(cfg, band, start, end, p.thor_model, chips_dir)
+              if s.name not in p.exclude]
+    packets = build_czml(scenes, p, static, sp, aoi)
     out = cfg.path("czml")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(packets, separators=(",", ":")), encoding="utf-8")

@@ -131,6 +131,11 @@ viewer:
   size_px: [6, 13, 22]      # point diameter per class
   simplify_m: 100           # footprint / pack-ice outline simplification
   thor_model: thor-linear   # THOR layer (Milestone 5): `thor-detect` tag; shown at thor.compare.view_score
+  exclude:                  # left out of the viewer: the ice mask misses the pack (the open-water
+                            # reference is itself ice), so detections in ice show as open water
+    - S1A_IW_20190228T094106_DHP_RTC10_G_spuned_6EBF
+    - S1B_IW_20190306T094024_DHP_RTC10_G_spuned_3600
+    - S1A_IW_20190317T094903_DHP_RTC10_G_spuned_3AF7
 
 chips:
   # Chips around detections for the iceberg/ship CNN, matched to the Kaggle chips.
