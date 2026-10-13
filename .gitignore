@@ -1,5 +1,7 @@
 # Data, outputs, and model weights: never commit
 data/
+# ...except the viewer's published, derived data (`cli.py publish`, served by Pages)
+!viewer/public/data/
 *.tif
 *.tiff
 *.zip
@@ -28,7 +30,6 @@ dist/
 # Viewer
 viewer/node_modules/
 viewer/dist/
-viewer/public/data/
 viewer/public/cesium/
 
 # OS / editor

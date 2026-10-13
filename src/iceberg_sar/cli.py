@@ -238,6 +238,21 @@ def czml(
 
 
 @app.command()
+def publish(config: ConfigOption = DEFAULT_CONFIG) -> None:
+    """Rebuild the viewer's static data (per-scene CZML, figures, manifest) from data/outputs.
+
+    Run `czml` first. The output folder (publish.out_dir) is committed and served by GitHub Pages.
+    """
+    from iceberg_sar.publish import publish as publish_data
+
+    out, manifest, total_mb = publish_data(load_config(config))
+    for e in manifest.scenes:
+        typer.echo(f"{e.date}  {e.detector:<4}  {e.scene_id}  detections={e.n_detections}")
+    n = len({e.scene_id for e in manifest.scenes})
+    typer.echo(f"ok  {out}  ({n} scenes, {len(manifest.scenes)} CZML files, {total_mb:.1f} MB)")
+
+
+@app.command()
 def run(
     config: ConfigOption = DEFAULT_CONFIG,
     start: DateOption = None,

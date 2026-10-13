@@ -1,0 +1,647 @@
+{
+ "generated": "2026-10-13T20:04:43Z",
+ "base_czml": "base.czml",
+ "compare_index": "compare/index.json",
+ "scenes": [
+  {
+   "scene_id": "S1A_IW_20190415T095705_DHP_RTC10_G_gpuned_59A9",
+   "date": "2019-04-15",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1A_IW_20190415T095705_DHP_RTC10_G_gpuned_59A9_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 53
+  },
+  {
+   "scene_id": "S1A_IW_20190415T095705_DHP_RTC10_G_gpuned_59A9",
+   "date": "2019-04-15",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1A_IW_20190415T095705_DHP_RTC10_G_gpuned_59A9_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 297
+  },
+  {
+   "scene_id": "S1A_IW_20190417T094107_DHP_RTC10_G_gpuned_EDB4",
+   "date": "2019-04-17",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1A_IW_20190417T094107_DHP_RTC10_G_gpuned_EDB4_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 311
+  },
+  {
+   "scene_id": "S1A_IW_20190417T094107_DHP_RTC10_G_gpuned_EDB4",
+   "date": "2019-04-17",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1A_IW_20190417T094107_DHP_RTC10_G_gpuned_EDB4_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 345
+  },
+  {
+   "scene_id": "S1B_IW_20190423T094026_DHP_RTC10_G_gpuned_A784",
+   "date": "2019-04-23",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1B_IW_20190423T094026_DHP_RTC10_G_gpuned_A784_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 337
+  },
+  {
+   "scene_id": "S1B_IW_20190423T094026_DHP_RTC10_G_gpuned_A784",
+   "date": "2019-04-23",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1B_IW_20190423T094026_DHP_RTC10_G_gpuned_A784_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 581
+  },
+  {
+   "scene_id": "S1A_IW_20190424T093305_DHP_RTC10_G_gpuned_132E",
+   "date": "2019-04-24",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1A_IW_20190424T093305_DHP_RTC10_G_gpuned_132E_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 44
+  },
+  {
+   "scene_id": "S1A_IW_20190424T093305_DHP_RTC10_G_gpuned_132E",
+   "date": "2019-04-24",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1A_IW_20190424T093305_DHP_RTC10_G_gpuned_132E_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 52
+  },
+  {
+   "scene_id": "S1A_IW_20190429T094108_DHP_RTC10_G_gpuned_671B",
+   "date": "2019-04-29",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1A_IW_20190429T094108_DHP_RTC10_G_gpuned_671B_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 531
+  },
+  {
+   "scene_id": "S1A_IW_20190429T094108_DHP_RTC10_G_gpuned_671B",
+   "date": "2019-04-29",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1A_IW_20190429T094108_DHP_RTC10_G_gpuned_671B_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 714
+  },
+  {
+   "scene_id": "S1A_IW_20190511T094108_DHP_RTC10_G_spuned_B52C",
+   "date": "2019-05-11",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1A_IW_20190511T094108_DHP_RTC10_G_spuned_B52C_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 45
+  },
+  {
+   "scene_id": "S1A_IW_20190511T094108_DHP_RTC10_G_spuned_B52C",
+   "date": "2019-05-11",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1A_IW_20190511T094108_DHP_RTC10_G_spuned_B52C_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 87
+  },
+  {
+   "scene_id": "S1B_IW_20190517T094027_DHP_RTC10_G_spuned_D4E0",
+   "date": "2019-05-17",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1B_IW_20190517T094027_DHP_RTC10_G_spuned_D4E0_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 33
+  },
+  {
+   "scene_id": "S1B_IW_20190517T094027_DHP_RTC10_G_spuned_D4E0",
+   "date": "2019-05-17",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1B_IW_20190517T094027_DHP_RTC10_G_spuned_D4E0_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 69
+  },
+  {
+   "scene_id": "S1A_IW_20190523T094109_DHP_RTC10_G_spuned_A2A0",
+   "date": "2019-05-23",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1A_IW_20190523T094109_DHP_RTC10_G_spuned_A2A0_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 12
+  },
+  {
+   "scene_id": "S1A_IW_20190523T094109_DHP_RTC10_G_spuned_A2A0",
+   "date": "2019-05-23",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1A_IW_20190523T094109_DHP_RTC10_G_spuned_A2A0_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 26
+  },
+  {
+   "scene_id": "S1B_IW_20190529T094027_DHP_RTC10_G_spuned_4D4E",
+   "date": "2019-05-29",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1B_IW_20190529T094027_DHP_RTC10_G_spuned_4D4E_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 15
+  },
+  {
+   "scene_id": "S1B_IW_20190529T094027_DHP_RTC10_G_spuned_4D4E",
+   "date": "2019-05-29",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1B_IW_20190529T094027_DHP_RTC10_G_spuned_4D4E_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 17
+  },
+  {
+   "scene_id": "S1A_IW_20190604T094109_DHP_RTC10_G_spuned_55AD",
+   "date": "2019-06-04",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1A_IW_20190604T094109_DHP_RTC10_G_spuned_55AD_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 12
+  },
+  {
+   "scene_id": "S1A_IW_20190604T094109_DHP_RTC10_G_spuned_55AD",
+   "date": "2019-06-04",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1A_IW_20190604T094109_DHP_RTC10_G_spuned_55AD_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 24
+  },
+  {
+   "scene_id": "S1B_IW_20190615T094825_DHP_RTC10_G_spuned_E72B",
+   "date": "2019-06-15",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1B_IW_20190615T094825_DHP_RTC10_G_spuned_E72B_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 22
+  },
+  {
+   "scene_id": "S1B_IW_20190615T094825_DHP_RTC10_G_spuned_E72B",
+   "date": "2019-06-15",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1B_IW_20190615T094825_DHP_RTC10_G_spuned_E72B_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 25
+  },
+  {
+   "scene_id": "S1A_IW_20190616T094110_DHP_RTC10_G_spuned_9A4B",
+   "date": "2019-06-16",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1A_IW_20190616T094110_DHP_RTC10_G_spuned_9A4B_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 5
+  },
+  {
+   "scene_id": "S1A_IW_20190616T094110_DHP_RTC10_G_spuned_9A4B",
+   "date": "2019-06-16",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1A_IW_20190616T094110_DHP_RTC10_G_spuned_9A4B_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 18
+  },
+  {
+   "scene_id": "S1B_IW_20200427T095644_DHP_RTC10_G_spuned_8822",
+   "date": "2020-04-27",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1B_IW_20200427T095644_DHP_RTC10_G_spuned_8822_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 96
+  },
+  {
+   "scene_id": "S1B_IW_20200427T095644_DHP_RTC10_G_spuned_8822",
+   "date": "2020-04-27",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1B_IW_20200427T095644_DHP_RTC10_G_spuned_8822_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 195
+  },
+  {
+   "scene_id": "S1B_IW_20200504T094829_DHP_RTC10_G_spuned_6D50",
+   "date": "2020-05-04",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1B_IW_20200504T094829_DHP_RTC10_G_spuned_6D50_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 77
+  },
+  {
+   "scene_id": "S1B_IW_20200504T094829_DHP_RTC10_G_spuned_6D50",
+   "date": "2020-05-04",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1B_IW_20200504T094829_DHP_RTC10_G_spuned_6D50_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 76
+  },
+  {
+   "scene_id": "S1A_IW_20200505T094114_DHP_RTC10_G_spuned_D633",
+   "date": "2020-05-05",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1A_IW_20200505T094114_DHP_RTC10_G_spuned_D633_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 34
+  },
+  {
+   "scene_id": "S1A_IW_20200505T094114_DHP_RTC10_G_spuned_D633",
+   "date": "2020-05-05",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1A_IW_20200505T094114_DHP_RTC10_G_spuned_D633_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 70
+  },
+  {
+   "scene_id": "S1B_IW_20200509T095644_DHP_RTC10_G_spuned_5BCE",
+   "date": "2020-05-09",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1B_IW_20200509T095644_DHP_RTC10_G_spuned_5BCE_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 15
+  },
+  {
+   "scene_id": "S1B_IW_20200509T095644_DHP_RTC10_G_spuned_5BCE",
+   "date": "2020-05-09",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1B_IW_20200509T095644_DHP_RTC10_G_spuned_5BCE_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 29
+  },
+  {
+   "scene_id": "S1A_IW_20200510T094846_DHP_RTC10_G_spuned_C8A6",
+   "date": "2020-05-10",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1A_IW_20200510T094846_DHP_RTC10_G_spuned_C8A6_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 7
+  },
+  {
+   "scene_id": "S1A_IW_20200510T094911_DHP_RTC10_G_spuned_B7E9",
+   "date": "2020-05-10",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1A_IW_20200510T094911_DHP_RTC10_G_spuned_B7E9_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 19
+  },
+  {
+   "scene_id": "S1A_IW_20200510T094846_DHP_RTC10_G_spuned_C8A6",
+   "date": "2020-05-10",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1A_IW_20200510T094846_DHP_RTC10_G_spuned_C8A6_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 28
+  },
+  {
+   "scene_id": "S1A_IW_20200510T094911_DHP_RTC10_G_spuned_B7E9",
+   "date": "2020-05-10",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1A_IW_20200510T094911_DHP_RTC10_G_spuned_B7E9_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 85
+  },
+  {
+   "scene_id": "S1A_IW_20200515T095712_DHP_RTC10_G_spuned_29DC",
+   "date": "2020-05-15",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1A_IW_20200515T095712_DHP_RTC10_G_spuned_29DC_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 15
+  },
+  {
+   "scene_id": "S1A_IW_20200515T095712_DHP_RTC10_G_spuned_29DC",
+   "date": "2020-05-15",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1A_IW_20200515T095712_DHP_RTC10_G_spuned_29DC_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 28
+  },
+  {
+   "scene_id": "S1B_IW_20200516T094804_DHP_RTC10_G_spuned_6C98",
+   "date": "2020-05-16",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1B_IW_20200516T094804_DHP_RTC10_G_spuned_6C98_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 22
+  },
+  {
+   "scene_id": "S1B_IW_20200516T094829_DHP_RTC10_G_spuned_B410",
+   "date": "2020-05-16",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1B_IW_20200516T094829_DHP_RTC10_G_spuned_B410_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 47
+  },
+  {
+   "scene_id": "S1B_IW_20200516T094804_DHP_RTC10_G_spuned_6C98",
+   "date": "2020-05-16",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1B_IW_20200516T094804_DHP_RTC10_G_spuned_6C98_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 29
+  },
+  {
+   "scene_id": "S1B_IW_20200516T094829_DHP_RTC10_G_spuned_B410",
+   "date": "2020-05-16",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1B_IW_20200516T094829_DHP_RTC10_G_spuned_B410_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 59
+  },
+  {
+   "scene_id": "S1A_IW_20200517T094115_DHP_RTC10_G_spuned_5283",
+   "date": "2020-05-17",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1A_IW_20200517T094115_DHP_RTC10_G_spuned_5283_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 12
+  },
+  {
+   "scene_id": "S1A_IW_20200517T094115_DHP_RTC10_G_spuned_5283",
+   "date": "2020-05-17",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1A_IW_20200517T094115_DHP_RTC10_G_spuned_5283_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 25
+  },
+  {
+   "scene_id": "S1A_IW_20200610T094116_DHP_RTC10_G_gpuned_DE43",
+   "date": "2020-06-10",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1A_IW_20200610T094116_DHP_RTC10_G_gpuned_DE43_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 7
+  },
+  {
+   "scene_id": "S1A_IW_20200610T094116_DHP_RTC10_G_gpuned_DE43",
+   "date": "2020-06-10",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1A_IW_20200610T094116_DHP_RTC10_G_gpuned_DE43_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 30
+  },
+  {
+   "scene_id": "S1C_IW_20250502T094802_DHP_RTC10_G_gpuned_F77A",
+   "date": "2025-05-02",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1C_IW_20250502T094802_DHP_RTC10_G_gpuned_F77A_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 837
+  },
+  {
+   "scene_id": "S1C_IW_20250502T094802_DHP_RTC10_G_gpuned_F77A",
+   "date": "2025-05-02",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1C_IW_20250502T094802_DHP_RTC10_G_gpuned_F77A_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 202
+  },
+  {
+   "scene_id": "S1A_IW_20250508T094925_DHP_RTC10_G_gpuned_02C1",
+   "date": "2025-05-08",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1A_IW_20250508T094925_DHP_RTC10_G_gpuned_02C1_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 110
+  },
+  {
+   "scene_id": "S1A_IW_20250508T094925_DHP_RTC10_G_gpuned_02C1",
+   "date": "2025-05-08",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1A_IW_20250508T094925_DHP_RTC10_G_gpuned_02C1_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 201
+  },
+  {
+   "scene_id": "S1C_IW_20250514T094802_DHP_RTC10_G_gpuned_14AD",
+   "date": "2025-05-14",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1C_IW_20250514T094802_DHP_RTC10_G_gpuned_14AD_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 168
+  },
+  {
+   "scene_id": "S1C_IW_20250514T094802_DHP_RTC10_G_gpuned_14AD",
+   "date": "2025-05-14",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1C_IW_20250514T094802_DHP_RTC10_G_gpuned_14AD_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 94
+  },
+  {
+   "scene_id": "S1D_IW_20260924T095633_DHR_RTC10_G_gpuned_F393",
+   "date": "2026-09-24",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1D_IW_20260924T095633_DHR_RTC10_G_gpuned_F393_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 0
+  },
+  {
+   "scene_id": "S1D_IW_20260924T095633_DHR_RTC10_G_gpuned_F393",
+   "date": "2026-09-24",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1D_IW_20260924T095633_DHR_RTC10_G_gpuned_F393_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 3
+  },
+  {
+   "scene_id": "S1C_IW_20260925T094813_DHR_RTC10_G_gpuned_91BD",
+   "date": "2026-09-25",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1C_IW_20260925T094813_DHR_RTC10_G_gpuned_91BD_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 2
+  },
+  {
+   "scene_id": "S1C_IW_20260925T094838_DHR_RTC10_G_gpuned_81D7",
+   "date": "2026-09-25",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1C_IW_20260925T094838_DHR_RTC10_G_gpuned_81D7_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 28
+  },
+  {
+   "scene_id": "S1C_IW_20260925T094813_DHR_RTC10_G_gpuned_91BD",
+   "date": "2026-09-25",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1C_IW_20260925T094813_DHR_RTC10_G_gpuned_91BD_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 6
+  },
+  {
+   "scene_id": "S1C_IW_20260925T094838_DHR_RTC10_G_gpuned_81D7",
+   "date": "2026-09-25",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1C_IW_20260925T094838_DHR_RTC10_G_gpuned_81D7_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 31
+  },
+  {
+   "scene_id": "S1D_IW_20261001T094824_DHR_RTC10_G_gpuned_59A1",
+   "date": "2026-10-01",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1D_IW_20261001T094824_DHR_RTC10_G_gpuned_59A1_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 6
+  },
+  {
+   "scene_id": "S1D_IW_20261001T094849_DHR_RTC10_G_gpuned_CD59",
+   "date": "2026-10-01",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1D_IW_20261001T094849_DHR_RTC10_G_gpuned_CD59_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 33
+  },
+  {
+   "scene_id": "S1D_IW_20261001T094824_DHR_RTC10_G_gpuned_59A1",
+   "date": "2026-10-01",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1D_IW_20261001T094824_DHR_RTC10_G_gpuned_59A1_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 6
+  },
+  {
+   "scene_id": "S1D_IW_20261001T094849_DHR_RTC10_G_gpuned_CD59",
+   "date": "2026-10-01",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1D_IW_20261001T094849_DHR_RTC10_G_gpuned_CD59_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 35
+  },
+  {
+   "scene_id": "S1C_IW_20261002T094015_DHR_RTC10_G_gpuned_55BD",
+   "date": "2026-10-02",
+   "polarization": "HH+HV",
+   "detector": "cfar",
+   "czml": "S1C_IW_20261002T094015_DHR_RTC10_G_gpuned_55BD_cfar.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 11
+  },
+  {
+   "scene_id": "S1C_IW_20261002T094015_DHR_RTC10_G_gpuned_55BD",
+   "date": "2026-10-02",
+   "polarization": "HH+HV",
+   "detector": "thor",
+   "czml": "S1C_IW_20261002T094015_DHR_RTC10_G_gpuned_55BD_thor.czml",
+   "quicklook": null,
+   "quicklook_bounds": null,
+   "n_detections": 12
+  }
+ ]
+}

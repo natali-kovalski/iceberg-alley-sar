@@ -14,9 +14,28 @@ import {
   type Entity,
 } from "cesium";
 
-export const CZML_URL = "data/iceberg_alley.czml";
-// Per-scene THOR vs CFAR recall figures, written by `thor-compare` / `czml` (optional).
-export const COMPARE_DIR = "data/compare/";
+// Everything the viewer shows is listed in data/manifest.json, written by `cli.py publish`.
+// URLs are built from BASE_URL so the same build works at / and under /iceberg-alley-sar/ (Pages).
+export const DATA_URL = `${import.meta.env.BASE_URL}data/`;
+
+// One CZML per scene and detector (schema: iceberg_sar.publish.Manifest).
+export interface ManifestScene {
+  scene_id: string;
+  date: string;
+  polarization: string;
+  detector: "cfar" | "thor";
+  czml: string; // relative to the manifest
+  quicklook: string | null;
+  quicklook_bounds: [number, number, number, number] | null; // W, S, E, N
+  n_detections: number;
+}
+
+export interface Manifest {
+  generated: string;
+  base_czml: string;
+  compare_index: string | null;
+  scenes: ManifestScene[];
+}
 
 // Iceberg Alley, Bonavista to St. Anthony and offshore (matches aoi.geojson roughly).
 const HOME = Rectangle.fromDegrees(-57.5, 48.3, -50.5, 52.8);
@@ -126,7 +145,14 @@ export async function loadDetections(viewer: Viewer): Promise<{
   scenes: SceneInfo[];
   legend: Legend;
 }> {
-  const dataSource = await CzmlDataSource.load(CZML_URL);
+  const manifest = await fetchJson<Manifest>(`${DATA_URL}manifest.json`);
+  // Fetch in parallel, process in manifest order: a scene's CFAR file holds the `scene/` parent
+  // of its THOR points. Every file starts with a document packet; only base.czml has the clock.
+  const [base, ...rest] = await Promise.all(
+    [manifest.base_czml, ...manifest.scenes.map((s) => s.czml)].map((f) => fetchJson<object[]>(DATA_URL + f)),
+  );
+  const dataSource = await CzmlDataSource.load(base);
+  for (const czml of rest) await dataSource.process(czml);
   await viewer.dataSources.add(dataSource);
   viewer.clockTrackedDataSource = dataSource;
   viewer.timeline.zoomTo(viewer.clock.startTime, viewer.clock.stopTime);
@@ -176,7 +202,7 @@ export async function loadDetections(viewer: Viewer): Promise<{
     s.split ??= f.split;
   }
   const scenes = [...byDate.values()];
-  const compare = await loadCompare();
+  const compare = await loadCompare(manifest.compare_index);
   for (const s of scenes) s.compare = compare.get(s.date);
   const l = dataSource.entities.getById("legend");
   const legend: Legend = {
@@ -198,19 +224,23 @@ function arrayProp<T extends number[]>(entity: Entity | undefined, name: string,
   return Array.isArray(v) && v.length === n ? (v as T) : undefined;
 }
 
-async function loadCompare(): Promise<Map<string, Compare>> {
+async function fetchJson<T>(url: string): Promise<T> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
+  return (await res.json()) as T;
+}
+
+// Per-pass THOR vs CFAR recall figures; the viewer works without them.
+async function loadCompare(indexPath: string | null): Promise<Map<string, Compare>> {
+  if (!indexPath) return new Map();
+  const dir = DATA_URL + indexPath.slice(0, indexPath.lastIndexOf("/") + 1);
   try {
-    const res = await fetch(`${COMPARE_DIR}index.json`);
-    if (!res.ok) return new Map();
-    const index = (await res.json()) as Record<string, { figure: string; labels: number }>;
+    const index = await fetchJson<Record<string, { figure: string; labels: number }>>(DATA_URL + indexPath);
     return new Map(
-      Object.entries(index).map(([date, c]) => [
-        date,
-        { figureUrl: COMPARE_DIR + c.figure, labels: c.labels },
-      ]),
+      Object.entries(index).map(([date, c]) => [date, { figureUrl: dir + c.figure, labels: c.labels }]),
     );
   } catch {
-    return new Map(); // no comparison run: the viewer works without it
+    return new Map();
   }
 }
 

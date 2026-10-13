@@ -91,6 +91,7 @@ Run the whole pipeline for the demo dates, then open the viewer:
 ```powershell
 python -m iceberg_sar.cli run --start 2025-05-01 --end 2025-05-15 --dry-run   # plan + credit estimate
 python -m iceberg_sar.cli run --start 2025-05-01 --end 2025-05-15
+python -m iceberg_sar.cli publish  # per-scene CZML + manifest -> viewer/public/data/
 cd viewer
 npm install
 npm run dev                        # http://localhost:5173
@@ -99,7 +100,7 @@ npm run dev                        # http://localhost:5173
 `run` does the following:
 1. Searches ASF for HH+HV scenes over [aoi.geojson](aoi.geojson) and keeps the `run.max_scenes` (default 3) that cover the AOI best.
 2. Orders HyP3 RTC jobs, waits for them (often 30–60 min) and downloads them. Each 10 m scene costs 60 of the monthly HyP3 credits, and `--dry-run` shows the total first.
-3. Builds the land mask (one-time ~900 MB OSM download), preprocesses each scene, runs detection, and writes `viewer/public/data/iceberg_alley.czml`. The CZML holds every scene processed so far, not just this run's dates, so the viewer accumulates seasons.
+3. Builds the land mask (one-time ~900 MB OSM download), preprocesses each scene, runs detection, and writes `data/outputs/iceberg_alley.czml`. The CZML holds every scene processed so far, not just this run's dates, so the viewer accumulates seasons. `publish` then splits it into one CZML per scene and detector plus a `manifest.json` in `viewer/public/data/` (committed; the viewer loads whatever the manifest lists).
 
 Re-runs reuse everything on disk: downloaded products, masked rasters and detections. Use `--force` to redo preprocessing and detection after changing parameters. Without `--start`/`--end`, the dates come from `search` in `config.yaml`.
 
@@ -107,7 +108,7 @@ In the viewer:
 - Scrub the timeline to step through passes, and click a target to see its attributes.
 - Open-water targets are coloured by contrast and sized by structure length. Targets within 5 km of pack ice are grey (likely ice floes), and a checkbox hides them.
 - Toggle the scene footprint and the pack-ice mask.
-- The basemap is Esri World Imagery, so no Cesium ion token is needed. `npm run build` gives a static site in `viewer/dist/`.
+- The basemap is Esri World Imagery, so no Cesium ion token is needed. `npm run build` gives a static site in `viewer/dist/` for `/iceberg-alley-sar/` (GitHub Pages); set `VIEWER_BASE=/` to host it at a root.
 
 ## Individual steps
 
@@ -121,6 +122,7 @@ python -m iceberg_sar.cli land-mask                          # --force rebuilds 
 python -m iceberg_sar.cli preprocess data\raw\<product_dir>  # masked linear rasters + dB quicklooks
 python -m iceberg_sar.cli detect data\raw\<product_dir>      # CFAR on HV; --band HH to compare
 python -m iceberg_sar.cli czml --start 2025-05-01 --end 2025-05-15
+python -m iceberg_sar.cli publish                            # viewer/public/data/ from data/outputs/ only
 python -m iceberg_sar.cli figures                            # regenerate docs/img (scenes in `figures:` in config.yaml)
 ```
 

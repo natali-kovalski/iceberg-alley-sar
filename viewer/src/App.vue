@@ -31,7 +31,7 @@ onMounted(async () => {
   try {
     ({ dataSource, scenes: scenes.value, legend: legend.value } = await loadDetections(viewer));
   } catch (e) {
-    error.value = `Could not load detections (${String(e)}). Run "python -m iceberg_sar.cli czml" first.`;
+    error.value = `Could not load detections (${String(e)}). Run "python -m iceberg_sar.cli czml" and "publish" first.`;
     return;
   }
   applyLayers(dataSource, layers);
