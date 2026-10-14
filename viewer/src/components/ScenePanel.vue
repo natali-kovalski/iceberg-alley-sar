@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import type { Layers, Legend, SceneInfo } from "../scene";
 
-import { computed } from "vue";
+import { computed, ref } from "vue";
 
 const props = defineProps<{ scenes: SceneInfo[]; legend: Legend; currentId?: string }>();
 const layers = defineModel<Layers>("layers", { required: true });
-const emit = defineEmits<{ jump: [scene: SceneInfo] }>();
+const emit = defineEmits<{ jump: [scene: SceneInfo]; about: [] }>();
+
+// On a phone the panel would cover the globe, so it starts collapsed to its title row.
+const collapsed = ref(window.matchMedia("(max-width: 600px)").matches);
+const currentDate = computed(() => props.currentId?.replace("pass/", ""));
 
 // Ice controls only mean something when the scene on screen has pack ice mapped.
 const hasIce = (s: SceneInfo) => s.iceAreaKm2 > 0;
@@ -37,8 +41,18 @@ const currentHasIce = computed(() => {
 
 <template>
   <aside class="panel">
-    <h1>Iceberg Alley SAR</h1>
+    <div class="title">
+      <h1>Iceberg Alley SAR</h1>
+      <span class="actions">
+        <button type="button" class="about-btn" @click="emit('about')">About</button>
+        <button type="button" class="toggle" :aria-expanded="!collapsed"
+                :aria-label="collapsed ? 'Show legend and scenes' : 'Hide legend and scenes'"
+                @click="collapsed = !collapsed">{{ collapsed ? "▸" : "▾" }}</button>
+      </span>
+    </div>
     <p class="sub">Sentinel-1 HH/HV, CA-CFAR candidates<template v-if="hasThor"> + THOR</template></p>
+    <p v-if="collapsed && currentDate" class="sub">Pass {{ currentDate }}</p>
+    <div v-show="!collapsed">
 
     <h2>Legend</h2>
     <div class="key"><span class="dot cfar" /> CA-CFAR candidate</div>
@@ -86,6 +100,7 @@ const currentHasIce = computed(() => {
     <label v-if="hasCoverage"><input v-model="layers.unobserved" type="checkbox" /> Dim area not imaged</label>
     <label v-if="hasThor"><input v-model="layers.thor" type="checkbox" /> THOR detections (foundation model)</label>
     <label v-if="hasTruth"><input v-model="layers.truth" type="checkbox" /> IIP labels on training frames</label>
+    </div>
   </aside>
 </template>
 
@@ -105,6 +120,13 @@ const currentHasIce = computed(() => {
   box-sizing: border-box;
 }
 h1 { margin: 0; font-size: 16px; }
+.title { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.about-btn { padding: 2px 8px; border-radius: 10px; border: 1px solid rgba(143, 163, 187, 0.6); background: none; color: #c9d4e0; font-size: 11px; cursor: pointer; }
+.about-btn:hover { color: #fff; border-color: #fff; }
+.actions { display: flex; align-items: center; gap: 4px; flex: none; }
+.toggle { width: 22px; padding: 0; border: none; background: none; color: #c9d4e0; font-size: 14px; cursor: pointer; }
+.toggle:hover { color: #fff; }
+@media (max-width: 600px) { .panel { width: calc(100% - 120px); max-width: 300px; } }
 h2 { margin: 14px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: #8fa3bb; }
 .sub { margin: 2px 0 0; color: #8fa3bb; }
 .scenes { list-style: none; margin: 0; padding: 0; }

@@ -26,7 +26,7 @@ This project builds that pipeline on free Copernicus Sentinel-1 data, for the co
 
 ![Detections vs. IIP labels, 2019-04-29](docs/img/validation_20190429.png)
 
-The viewer shows 32 passes from spring 2019, 2020 and 2025 and autumn 2026, with CFAR and THOR as separate layers. For the three spring 2025 passes (2025-05-02, 05-08, 05-14), in the 1° squares each scene covers, open-water detections are within 2–4× of the North American Ice Service chart estimate (106 vs. 26, 98 vs. 31, 137 vs. 71). The chart is per 1° square and partly modelled, so this is a sanity check, not a measurement. The full validation story, including the sources that didn't work, is in [docs/validation-findings.md](docs/validation-findings.md).
+The viewer shows 32 scenes (28 passes) from spring 2019, 2020 and 2025 and autumn 2026, with CFAR and THOR as separate layers. For the three spring 2025 passes (2025-05-02, 05-08, 05-14), in the 1° squares each scene covers, open-water detections are within 2–4× of the North American Ice Service chart estimate (106 vs. 26, 98 vs. 31, 137 vs. 71). The chart is per 1° square and partly modelled, so this is a sanity check, not a measurement. The full validation story, including the sources that didn't work, is in [docs/validation-findings.md](docs/validation-findings.md).
 
 ## Data
 
@@ -123,7 +123,7 @@ python -m iceberg_sar.cli publish                           # rebuild viewer/pub
 git add viewer/public/data; git commit -m "Viewer: add <dates>"; git push
 ```
 
-A push to `main` that touches `viewer/**` triggers [.github/workflows/pages.yml](.github/workflows/pages.yml), which builds the viewer and deploys it. `publish` rebuilds `viewer/public/data/` from scratch on each run and copies derived products only: CZML, web quicklooks and `manifest.json`, never raw rasters, Kaggle chips, model weights or cached features. It fails if a file exceeds `publish.max_file_mb` (25) or the folder exceeds `publish.max_total_mb` (300). The viewer loads whatever the manifest lists, so no scene names are hardcoded.
+A push to `main` that touches `viewer/**` triggers [.github/workflows/pages.yml](.github/workflows/pages.yml), which builds the viewer and deploys it. `publish` rebuilds `viewer/public/data/` from scratch on each run and copies derived products only: CZML, the THOR vs CFAR figures and `manifest.json`, never raw rasters, Kaggle chips, model weights or cached features. It fails if a file exceeds `publish.max_file_mb` (25) or the folder exceeds `publish.max_total_mb` (300). The viewer loads whatever the manifest lists, so no scene names are hardcoded.
 
 ## Individual steps
 
