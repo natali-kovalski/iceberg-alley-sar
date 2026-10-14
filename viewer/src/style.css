@@ -8,3 +8,10 @@ body,
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   background: #0b1320;
 }
+
+/* Text buttons added to Cesium's toolbar (scene.ts addToolbarButton); outside Vue's scoped CSS. */
+.cesium-toolbar-button.text-toolbar-button {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+}

@@ -5,7 +5,7 @@ import { computed, ref } from "vue";
 
 const props = defineProps<{ scenes: SceneInfo[]; legend: Legend; currentId?: string }>();
 const layers = defineModel<Layers>("layers", { required: true });
-const emit = defineEmits<{ jump: [scene: SceneInfo]; about: [] }>();
+const emit = defineEmits<{ jump: [scene: SceneInfo] }>();
 
 // On a phone the panel would cover the globe, so it starts collapsed to its title row.
 const collapsed = ref(window.matchMedia("(max-width: 600px)").matches);
@@ -44,7 +44,6 @@ const currentHasIce = computed(() => {
     <div class="title">
       <h1>Iceberg Alley SAR</h1>
       <span class="actions">
-        <button type="button" class="about-btn" @click="emit('about')">About</button>
         <button type="button" class="toggle" :aria-expanded="!collapsed"
                 :aria-label="collapsed ? 'Show legend and scenes' : 'Hide legend and scenes'"
                 @click="collapsed = !collapsed">{{ collapsed ? "▸" : "▾" }}</button>
@@ -121,8 +120,6 @@ const currentHasIce = computed(() => {
 }
 h1 { margin: 0; font-size: 16px; }
 .title { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.about-btn { padding: 2px 8px; border-radius: 10px; border: 1px solid rgba(143, 163, 187, 0.6); background: none; color: #c9d4e0; font-size: 11px; cursor: pointer; }
-.about-btn:hover { color: #fff; border-color: #fff; }
 .actions { display: flex; align-items: center; gap: 4px; flex: none; }
 .toggle { width: 22px; padding: 0; border: none; background: none; color: #c9d4e0; font-size: 14px; cursor: pointer; }
 .toggle:hover { color: #fff; }

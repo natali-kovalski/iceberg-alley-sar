@@ -5,6 +5,7 @@ import AboutPanel from "./components/AboutPanel.vue";
 import ComparePanel from "./components/ComparePanel.vue";
 import ScenePanel from "./components/ScenePanel.vue";
 import {
+  addToolbarButton,
   applyLayers,
   createViewer,
   jumpTo,
@@ -32,6 +33,7 @@ let dataSource: CzmlDataSource | undefined;
 
 onMounted(async () => {
   viewer = createViewer(container.value!);
+  addToolbarButton(viewer, "?", "About this viewer", () => (showAbout.value = true));
   try {
     ({ dataSource, scenes: scenes.value, legend: legend.value } = await loadDetections(viewer));
   } catch (e) {
@@ -74,7 +76,7 @@ function jump(scene: SceneInfo): void {
 
 <template>
   <div ref="container" class="globe" />
-  <ScenePanel v-model:layers="layers" :scenes="scenes" :legend="legend" :current-id="currentId" @jump="jump" @about="showAbout = true" />
+  <ScenePanel v-model:layers="layers" :scenes="scenes" :legend="legend" :current-id="currentId" @jump="jump" />
   <ComparePanel v-if="compareScene" :scene="compareScene" @close="compareScene = undefined" />
   <div v-if="error" class="error">{{ error }}</div>
   <AboutPanel v-if="showAbout" @close="closeAbout" />
