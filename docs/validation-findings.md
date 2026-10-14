@@ -1,6 +1,12 @@
 # Validation: how accurate is the detector?
 
-**Headline:** on a Sentinel-1 pass where International Ice Patrol (IIP) analysts marked every
+> **Note (Milestone 5).** This page validates the CA-CFAR, which is now the project's baseline.
+> The main detector is THOR; see [thor-vs-cfar.md](thor-vs-cfar.md). The 78% below counts CFAR
+> detections near pack ice too. The THOR comparison drops detections within 5 km of pack ice for
+> both detectors, which gives the CFAR **74%** (197 / 267) on this pass and 74% pooled over four
+> passes, against THOR's 89% and 84%. Compare THOR with the 74%, not the 78%.
+
+**Headline (CFAR, before THOR):** on a Sentinel-1 pass where International Ice Patrol (IIP) analysts marked every
 iceberg they identified, the detector found **78% of them (207 of 267)**, with a median
 position difference of **67 m**. Small bergs (15-60 m) are found 65% of the time, medium
 bergs (61-120 m) 81%.

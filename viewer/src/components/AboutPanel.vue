@@ -20,30 +20,37 @@ const REPO = "https://github.com/natali-kovalski/iceberg-alley-sar";
 
       <h3>What the points are</h3>
       <ul>
-        <li><b class="cfar">Orange dots</b>: bright targets found by a CA-CFAR detector.</li>
-        <li><b class="thor">Cyan rings</b>: targets found by the THOR foundation model (frozen
-          encoder + a small trained head).</li>
+        <li><b class="thor">Cyan rings</b>: icebergs found by THOR, a radar foundation model, with
+          a small head trained on Ice Patrol labels. This is the main detector.</li>
+        <li><b class="cfar">Orange dots</b>: bright targets found by a classical CA-CFAR detector,
+          kept as the baseline to compare against.</li>
         <li><b class="grey">Grey</b>: within a few km of pack ice, so probably ice floes.</li>
         <li><b class="truth">Blue ✕</b>: icebergs marked by International Ice Patrol analysts on
-          the same pass (training frames only).</li>
+          the same pass (THOR training frames only).</li>
       </ul>
       <p class="note">
-        These are <b>candidates</b>, not confirmed icebergs: ships look similar to radar, and
-        without ship positions (AIS) the false-alarm rate can't be measured. On a validation pass
-        the CFAR found 78% of the icebergs IIP analysts marked.
+        On four test passes with 512 icebergs marked by Ice Patrol analysts, THOR found
+        <b>84%</b> and the CFAR <b>74%</b>, with the same number of detections each. Passes
+        marked "THOR vs CFAR" in the list open the chart. All points are still
+        <b>candidates</b>: ships look similar to radar, and without ship positions (AIS) the
+        false-alarm rate can't be measured.
       </p>
 
       <h3>Method</h3>
       <p>
-        Cross-polarized (HV) backscatter, land and pack ice masked. CA-CFAR compares each pixel
-        with the sea around it and keeps those brighter than a 10⁻⁶ false-alarm threshold, then a
-        co-polarized (HH) check removes speckle. THOR runs on the same masked scenes.
+        Land and pack ice are masked first, using the cross-polarized (HV) radar signal. THOR
+        turns each scene into general-purpose image features; it was pretrained on Sentinel-1
+        and is used as is. A 769-parameter head turns those features into an iceberg score, and
+        points scoring 0.35 or more are shown. The CFAR baseline compares each pixel with the
+        sea around it, keeps those above a 10⁻⁶ false-alarm threshold, and checks them in the
+        co-polarized (HH) channel.
       </p>
 
       <h3>Data</h3>
       <ul>
         <li>Contains modified Copernicus Sentinel data (2019–2026), processed by ESA; terrain
           correction by ASF HyP3.</li>
+        <li>THOR foundation model: FM4CS (Apache 2.0).</li>
         <li>Iceberg sightings: International Ice Patrol, via NSIDC (G00807).</li>
         <li>Basemap and terrain: Esri World Imagery and World Elevation.</li>
       </ul>
