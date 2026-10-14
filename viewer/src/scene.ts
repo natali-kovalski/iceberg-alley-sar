@@ -136,6 +136,18 @@ export function createViewer(container: HTMLElement): Viewer {
   return viewer;
 }
 
+// A text button in Cesium's toolbar, left of Home, styled like the built-in ones.
+export function addToolbarButton(viewer: Viewer, label: string, title: string, onClick: () => void): void {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "cesium-button cesium-toolbar-button text-toolbar-button";
+  button.textContent = label;
+  button.title = title;
+  button.setAttribute("aria-label", title);
+  button.addEventListener("click", onClick);
+  viewer.container.querySelector(".cesium-viewer-toolbar")?.prepend(button);
+}
+
 function prop(entity: Entity, name: string): unknown {
   return entity.properties?.[name]?.getValue(JulianDate.now());
 }
