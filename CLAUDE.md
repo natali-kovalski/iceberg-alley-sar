@@ -328,7 +328,10 @@ CA-CFAR as the baseline; the viewer and `cli.py run` still treat the CFAR as pri
   open-water count shown first per scene. The CFAR becomes a "CA-CFAR baseline" layer
   (keep it on by default or off: decide when you see it).
 - Subtitle: "Sentinel-1 HH/HV · THOR detections, CA-CFAR baseline" (now "CA-CFAR candidates + THOR").
-- Info box for a THOR detection: score first, then the shared attributes.
+- Info box for a THOR detection: score first, then the shared attributes. Today the score is
+  only in the entity name (info box title); `_description()` in `export_czml.py` is shared with
+  the CFAR and has no score row. Add a "THOR score" row at the top of the table for THOR
+  packets, then re-run `czml` + `publish` to rebuild the CZMLs.
 - Check the About dialog still matches what the viewer shows (its text was updated in the docs pass).
 - **Done when:** a first-time visitor reads the viewer as a THOR result with a CFAR comparison,
   on desktop and phone.
