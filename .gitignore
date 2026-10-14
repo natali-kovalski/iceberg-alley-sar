@@ -32,8 +32,9 @@ viewer/node_modules/
 viewer/dist/
 viewer/public/cesium/
 
-# OS / editor
+# OS / editor (~$* = Office lock files while a document is open)
 .DS_Store
 Thumbs.db
+~$*
 .vscode/
 .idea/

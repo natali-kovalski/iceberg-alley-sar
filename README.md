@@ -282,3 +282,7 @@ python -m iceberg_sar.cli classify data\raw\<product_dir>
 - Iceberg charts: North American Ice Service (International Ice Patrol + Canadian Ice Service).
 - Land polygons: © OpenStreetMap contributors, ODbL.
 - Kaggle Statoil/C-CORE chips: used under the competition terms and not redistributed.
+
+## License
+
+The code is released under the [MIT License](LICENSE). It covers the code and docs in this repository only. The data sources above keep their own terms.
