@@ -1,7 +1,9 @@
 # Iceberg Alley SAR: Iceberg Detection off Newfoundland
 
 ## What this project is
-Detect icebergs off the coast of Newfoundland & Labrador in Sentinel-1 SAR imagery with a CFAR detector, and display the results on an interactive **CesiumJS** globe with a timeline.
+Detect icebergs off the coast of Newfoundland & Labrador in Sentinel-1 SAR imagery with **THOR**, a SAR foundation model (frozen encoder + a small trained head), benchmarked against a classical **CA-CFAR** detector, and display the results on an interactive **CesiumJS** globe with a timeline.
+
+**Main story (since Milestone 5):** THOR is the detector, the CA-CFAR is the baseline. The classical SAR pipeline (HyP3 calibration, land mask, HV pack-ice mask) feeds both, and THOR depends on it. Headline: on four held-out April 2019 passes (512 same-pass IIP labels), THOR finds 0.84 vs. CFAR 0.74 at the same number of detections, and 11 vs. 4 of 14 large bergs. Don't use the old CFAR 78% as a headline: it counts near-ice detections and isn't comparable (the CFAR's comparable figure is 0.74). Keep the caveats with the headline: one month of one year, THOR learned from IIP analyst labels, precision unknown without AIS.
 
 This is a portfolio project. It should show hands-on SAR and maritime-domain skills to remote sensing / ocean-tech employers in St. John's, NL. Clarity, reproducibility, and a polished demo matter more than state-of-the-art accuracy.
 
@@ -77,7 +79,9 @@ iceberg-alley-sar/
 └── tests/
 ```
 
-## Current status (as of 2026-10-05)
+## Current status (as of 2026-10-13)
+- **Milestones 0–6: done.** The live viewer is on GitHub Pages with THOR and CFAR layers, an About ("?") dialog and per-pass THOR vs CFAR charts.
+- **Docs reframed THOR-first (2026-10-13):** README, About dialog, `docs/validation-findings.md` (note on 78% vs 74%), and the presentations in `docs/presentation/` (Project Brief v2 deck + one-pager, CA-CFAR vs THOR brief as the technical deep-dive). The code still treats the CFAR as primary in places; that's Milestone 7.
 - **Milestones 0–3: done.** Search, HyP3 RTC (10 m), land + pack-ice masks, CA-CFAR on HV with strip rejection and an HH co-pol check, GeoJSON detections, and the Vue + Cesium viewer.
 - **Scenes:** spring 2025 (2025-05-02, 05-08, 05-14) in the viewer, checked against NAIS charts. Spring 2019 (2019-04-15, 04-29) and 2020-06-10 for point-level validation.
 - **Validation (beyond the plan):** 78% recall (207/267) against same-pass IIP analyst labels on 2019-04-29, median offset 67 m (IIP positions are truncated to 0.1'; corrected to cell centres). Precision is not measurable without AIS. Large bergs (>120 m) are missed: their grown blobs exceed `max_structure_m` (the ice-strip rule). See `docs/validation-findings.md`.
@@ -313,3 +317,44 @@ Goal: a public, stable URL for the Cesium viewer, updated by
 - If quicklooks outgrow the limits: move `viewer/public/data/` to a Cloudflare R2
   or S3 bucket with CORS, and have `publish` upload there (no redeploy needed).
 - Whether to show the experimental `iceberg_prob` in the public viewer or hide it.
+
+### Milestone 7: THOR-first product
+
+Goal: make the code match the story. The docs already present THOR as the detector and the
+CA-CFAR as the baseline; the viewer and `cli.py run` still treat the CFAR as primary.
+
+#### 7a: Viewer
+- THOR is the primary layer: listed first in the legend and layer list, drawn on top, and its
+  open-water count shown first per scene. The CFAR becomes a "CA-CFAR baseline" layer
+  (keep it on by default or off: decide when you see it).
+- Subtitle: "Sentinel-1 HH/HV · THOR detections, CA-CFAR baseline" (now "CA-CFAR candidates + THOR").
+- Info box for a THOR detection: score first, then the shared attributes.
+- Check the About dialog still matches what the viewer shows (its text was updated in the docs pass).
+- **Done when:** a first-time visitor reads the viewer as a THOR result with a CFAR comparison,
+  on desktop and phone.
+
+#### 7b: THOR in the pipeline
+- `cli.py run` runs THOR after preprocessing, controlled by `run.detectors: [thor, cfar]` in
+  `config.yaml`, then `czml` (and optionally `publish`), so one command gives both layers.
+- If CUDA or the trained head is missing, skip THOR with one clear message and still finish the
+  CFAR part (don't fail the run). `--detectors` on the CLI overrides the config.
+- `--dry-run` reports whether THOR will run (GPU found, head found).
+- Tests: detector selection, the skip path (no GPU / no head) with a stubbed THOR call.
+- **Done when:** `run --start ... --end ...` on a GPU machine writes THOR and CFAR detections and
+  a CZML with both layers, and on a CPU-only machine finishes with the CFAR and a skip notice.
+
+#### 7c: Reproducible THOR without retraining
+- The trained linear head is tiny (769 parameters) but the rule is "never commit weights".
+  Options: a GitHub release asset, or a Hugging Face model repo, plus a `thor-fetch-head`
+  command that downloads it to `data/models/thor/linear/final/`. Decide with me first.
+- README Quickstart then becomes: install, fetch head, `run`.
+
+#### 7d: Visuals
+- Done 2026-10-14 (ahead of 7a-c): `docs/img/viewer.png` (2025-05-08, THOR rings + CFAR dots) and
+  `docs/img/viewer_compare.png` (2019-04-29 with its recall chart), taken from `npm run preview`
+  with Playwright + Edge; swapped into the Project Brief v2 deck, the one-pager and the CA-CFAR vs
+  THOR brief. Retake them after 7a, since the viewer's subtitle and legend order will change.
+
+#### Milestone 7 open questions
+- Distribution of the head weights (7c).
+- Whether the CFAR layer stays visible by default in the public viewer.
