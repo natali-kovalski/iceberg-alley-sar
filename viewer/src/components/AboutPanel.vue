@@ -1,62 +1,74 @@
 <script setup lang="ts">
 const emit = defineEmits<{ close: [] }>();
 const REPO = "https://github.com/natali-kovalski/iceberg-alley-sar";
+const WRITEUP = `${REPO}/blob/main/docs/thor-vs-cfar.md`;
 </script>
 
 <template>
   <div class="backdrop" @click.self="emit('close')">
     <section class="about" role="dialog" aria-labelledby="about-title">
       <header>
-        <h2 id="about-title">About this viewer</h2>
+        <h2 id="about-title">Iceberg Alley SAR</h2>
         <button type="button" aria-label="Close" @click="emit('close')">×</button>
       </header>
 
-      <p>
-        Iceberg candidates detected automatically in Sentinel-1 radar images of "Iceberg Alley",
-        the northeast coast of Newfoundland. Radar sees through cloud and darkness, so every pass
-        gives a picture of the sea. Step through the passes with the list or the timeline, and
-        click a point to see its measurements.
+      <p class="lead">
+        Every spring, icebergs from Greenland drift down the Labrador Current into "Iceberg
+        Alley", past Newfoundland's northeast coast, its shipping lanes, fishing grounds and
+        offshore platforms. Aircraft patrols are costly and often grounded by fog. Satellite
+        radar (Sentinel-1) sees through cloud and darkness, so every pass gives a picture of the
+        sea. This viewer shows the icebergs found automatically in those pictures.
       </p>
 
-      <h3>What the points are</h3>
-      <ul>
-        <li><b class="thor">Cyan rings</b>: icebergs found by THOR, a radar foundation model, with
-          a small head trained on Ice Patrol labels. This is the main detector.</li>
-        <li><b class="cfar">Orange dots</b>: bright targets found by a classical CA-CFAR detector,
-          kept as the baseline to compare against.</li>
-        <li><b class="grey">Grey</b>: within a few km of pack ice, so probably ice floes.</li>
-        <li><b class="truth">Blue ✕</b>: icebergs marked by International Ice Patrol analysts on
-          the same pass (THOR training frames only).</li>
-      </ul>
+      <h3>The question</h3>
+      <p>
+        Can a foundation model, used off the shelf, find icebergs better than the classical radar
+        detector? <b>THOR</b> is a model pretrained on huge amounts of satellite imagery,
+        including Sentinel-1. It stays frozen here; only a tiny head of 769 numbers was trained
+        on its features, using icebergs that International Ice Patrol analysts marked on 2019
+        and 2020 passes. The comparison is a <b>CA-CFAR</b>, the textbook method that flags
+        pixels much brighter than the sea around them.
+      </p>
+
+      <h3>The result</h3>
+      <p>
+        On four April 2019 passes that neither detector was tuned on, with 512 icebergs marked by
+        Ice Patrol analysts, THOR found <b>84%</b> and the CFAR <b>74%</b>, with the same number of
+        detections each. For large bergs it was <b>11 of 14</b> against 4. Click a pass marked
+        "THOR vs CFAR" for its chart.
+      </p>
       <p class="note">
-        On four test passes with 512 icebergs marked by Ice Patrol analysts, THOR found
-        <b>84%</b> and the CFAR <b>74%</b>, with the same number of detections each. Passes
-        marked "THOR vs CFAR" in the list open the chart. All points are still
-        <b>candidates</b>: ships look similar to radar, and without ship positions (AIS) the
-        false-alarm rate can't be measured.
+        The fine print: it is one month of one year. THOR still needs the classical pack-ice
+        mask, because on its own it mistakes pack ice for bergs. Small bergs are a tie. Ships look
+        like bergs to radar, and without ship positions (AIS) neither detector's false-alarm rate
+        can be measured.
       </p>
 
-      <h3>Method</h3>
+      <h3>How it's built</h3>
       <p>
-        Land and pack ice are masked first, using the cross-polarized (HV) radar signal. THOR
-        turns each scene into general-purpose image features; it was pretrained on Sentinel-1
-        and is used as is. A 769-parameter head turns those features into an iceberg score, and
-        points scoring 0.35 or more are shown. The CFAR baseline compares each pixel with the
-        sea around it, keeps those above a 10⁻⁶ false-alarm threshold, and checks them in the
-        co-polarized (HH) channel.
+        Python pipeline: scene search and terrain correction (ASF HyP3), land and pack-ice masks,
+        THOR (PyTorch, TerraTorch) and the CFAR, then CZML for this Vue + CesiumJS globe. New
+        passes are added with two commands and deployed by GitHub Actions. Next: ship positions to
+        measure precision, and a finer THOR patch size for small bergs.
+      </p>
+
+      <p class="who">
+        A portfolio project by <b>Natali Kovalski</b>, geospatial engineer (photogrammetry, 3D,
+        geospatial AI), learning SAR on a very Newfoundland problem.
       </p>
 
       <h3>Data</h3>
       <ul>
         <li>Contains modified Copernicus Sentinel data (2019–2026), processed by ESA; terrain
           correction by ASF HyP3.</li>
-        <li>THOR foundation model: FM4CS (Apache 2.0).</li>
+        <li>THOR foundation model: FM4CS (Apache 2.0); method after Forgaard et al., IGARSS 2026.</li>
         <li>Iceberg sightings: International Ice Patrol, via NSIDC (G00807).</li>
         <li>Basemap and terrain: Esri World Imagery and World Elevation.</li>
       </ul>
 
       <p class="links">
-        <a :href="REPO" target="_blank" rel="noopener">Code, method and validation on GitHub →</a>
+        <a :href="REPO" target="_blank" rel="noopener">Code and README on GitHub →</a><br>
+        <a :href="WRITEUP" target="_blank" rel="noopener">Full THOR vs CFAR write-up →</a>
       </p>
     </section>
   </div>
@@ -93,11 +105,9 @@ h3 { margin: 14px 0 4px; font-size: 12px; text-transform: uppercase; letter-spac
 p { margin: 8px 0; }
 ul { margin: 4px 0; padding-left: 18px; }
 li { margin: 2px 0; }
-.note { color: #c9d4e0; }
-.cfar { color: #fba238; }
-.thor { color: rgb(0, 229, 255); }
-.grey { color: #a9b3bf; }
-.truth { color: #6f93f5; }   /* the map's #1e4fd8, lightened to read on the dark panel */
+.lead { font-size: 14px; }
+.note { color: #a9b8c8; font-size: 12px; }
+.who { margin-top: 14px; padding-top: 10px; border-top: 1px solid rgba(143, 163, 187, 0.25); color: #c9d4e0; }
 a { color: rgb(0, 229, 255); }
 .links { margin-top: 14px; }
 button { background: none; border: none; color: #8fa3bb; font-size: 22px; line-height: 1; cursor: pointer; }
