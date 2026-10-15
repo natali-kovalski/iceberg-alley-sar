@@ -82,11 +82,12 @@ export interface Legend {
 }
 
 export interface Layers {
+  thor: boolean; // primary detector
+  cfar: boolean; // CA-CFAR baseline
   nearIce: boolean;
   seaIce: boolean;
   footprints: boolean;
   unobserved: boolean;
-  thor: boolean;
   truth: boolean;
 }
 
@@ -258,7 +259,8 @@ async function loadCompare(indexPath: string | null): Promise<Map<string, Compar
 
 export function applyLayers(dataSource: CzmlDataSource, layers: Layers): void {
   for (const e of dataSource.entities.values) {
-    if (e.id.startsWith("det/")) e.show = layers.nearIce || prop(e, "near_ice") !== true;
+    if (e.id.startsWith("det/"))
+      e.show = layers.cfar && (layers.nearIce || prop(e, "near_ice") !== true);
     else if (e.id.startsWith("thor/"))
       e.show = layers.thor && (layers.nearIce || prop(e, "near_ice") !== true);
     else if (e.id.startsWith("truth/")) e.show = layers.truth;

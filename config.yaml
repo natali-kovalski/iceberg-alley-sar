@@ -28,6 +28,10 @@ run:
   pol: HH+HV                # CFAR and the pack-ice mask are tuned on HV; null = any
   min_aoi_overlap: 0.05     # skip scenes that barely touch the AOI
   max_scenes: 3             # best-covering scenes per run; caps HyP3 credits (60/scene at 10 m). null = all
+  detectors: [thor, cfar]   # THOR is the detector, the CFAR the baseline; `run --detectors` overrides
+                            # THOR is skipped (one notice) without a CUDA GPU or the trained head
+                            # (head = viewer.thor_model, under paths.models; `thor-fetch-head`)
+  thor_device: cuda
 
 hyp3:
   job_type: RTC_GAMMA
@@ -259,6 +263,12 @@ thor:
     batch: 8
     blob_window_m: 320      # attributes: berg blob grown around the peak within this window
     grow_db: 4              # blob = pixels this far above the ring background (as detections.grow_db)
+  release:
+    # 7c: the final linear head (769 parameters) as a GitHub release asset, so `run` needs no
+    # retraining. `thor-fetch-head` saves it as <paths.models>/thor/<head>/final/head.pt.
+    url: https://github.com/natali-kovalski/iceberg-alley-sar/releases/download/thor-head-v1/thor-linear-head.pt
+    sha256: 659cb0f47016eb17c2012c6b255c94c998e7f310c51e08f42ce262f5e75b580f
+    head: linear
   compare:
     # 5d: THOR vs CFAR on the held-out April 2019 scenes. Nothing in here is tuned on them.
     out_dir: data/outputs/thor/5d

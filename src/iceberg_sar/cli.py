@@ -259,10 +259,16 @@ def run(
     end: DateOption = None,
     dry_run: Annotated[bool, typer.Option(help="Search and show the plan; order nothing.")] = False,
     force: Annotated[bool, typer.Option(help="Redo preprocessing and detection.")] = False,
+    detectors: Annotated[str | None, typer.Option(
+        help="Comma-separated, e.g. 'thor,cfar' or 'cfar' (default: run.detectors).")] = None,
+    publish: Annotated[bool, typer.Option(
+        "--publish", help="Also rebuild the viewer's static data (`publish`).")] = False,
 ) -> None:
-    """End to end for a date range: search, HyP3 RTC, masks, CFAR, CZML for the viewer.
+    """End to end for a date range: search, HyP3 RTC, masks, THOR + CFAR, CZML for the viewer.
 
     Dates default to `search.start_date` / `end_date`; scene selection is set in `run:`.
+    THOR is skipped, with a notice, without a CUDA GPU or the trained head (`thor-fetch-head`);
+    the CFAR baseline still runs. --dry-run shows whether THOR will run.
     The CZML includes every scene processed so far, not only this date range.
     Already downloaded products and existing outputs are reused.
     """
@@ -272,7 +278,16 @@ def run(
     s = cfg.section("search")
     d0 = start.date() if start else date.fromisoformat(str(s["start_date"]))
     d1 = end.date() if end else date.fromisoformat(str(s["end_date"]))
-    out = run_pipeline(cfg, d0, d1, dry_run=dry_run, force=force, log=typer.echo)
+    try:
+        out = run_pipeline(cfg, d0, d1, dry_run=dry_run, force=force, log=typer.echo,
+                           detectors=detectors)
+    except ValueError as e:   # bad --detectors
+        raise typer.BadParameter(str(e), param_hint="--detectors") from e
+    if out and publish:
+        from iceberg_sar.publish import publish as publish_data
+
+        pub, manifest, total_mb = publish_data(cfg)
+        typer.echo(f"publish     {pub}  ({len(manifest.scenes)} CZML files, {total_mb:.1f} MB)")
     if out:
         typer.echo("view it:  cd viewer; npm install; npm run dev")
 
@@ -673,6 +688,23 @@ def thor_detect(
         typer.echo(outputs["summary"].read_text(encoding="utf-8"))
         for kind, path in outputs.items():
             typer.echo(f"{kind:<10} {path}")
+
+
+@app.command("thor-fetch-head")
+def thor_fetch_head(
+    force: Annotated[bool, typer.Option(help="Download even if the head is already there.")]
+    = False,
+    config: ConfigOption = DEFAULT_CONFIG,
+) -> None:
+    """Milestone 7c: download the trained THOR head (thor.release) so `run` needs no retraining.
+
+    Saved where `run` and `thor-detect` look (data/models/thor/<head>/final/head.pt), checked
+    against the pinned SHA-256.
+    """
+    from iceberg_sar.thor.release import fetch_head
+
+    out, downloaded = fetch_head(load_config(config), force)
+    typer.echo(f"ok  {out}" + ("" if downloaded else "  (already there, hash matches)"))
 
 
 @app.command("thor-compare")
