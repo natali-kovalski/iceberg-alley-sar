@@ -371,7 +371,7 @@ def make_ensemble(members: list[Path], out: Path) -> Path:
     """One checkpoint holding several trained heads; `load_head` averages their probabilities."""
     import torch
 
-    cks = [torch.load(m, map_location="cpu", weights_only=False) for m in members]
+    cks = [torch.load(m, map_location="cpu", weights_only=True) for m in members]
     out.parent.mkdir(parents=True, exist_ok=True)
     torch.save({"kind": "ensemble", "members": cks,
                 "member_paths": [str(m) for m in members]}, out)
@@ -382,7 +382,8 @@ def load_head(path: Path, device: str = "cpu"):
     """Rebuild a trained head (or an ensemble of heads) from its checkpoint."""
     import torch
 
-    ck = torch.load(path, map_location=device, weights_only=False)
+    # Tensors and plain values only: a downloaded head (thor-fetch-head) cannot run pickled code.
+    ck = torch.load(path, map_location=device, weights_only=True)
     return _from_checkpoint(ck).to(device).eval()
 
 

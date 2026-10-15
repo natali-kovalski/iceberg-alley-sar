@@ -115,40 +115,34 @@ git clone https://github.com/natali-kovalski/iceberg-alley-sar.git
 cd iceberg-alley-sar
 py -3.11 -m venv .venv
 .venv\Scripts\Activate.ps1
-pip install -e ".[dev]"
+pip install -e ".[dev,ml,thor]" --extra-index-url https://download.pytorch.org/whl/cu124   # no GPU: pip install -e ".[dev]"
 copy .env.example .env             # fill in EARTHDATA_USERNAME / EARTHDATA_PASSWORD
 python -m iceberg_sar.cli init-dirs
+python -m iceberg_sar.cli thor-fetch-head    # trained THOR head from the GitHub release, SHA-256 checked
 ```
 
-Run the classical pipeline for the demo dates (scene search, HyP3 processing, masks, CFAR baseline):
+Run the pipeline for the demo dates and open the viewer:
 
 ```powershell
-python -m iceberg_sar.cli run --start 2025-05-01 --end 2025-05-15 --dry-run   # plan + credit estimate
-python -m iceberg_sar.cli run --start 2025-05-01 --end 2025-05-15
-```
-
-`run` does the following:
-1. Searches ASF for HH+HV scenes over [aoi.geojson](aoi.geojson) and keeps the `run.max_scenes` (default 3) that cover the AOI best.
-2. Orders HyP3 RTC jobs, waits for them (often 30–60 min) and downloads them. Each 10 m scene costs 60 of the monthly HyP3 credits, and `--dry-run` shows the total first.
-3. Builds the land mask (one-time ~900 MB OSM download), preprocesses each scene (masks), runs the CFAR, and writes `data/outputs/iceberg_alley.czml`. The CZML holds every scene processed so far, not just this run's dates, so the viewer accumulates seasons.
-
-Re-runs reuse everything on disk: downloaded products, masked rasters and detections. Use `--force` to redo preprocessing and detection after changing parameters. Without `--start`/`--end`, the dates come from `search` in `config.yaml`.
-
-Then run THOR on the same scenes and open the viewer. `run` doesn't include THOR yet, and the trained head isn't distributed, so the first time you train it (see [THOR training](#thor-training) below):
-
-```powershell
-pip install -e .[ml,thor] --extra-index-url https://download.pytorch.org/whl/cu124
-python -m iceberg_sar.cli thor-detect data\raw\<product_dir> [<product_dir> ...] --head linear
-python -m iceberg_sar.cli czml       # picks up the THOR detections next to the CFAR ones
-python -m iceberg_sar.cli publish    # per-scene CZML + manifest -> viewer/public/data/
+python -m iceberg_sar.cli run --start 2025-05-01 --end 2025-05-15 --dry-run   # plan, credits, whether THOR runs
+python -m iceberg_sar.cli run --start 2025-05-01 --end 2025-05-15 --publish
 cd viewer
 npm install
 npm run dev                          # http://localhost:5173
 ```
 
+`run` does the following:
+1. Searches ASF for HH+HV scenes over [aoi.geojson](aoi.geojson) and keeps the `run.max_scenes` (default 3) that cover the AOI best.
+2. Orders HyP3 RTC jobs, waits for them (often 30–60 min) and downloads them. Each 10 m scene costs 60 of the monthly HyP3 credits, and `--dry-run` shows the total first.
+3. Builds the land mask (one-time ~900 MB OSM download) and preprocesses each scene (land and pack-ice masks).
+4. Runs the detectors in `run.detectors`: THOR and the CA-CFAR baseline (`--detectors cfar` or `thor` overrides the config). Without a CUDA GPU or the trained head, THOR is skipped with one notice and the run finishes with the CFAR; `--dry-run` says which it will be.
+5. Writes `data/outputs/iceberg_alley.czml` with both layers. The CZML holds every scene processed so far, not just this run's dates, so the viewer accumulates seasons. `--publish` also rebuilds `viewer/public/data/`.
+
+Re-runs reuse everything on disk: downloaded products, masked rasters and detections. Use `--force` to redo preprocessing and detection after changing parameters. Without `--start`/`--end`, the dates come from `search` in `config.yaml`. To retrain the head instead of fetching it, see [THOR training](#thor-training).
+
 In the viewer:
 - Scrub the timeline to step through passes, and click a target to see its attributes.
-- THOR detections are cyan rings (score ≥ 0.35), CFAR detections orange dots. Both share one size scale, and the THOR layer can be toggled. Targets within 5 km of pack ice are grey (likely ice floes), and a checkbox hides them.
+- THOR detections are cyan rings (score ≥ 0.35), the CA-CFAR baseline orange dots. Both share one size scale, and either layer can be toggled. The panel shows each detector's open-water count for the pass on screen, and a THOR detection's info box starts with its score. Targets within 5 km of pack ice are grey (likely ice floes), and a checkbox hides them.
 - Passes marked "THOR vs CFAR" open the recall chart for that pass.
 - Toggle the scene footprint and the pack-ice mask. The "?" button explains what the points are.
 - The basemap is Esri World Imagery, so no Cesium ion token is needed. `npm run build` gives a static site in `viewer/dist/` for `/iceberg-alley-sar/` (GitHub Pages); set `VIEWER_BASE=/` to host it at a root.
@@ -173,9 +167,7 @@ python -m iceberg_sar.cli thor-compare --sweep            # THOR vs CFAR on the 
 The live viewer is a static site on GitHub Pages. Python never runs in CI: the data is built locally and committed.
 
 ```powershell
-python -m iceberg_sar.cli run --start <date> --end <date>       # process new scenes
-python -m iceberg_sar.cli thor-detect data\raw\<product_dir>    # THOR on each new scene
-python -m iceberg_sar.cli czml; python -m iceberg_sar.cli publish
+python -m iceberg_sar.cli run --start <date> --end <date> --publish   # new scenes: THOR + CFAR, web data
 git add viewer/public/data; git commit -m "Viewer: add <dates>"; git push
 ```
 
@@ -183,7 +175,7 @@ A push to `main` that touches `viewer/**` triggers [.github/workflows/pages.yml]
 
 ## Individual steps
 
-`run` chains the classical steps, and each can be run on its own (`--help` on any command):
+`run` chains these steps, and each can be run on its own (`--help` on any command):
 
 ```powershell
 python -m iceberg_sar.cli search --pol HH+HV                 # scene list + footprints -> data/outputs/

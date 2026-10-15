@@ -81,7 +81,10 @@ iceberg-alley-sar/
 
 ## Current status (as of 2026-10-13)
 - **Milestones 0–6: done.** The live viewer is on GitHub Pages with THOR and CFAR layers, an About ("?") dialog and per-pass THOR vs CFAR charts.
-- **Docs reframed THOR-first (2026-10-13):** README, About dialog, `docs/validation-findings.md` (note on 78% vs 74%), and the presentations in `docs/presentation/` (Project Brief v2 deck + one-pager, CA-CFAR vs THOR brief as the technical deep-dive). The code still treats the CFAR as primary in places; that's Milestone 7.
+- **Docs reframed THOR-first (2026-10-13):** README, About dialog, `docs/validation-findings.md` (note on 78% vs 74%), and the presentations in `docs/presentation/` (Project Brief v2 deck + one-pager, CA-CFAR vs THOR brief as the technical deep-dive).
+- **Milestone 7 (branch `milestone7-thor-first`, 2026-10-15):** viewer is THOR-first (7a), `run` runs THOR +
+  CFAR with a skip path (7b), `thor-fetch-head` pulls the head from a GitHub release pinned by SHA-256 (7c),
+  screenshots retaken (7d). Head checkpoints now load with `weights_only=True`.
 - **Milestones 0–3: done.** Search, HyP3 RTC (10 m), land + pack-ice masks, CA-CFAR on HV with strip rejection and an HH co-pol check, GeoJSON detections, and the Vue + Cesium viewer.
 - **Scenes:** spring 2025 (2025-05-02, 05-08, 05-14) in the viewer, checked against NAIS charts. Spring 2019 (2019-04-15, 04-29) and 2020-06-10 for point-level validation.
 - **Validation (beyond the plan):** 78% recall (207/267) against same-pass IIP analyst labels on 2019-04-29, median offset 67 m (IIP positions are truncated to 0.1'; corrected to cell centres). Precision is not measurable without AIS. Large bergs (>120 m) are missed: their grown blobs exceed `max_structure_m` (the ice-strip rule). See `docs/validation-findings.md`.
@@ -358,6 +361,11 @@ CA-CFAR as the baseline; the viewer and `cli.py run` still treat the CFAR as pri
   with Playwright + Edge; swapped into the Project Brief v2 deck, the one-pager and the CA-CFAR vs
   THOR brief. Retake them after 7a, since the viewer's subtitle and legend order will change.
 
-#### Milestone 7 open questions
-- Distribution of the head weights (7c).
-- Whether the CFAR layer stays visible by default in the public viewer.
+#### Milestone 7 decisions (2026-10-15)
+- Head weights: GitHub release asset (tag `thor-head-v1`, `thor-linear-head.pt`), pinned in
+  `thor.release` by SHA-256. `thor-fetch-head` downloads it to `data/models/thor/linear/final/head.pt`.
+- The CA-CFAR baseline layer stays on by default: a dot inside a ring reads as "found by both".
+- `run` takes its THOR head from `viewer.thor_model`, so the run and the viewer layer can't drift apart.
+  A `--detectors thor` run still preprocesses, but the CZML lists scenes by their CFAR output.
+- 7d: only the Project Brief v2 deck (slide 11) holds the full screenshot; the other decks use a
+  globe-only crop that 7a didn't change. The deck's PDF was re-exported with PowerPoint.
