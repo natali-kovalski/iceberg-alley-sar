@@ -190,9 +190,11 @@ def _distance_text(km: Any, flag: bool) -> str:
     return f"{km:.1f} km" + (" (near ice: likely floe)" if flag else "")
 
 
-def _description(props: dict[str, Any]) -> str:
+def _description(props: dict[str, Any], score: float | None = None) -> str:
+    """Info-box table; a THOR detection (`score` given) leads with its score."""
     g = props.get
-    rows = [
+    rows = [("THOR score", _num(score, ".2f"))] if score is not None else []
+    rows += [
         ("Scene", props["scene_id"]),
         ("Time (UTC)", props["timestamp"]),
         ("Lat / lon", f"{_num(g('lat'), '.4f')}, {_num(g('lon'), '.4f')}"),
@@ -266,7 +268,7 @@ def thor_packets(gdf: gpd.GeoDataFrame, availability: str, p: ViewerParams
             "name": f"THOR {row['id']} (score {float(row['score']):.2f})",
             "parent": f"scene/{row['scene_id']}",
             "availability": availability,
-            "description": _description(raw),
+            "description": _description(raw, float(row["score"])),
             "position": {"cartographicDegrees": [float(row["lon"]), float(row["lat"]), 0.0]},
             "point": {
                 # Inner diameter = the CFAR dot (plus its 1 px outline) for the same extent.

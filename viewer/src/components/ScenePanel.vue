@@ -9,7 +9,6 @@ const emit = defineEmits<{ jump: [scene: SceneInfo] }>();
 
 // On a phone the panel would cover the globe, so it starts collapsed to its title row.
 const collapsed = ref(window.matchMedia("(max-width: 600px)").matches);
-const currentDate = computed(() => props.currentId?.replace("pass/", ""));
 
 // Ice controls only mean something when the scene on screen has pack ice mapped.
 const hasIce = (s: SceneInfo) => s.iceAreaKm2 > 0;
@@ -33,10 +32,8 @@ function splitTitle(s: SceneInfo): string | undefined {
     : "THOR pack-ice validation frame: labelled, never trained on";
   return `${what}. ${s.nTruth ?? 0} IIP analyst labels shown.`;
 }
-const currentHasIce = computed(() => {
-  const s = props.scenes.find((x) => x.id === props.currentId);
-  return s ? hasIce(s) : props.scenes.some(hasIce);
-});
+const current = computed(() => props.scenes.find((x) => x.id === props.currentId));
+const currentHasIce = computed(() => (current.value ? hasIce(current.value) : props.scenes.some(hasIce)));
 </script>
 
 <template>
@@ -49,19 +46,27 @@ const currentHasIce = computed(() => {
                 @click="collapsed = !collapsed">{{ collapsed ? "▸" : "▾" }}</button>
       </span>
     </div>
-    <p class="sub">Sentinel-1 HH/HV, CA-CFAR candidates<template v-if="hasThor"> + THOR</template></p>
-    <p v-if="collapsed && currentDate" class="sub">Pass {{ currentDate }}</p>
+    <p class="sub">Sentinel-1 HH/HV · <template v-if="hasThor">THOR detections, <span class="nw">CA-CFAR baseline</span></template><span v-else class="nw">CA-CFAR candidates</span></p>
+    <!-- Open-water counts of the pass on screen, THOR first: near-ice candidates are likely floes. -->
+    <p v-if="current" class="sub pass">
+      <span class="nw">Pass {{ current.date }}</span> · <span class="nw">open water:</span>&#32;<template
+        v-if="current.nThor !== undefined"><span class="n-thor">THOR {{ current.nThor }}</span> · </template><span
+        class="n-cfar">CFAR {{ current.nOpenWater }}</span>
+    </p>
     <div v-show="!collapsed">
 
     <h2>Legend</h2>
-    <div class="key"><span class="dot cfar" /> CA-CFAR candidate</div>
-    <div v-if="hasThor" class="key"><span class="ring" /> THOR candidate, score ≥ {{ legend.thorScore ?? 0.35 }}</div>
+    <div v-if="hasThor" class="key"><span class="ring" /> THOR detection, score ≥ {{ legend.thorScore ?? 0.35 }}</div>
+    <div class="key"><span class="dot cfar" /> CA-CFAR <template v-if="hasThor">baseline </template>candidate</div>
     <div v-if="hasThor" class="key"><span class="ring both"><span class="dot cfar" /></span> found by both</div>
     <div v-if="hasTruth" class="key"><span class="cross">✕</span> IIP analyst label, same pass (THOR training frames)</div>
     <div class="sizes-title">Size = target extent, same classes for both</div>
     <div class="sizes">
       <div v-for="c in sizeClasses" :key="c.label" class="size">
-        <span class="slot"><span class="dot cfar" :style="{ width: `${c.px}px`, height: `${c.px}px` }" /></span>
+        <span class="slot">
+          <span v-if="hasThor" class="ring" :style="{ width: `${c.px}px`, height: `${c.px}px` }" />
+          <span v-else class="dot cfar" :style="{ width: `${c.px}px`, height: `${c.px}px` }" />
+        </span>
         <span>{{ c.label }}</span><span class="muted">{{ c.range }}</span>
       </div>
     </div>
@@ -88,6 +93,9 @@ const currentHasIce = computed(() => {
     </ul>
 
     <h2>Layers</h2>
+    <label v-if="hasThor"><input v-model="layers.thor" type="checkbox" /> THOR detections (foundation model)</label>
+    <label v-if="hasThor"><input v-model="layers.cfar" type="checkbox" /> CA-CFAR baseline</label>
+    <label v-if="hasTruth"><input v-model="layers.truth" type="checkbox" /> IIP labels on training frames</label>
     <label :class="{ off: !currentHasIce }">
       <input v-model="layers.nearIce" type="checkbox" :disabled="!currentHasIce" /> Near-ice candidates (likely floes)
     </label>
@@ -97,8 +105,6 @@ const currentHasIce = computed(() => {
     </label>
     <label><input v-model="layers.footprints" type="checkbox" /> Scene footprint</label>
     <label v-if="hasCoverage"><input v-model="layers.unobserved" type="checkbox" /> Dim area not imaged</label>
-    <label v-if="hasThor"><input v-model="layers.thor" type="checkbox" /> THOR detections (foundation model)</label>
-    <label v-if="hasTruth"><input v-model="layers.truth" type="checkbox" /> IIP labels on training frames</label>
     </div>
   </aside>
 </template>
@@ -126,6 +132,10 @@ h1 { margin: 0; font-size: 16px; }
 @media (max-width: 600px) { .panel { width: calc(100% - 120px); max-width: 300px; } }
 h2 { margin: 14px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: #8fa3bb; }
 .sub { margin: 2px 0 0; color: #8fa3bb; }
+.pass { margin-top: 6px; }
+.nw, .n-thor, .n-cfar { white-space: nowrap; }
+.n-thor { color: rgb(0, 229, 255); font-weight: 600; }
+.n-cfar { color: rgb(251, 162, 56); }
 .scenes { list-style: none; margin: 0; padding: 0; }
 .scenes li {
   padding: 6px 8px;

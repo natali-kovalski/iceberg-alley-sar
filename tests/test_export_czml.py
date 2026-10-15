@@ -201,6 +201,10 @@ def test_thor_layer_threshold_and_counts(cfg: Config) -> None:
     assert dot["point"]["color"]["rgba"] == CFAR_RGBA
     assert rings[1]["point"]["pixelSize"] == dot["point"]["pixelSize"] + 4
     assert "n_thor" not in by_id[f"scene/{next(reversed(SCENES))}"]["properties"]
+    # Info box: a THOR detection leads with its score; a CFAR one has no score row.
+    assert rings[0]["description"].index("<th>THOR score</th><td>0.90</td>") < \
+        rings[0]["description"].index("<th>Scene</th>")
+    assert "THOR score" not in dot["description"]
 
 
 def test_pass_coverage_fraction_and_gap() -> None:

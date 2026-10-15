@@ -25,7 +25,10 @@ const compareScene = ref<SceneInfo>(); // scene whose THOR vs CFAR chart is open
 // The About dialog opens on a first visit only. Storage can be unavailable (private mode).
 const ABOUT_SEEN = "iceberg-alley-about-seen";
 const showAbout = ref(!storageGet(ABOUT_SEEN));
-const layers = reactive<Layers>({ nearIce: true, seaIce: true, footprints: true, unobserved: true, thor: true, truth: true });
+// THOR is the detector; the CFAR baseline stays on so "found by both" (dot in ring) reads at a glance.
+const layers = reactive<Layers>({
+  thor: true, cfar: true, nearIce: true, seaIce: true, footprints: true, unobserved: true, truth: true,
+});
 
 // Plain variables, not refs: Cesium objects must stay out of Vue's reactivity.
 let viewer: Viewer | undefined;
