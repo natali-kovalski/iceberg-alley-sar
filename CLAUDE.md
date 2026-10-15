@@ -362,7 +362,7 @@ CA-CFAR as the baseline; the viewer and `cli.py run` still treat the CFAR as pri
   THOR brief. Retake them after 7a, since the viewer's subtitle and legend order will change.
 
 #### Milestone 7 decisions (2026-10-15)
-- Head weights: GitHub release asset (tag `thor-head-v1`, `thor-linear-head.pt`), pinned in
+- Head weights: GitHub release asset (tag `thor-head-v1`, asset `head.pt`), pinned in
   `thor.release` by SHA-256. `thor-fetch-head` downloads it to `data/models/thor/linear/final/head.pt`.
 - The CA-CFAR baseline layer stays on by default: a dot inside a ring reads as "found by both".
 - `run` takes its THOR head from `viewer.thor_model`, so the run and the viewer layer can't drift apart.

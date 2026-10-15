@@ -266,7 +266,7 @@ thor:
   release:
     # 7c: the final linear head (769 parameters) as a GitHub release asset, so `run` needs no
     # retraining. `thor-fetch-head` saves it as <paths.models>/thor/<head>/final/head.pt.
-    url: https://github.com/natali-kovalski/iceberg-alley-sar/releases/download/thor-head-v1/thor-linear-head.pt
+    url: https://github.com/natali-kovalski/iceberg-alley-sar/releases/download/thor-head-v1/head.pt
     sha256: 659cb0f47016eb17c2012c6b255c94c998e7f310c51e08f42ce262f5e75b580f
     head: linear
   compare:
