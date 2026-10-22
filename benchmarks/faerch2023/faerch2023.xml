@@ -1,0 +1,1102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE article PUBLIC "-//NLM//DTD Journal Publishing with OASIS Tables v3.0 20080202//EN" "https://jats.nlm.nih.gov/nlm-dtd/publishing/3.0/journalpub-oasis3.dtd">
+<article xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:mml="http://www.w3.org/1998/Math/MathML" xmlns:oasis="http://docs.oasis-open.org/ns/oasis-exchange/table" xml:lang="en" dtd-version="3.0" article-type="research-article"><?xmltex \makeatother\@nolinetrue\makeatletter?>
+  <front>
+    <journal-meta><journal-id journal-id-type="publisher">TC</journal-id><journal-title-group>
+    <journal-title>The Cryosphere</journal-title>
+    <abbrev-journal-title abbrev-type="publisher">TC</abbrev-journal-title><abbrev-journal-title abbrev-type="nlm-ta">The Cryosphere</abbrev-journal-title>
+  </journal-title-group><issn pub-type="epub">1994-0424</issn><publisher>
+    <publisher-name>Copernicus Publications</publisher-name>
+    <publisher-loc>Göttingen, Germany</publisher-loc>
+  </publisher></journal-meta>
+    <article-meta>
+      <article-id pub-id-type="doi">10.5194/tc-17-5335-2023</article-id><title-group><article-title>A comparison of constant false alarm rate object detection algorithms for iceberg identification in L- and C-band<?xmltex \hack{\break}?> SAR imagery of the Labrador Sea</article-title><alt-title>A comparison of CFAR object detection algorithms</alt-title>
+      </title-group><?xmltex \runningtitle{A comparison of CFAR object detection algorithms}?><?xmltex \runningauthor{L. F{\ae}rch et al.}?>
+      <contrib-group>
+        <contrib contrib-type="author" corresp="yes" rid="aff1">
+          <name><surname>Færch</surname><given-names>Laust</given-names></name>
+          <email>laust.farch@uit.no</email>
+        </contrib>
+        <contrib contrib-type="author" corresp="no" rid="aff1 aff2">
+          <name><surname>Dierking</surname><given-names>Wolfgang</given-names></name>
+          
+        <ext-link>https://orcid.org/0000-0002-5031-648X</ext-link></contrib>
+        <contrib contrib-type="author" corresp="no" rid="aff3">
+          <name><surname>Hughes</surname><given-names>Nick</given-names></name>
+          
+        </contrib>
+        <contrib contrib-type="author" corresp="no" rid="aff1">
+          <name><surname>Doulgeris</surname><given-names>Anthony P.</given-names></name>
+          
+        <ext-link>https://orcid.org/0000-0002-9345-6896</ext-link></contrib>
+        <aff id="aff1"><label>1</label><institution>Center for Integrated Remote Sensing and Forecasting for Arctic Operations, Department of Physics and Technology, <?xmltex \hack{\break}?> UiT – The Arctic University of Norway, 9019 Tromsø, Norway</institution>
+        </aff>
+        <aff id="aff2"><label>2</label><institution>Alfred Wegener Institute, Helmholtz Center for Polar and Marine Research, Bussestr. 24, 27570 Bremerhaven, Germany</institution>
+        </aff>
+        <aff id="aff3"><label>3</label><institution>Norwegian Meteorological Institute, Kirkegårdsvejen, 60, 9293 Tromsø, Norway</institution>
+        </aff>
+      </contrib-group>
+      <author-notes><corresp id="corr1">Laust Færch (laust.farch@uit.no)</corresp></author-notes><pub-date><day>15</day><month>December</month><year>2023</year></pub-date>
+      
+      <volume>17</volume>
+      <issue>12</issue>
+      <fpage>5335</fpage><lpage>5355</lpage>
+      <history>
+        <date date-type="received"><day>3</day><month>February</month><year>2023</year></date>
+           <date date-type="rev-request"><day>14</day><month>February</month><year>2023</year></date>
+           <date date-type="rev-recd"><day>9</day><month>October</month><year>2023</year></date>
+           <date date-type="accepted"><day>23</day><month>October</month><year>2023</year></date>
+      </history>
+      <permissions>
+        <copyright-statement>Copyright: © 2023 </copyright-statement>
+        <copyright-year>2023</copyright-year>
+      <license license-type="open-access"><license-p>This work is licensed under the Creative Commons Attribution 4.0 International License. To view a copy of this licence, visit <ext-link ext-link-type="uri" xlink:href="https://creativecommons.org/licenses/by/4.0/">https://creativecommons.org/licenses/by/4.0/</ext-link></license-p></license></permissions><self-uri xlink:href="https://tc.copernicus.org/articles/.html">This article is available from https://tc.copernicus.org/articles/.html</self-uri><self-uri xlink:href="https://tc.copernicus.org/articles/.pdf">The full text article is available as a PDF file from https://tc.copernicus.org/articles/.pdf</self-uri>
+      <abstract><title>Abstract</title>
+
+      <p id="d1e125">In this study, we pursue two objectives: first, we compare six different “constant false alarm rate” (CFAR) algorithms for iceberg detection in SAR images, and second, we investigate the effect of radar frequency by comparing the detection performance at C- and L-band. The SAR images were acquired over the Labrador Sea under melting conditions. In an overlapping optical Sentinel-2 image, 492 icebergs were identified in the area. They were used for an assessment of the algorithms' capabilities to accurately detect them in the SAR images and for the determination of the number of false alarms and missed detections. By testing the detectors at varying probability of false alarm (PFA) levels, the optimum PFA for each detector was found. Additionally, we considered the effect of iceberg sizes in relation to image resolution. The results showed that the overall highest accuracy was achieved by applying a log-normal CFAR detector to the L-band image (<inline-formula><mml:math id="M1" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score of 70.4 %), however, only for a narrow range of PFA values. Three of the tested detectors provided high <inline-formula><mml:math id="M2" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> scores above 60 % over a wider range of PFA values both at L- and C-band. Low <inline-formula><mml:math id="M3" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> scores were mainly caused by missed detections of small-sized (<inline-formula><mml:math id="M4" display="inline"><mml:mrow><mml:mi mathvariant="italic">&lt;</mml:mi><mml:mn mathvariant="normal">60</mml:mn></mml:mrow></mml:math></inline-formula> m) and medium-sized (60–120 m) icebergs, with approximately 20 %–40 % of the medium icebergs and 85 %–90 % of small icebergs being missed by all detectors. The iDPolRAD detector, which is sensitive to volume scattering, is less suitable under melting conditions.</p>
+  </abstract>
+    
+<funding-group>
+<award-group id="gs1">
+<funding-source>Norges Forskningsråd</funding-source>
+<award-id>237906</award-id>
+</award-group>
+</funding-group>
+</article-meta>
+  </front>
+<body>
+      
+
+<sec id="Ch1.S1" sec-type="intro">
+  <label>1</label><title>Introduction</title>
+      <p id="d1e168">Icebergs pose a serious threat to maritime traffic and offshore installations in the Arctic and surrounding regions. As human presence in these areas increases, it becomes more important to develop improved methods for detecting, mapping, tracking, and predicting iceberg occurrences in real time and over large areas.</p>
+      <p id="d1e171">Traditionally, iceberg detection in the Northwest Atlantic has been conducted visually by observers on aircraft of the International Ice Patrol. However, the increased availability of data from satellite synthetic aperture radar (SAR) sensors in the past decades has promoted a move towards automated detection.</p>
+      <p id="d1e174">SAR is an active instrument that acquires images independent of sunlight and cloud cover conditions. This makes it the preferred sensor for high-latitude regions, where cloud cover and a lack of daylight can hinder the use of optical images. In a SAR image, the brightness of each pixel depends on the intensity of the signal that is scattered back from the surface – called the backscattering coefficient. Since different objects exhibit different backscatter characteristics, it is possible to identify targets in the SAR image by looking at the backscatter variations. This identification is further aided by the fact that the SAR sensor can transmit and receive radar pulses at different polarizations, giving rise to additional information about the objects.</p>
+      <p id="d1e177">However, SAR images can be more challenging to analyze compared to optical images for several reasons. Speckle<?pagebreak page5336?> noise, which occurs due to constructive and destructive interference in the radar signal, can make it difficult to identify small features in SAR images. The side-looking geometry of SAR sensors leads to a decrease of the backscattering coefficients with increasing incidence angle, which is most obvious over homogenous targets. A problem that often arises is how to exactly make a distinction between the backscatter intensity of icebergs and the scattering response of open water or sea ice around them.</p>
+      <p id="d1e181">Despite these issues, SAR images have been widely used for manual iceberg detection. The identification of icebergs in SAR images typically relies on the fact that icebergs tend to have a higher backscatter intensity than open water and certain types of sea ice (Gill, 2001; Sandven et al., 2007; Wesche and Dierking, 2012). In recent years, the development of automated detection schemes has become more and more important. Icebergs can be automatically detected by using either segmentation (Kim et al., 2011; Tao et al., 2016a; Akbari and Brekke, 2018; Karvonen et al., 2022) or global thresholding approaches (Dierking and Wesche, 2014; Barbat et al., 2019). The most common approach is the application of adaptive thresholding techniques such as the constant false alarm rate (CFAR) detector (Oliver and Quegan, 2004). CFAR detectors are especially valuable for wide-swath SAR images, where large variations in incidence angles make global thresholding techniques difficult to design. Automatic iceberg detection with CFAR has been demonstrated in the past for single-polarization (Power et al., 2001; Gill, 2001) and for dual- and quad-polarization SAR (Howell et al., 2004; Marino et al., 2016, Zakharov et al., 2017). Regional distributions of icebergs have been mapped using this method, e.g., for Greenland (Buus-Hinkler et al., 2014).</p>
+      <p id="d1e184">SAR images acquired at C-band (4–8 GHz) are typically employed in operational mapping, e.g. from the European Sentinel-1 mission. Sentinel-1 offers a high revisit interval with daily dual-polarization images over most of the Arctic in its extra-wide swath (EW) mode. Through the Copernicus program, Sentinel-1 images are available through a free and open-data policy. The Sentinel-1 mission and its Canadian equivalent, the RADARSAT Constellation Mission (RCM), will continue for at least another decade and will likely be followed by similar missions. C-band SAR is currently being used for iceberg monitoring by, e.g., the International Ice Patrol (IIP) and the Danish Meteorological Institute (DMI).</p>
+      <p id="d1e187">In 2028, a new L-band (1–2 GHz) SAR mission from ESA, called ROSE-L, is planned to be launched to supplement the C-band Sentinel-1 mission. ROSE-L will also offer regular dual-pol images of the Arctic (Davidson et al., 2021). Already in 2024, NASA and ISRO (Indian Space Research Organization) plan to launch the NISAR (NASA-ISRO synthetic aperture radar) mission with an L-band and an S-band sensor as payload (Das et al., 2021). Although the inclination and left-looking image acquisition of NISAR limits its coverage at 78.5<inline-formula><mml:math id="M5" display="inline"><mml:msup><mml:mi/><mml:mo>∘</mml:mo></mml:msup></mml:math></inline-formula> N, it could still be used for detecting icebergs around Greenland and along the coast of Labrador and Newfoundland. It is anticipated that the L-band data will be a useful complement as the longer wavelengths penetrate deeper into snow and ice, revealing the structures underneath (Dierking and Davidson, 2020), and additionally it is expected that L-band will be less sensitive to sea surface roughness and therefore will offer a higher contrast between icebergs and sea ice, making detection easier.</p>
+      <p id="d1e199">Only a few studies on using L-band SAR for iceberg observations have been carried out in the past. Gray and Arsenault (1991) showed that icebergs cause time-delayed reflections due to internal scattering in airborne L-band SAR images. Marino (2018) tested an iceberg detection algorithm developed for C-band on L-band images with encouraging results. Recently, a study on scattering mechanisms for icebergs in quad-pol L-band SAR images was conducted by Bailey and Marino (2020), and Bailey et al. (2021) later compared various detectors applied on quad-, dual-, and single-pol L-band SAR images. The studies mentioned above give some indication of the dominant scattering mechanisms and detection capabilities of icebergs at L-band. However, studies comparing C- and L-band for iceberg detection have not been carried out to date, and there is still a need to better understand the benefits and limits of both C- and L-band data and how different detectors perform on the two data types.</p>
+      <p id="d1e202">A significant challenge in using SAR for iceberg detection is validating the accuracy of detection algorithms. Many studies rely on the information on observed icebergs collected during field campaigns (Willis et al., 1996; Power et al., 2001; Denbina and Collins, 2012) or on visual identification of icebergs in SAR images by experts (Bailey et al., 2021; Marino et al., 2016; Akbari and Brekke, 2018). Both approaches have limitations. Using field observations of icebergs results in a spatially limited validation dataset, while expert interpretation of SAR images does not account for icebergs that may be present but not visible in the SAR image due to resolution or noise issues. Images from optical remote sensing satellites offer an independent source of validation data but are limited to days with reduced cloud cover. Another requirement is that optical and SAR images must be acquired within a small time gap between them to avoid icebergs having drifted over long distances between acquisitions.</p>
+      <p id="d1e205">In this study, we compare six different CFAR detection algorithms and apply them on an overlapping C- and L-band image pair to study the effect of the frequency and tuning of the algorithms on the detection accuracy. To ensure an accurate comparison, we created a validation dataset using an optical Sentinel-2 image, in which we manually accounted for the iceberg drift occurring between the image acquisitions. The detectors were then assessed not only on their ability to accurately detect the verified icebergs but also on the number of false detections they produced. The novelty of this work is the consistent comparison between L- and C-band SAR for iceberg detection. Additionally, by using Sentinel-2 data as validation, it was possible to test the detection accuracy<?pagebreak page5337?> as a function of iceberg size. Finally, one of the tested detection algorithms was based on the Wishart likelihood ratio test, which has not been applied before for iceberg detection.</p>
+      <p id="d1e209">The structure of the paper is as follows. In Sect. 2, a short introduction to CFAR algorithms for iceberg detection is provided, followed by Sect. 3, which presents the data used, explains the method used for creating validation data, and outlines the implementation details of the iceberg detection algorithms that we have tested. The paper proceeds with our results in Sect. 4 and a discussion in Sect. 5. The paper ends with a conclusion in Sect. 6.</p>
+</sec>
+<sec id="Ch1.S2">
+  <label>2</label><title>Theory</title>
+      <p id="d1e220">The SAR backscatter intensity from an iceberg mainly arises from surface- and volume-scattering (Power et al, 2001; Bailey and Marino, 2020). These two scattering mechanisms are influenced by several different parameters; some are target-dependent such as iceberg geometry, temperature, surface roughness, and structure (e.g., the presence of snow, firn, or saline layers). Others are sensor-dependent such as incidence angle, frequency, and polarization. Additionally, sensor limitations such as resolution and the presence of speckle noise further complicate image interpretations, as backscattering returns from icebergs, which mostly cover only a few pixels, might be indistinguishable from intensity variations of speckle. For operational applications, single- or dual-pol are commonly used, but if quad-pol data are available, polarimetric decomposition can be applied to aid image interpretation (Dierking and Wesche, 2014; Zakharov et al., 2017; Bailey et al., 2021).</p>
+      <p id="d1e223">It has been observed that icebergs covered by liquid water or wet snow stand out as dark objects against a lighter background of open water. However, in most cases, icebergs exhibit higher backscatter intensities than open water (Power et al., 2001; Wesche and Dierking, 2012). Icebergs are hence typically visible in SAR images as bright spots compared to the relatively darker ocean. Since the backscatter of open water can be highly variable due to its dependence on local wind conditions and incidence angle, global thresholding techniques are insufficient to detect icebergs. Instead, adaptive methods utilizing the local contrast in backscatter between neighboring pixels are normally employed to distinguish between icebergs and open water.</p>
+<sec id="Ch1.S2.SS1">
+  <label>2.1</label><title>CFAR iceberg detection</title>
+      <p id="d1e233">A CFAR detector is a type of adaptive thresholding algorithm used to identify objects such as ships or icebergs in SAR images. The algorithm compares the intensity of each pixel under test (PuT) to the local background clutter, and if the pixel value exceeds a certain threshold, it is marked as an outlier. Clusters of these outliers are assumed to represent objects of interest. The threshold is determined based on the probability density function (PDF) of the local clutter, allowing the CFAR detector to adapt to variations in the background noise (Crisp, 2004).</p>
+      <p id="d1e236">Accurate CFAR detection thus relies on accurate modeling of the background clutter PDF in SAR images, which is not an easy task. In practice, a handful of models are widely used to estimate sea surface clutter, but their performance depends on the actual clutter properties, which depend on radar parameters such as frequency. A model that works very well on C-band might prove inferior on L-band.</p>
+      <p id="d1e239">The <inline-formula><mml:math id="M6" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> distribution is a PDF that has been widely used to model sea surface clutter (Oliver and Quegan, 2004), and CFAR algorithms based on the <inline-formula><mml:math id="M7" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> distribution have been used for ship and iceberg detection (Power et al., 2001; Brekke and Anfinsen, 2011; Wesche and Dierking, 2012; Liu, 2018). But due to the complexity of the <inline-formula><mml:math id="M8" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> distribution, models based on simpler PDFs are also commonly used, e.g., the log-normal distribution (Crisp, 2004; El-Darymli et al., 2013) and gamma distribution (Gill, 2001; Crisp, 2004; Buus-Hinkler et al., 2014; Tao et al., 2016b).</p>
+      <p id="d1e263">If the background clutter is accurately modeled, a threshold can be set in such a way that the probability of falsely triggering the detector – the probability of false alarm (PFA) – is maintained at a constant level. However, in practice, there can be discrepancies between the theoretical PFA and the actual false alarm rate due to various implementation details. If the window over which the clutter parameters are estimated is too small, it will likely cause the calculated PDF parameters to be biased. If the window is too large, it is more likely to cover nonhomogeneous clutter regions or capture neighboring icebergs, which will contaminate the parameter estimation (Tao et al, 2016b). Additionally, CFAR algorithms used for operational detections are often optimized to minimize the computational complexity, which can further degrade the performance. When testing CFAR algorithms for operational monitoring, it is therefore of high importance to inform about the true number of false alarms, e.g., by testing the detector for an area without icebergs.</p>
+<sec id="Ch1.S2.SS1.SSS1">
+  <label>2.1.1</label><title>Merging of multiple bands</title>
+      <p id="d1e274">Most models used for estimating the clutter are based on single-channel statistics. For multi-channel data, i.e., the case where several polarizations are available, three distinct detection strategies can be used (Crisp, 2004). (1) The individual channels can be combined into a new single channel, which is then fed to a single-channel detector. This could be achieved by calculating the SPAN (or total power) or by making a new channel consisting of a sum of normalized intensities (Liu, 2015). But channel combinations can also be developed to enhance the contrast between background and target before applying the detector, e.g., by utilizing the polarimetric properties of the target which one wants to detect. One such example is the intensity dual-pol ratio anomaly detector (iDPolRAD) suggested for iceberg detection (Marino et al., 2016).<?pagebreak page5338?> (2) Multi-dimensional detectors based on multivariate PDFs can be applied directly to find outliers based on all channels simultaneously. (3) The far most common approach is simply to apply a single-channel detector to each channel and then combine the outputs of the resulting detections using Boolean operations.</p>
+      <p id="d1e277">When merging the output from multiple single-band CFAR detectors into a new channel, it needs to be considered that the PFA of the combined channel will not be the same as the PFA used on the individual bands. If we combine the output from two CFAR filters using a Boolean AND operation, the final product will contain fewer outliers than the number of outliers found by the individual detectors. Similarly, a Boolean OR operation will result in more outliers.</p>
+      <p id="d1e280">For determination of the combined PFA, the multiplication and addition rules for probabilities can be used.</p>
+      <p id="d1e283">If we have two detectors, e.g., one applied to the HH polarization and another to the HV polarization, and assuming that the noise in the HH and HV channel is independent, then the PFA after a Boolean AND operation becomes
+              <disp-formula id="Ch1.Ex1"><mml:math id="M9" display="block"><mml:mrow><mml:mi mathvariant="normal">PFA</mml:mi><mml:mfenced open="(" close=")"><mml:mtext>HH and HV</mml:mtext></mml:mfenced><mml:mo>=</mml:mo><mml:mi mathvariant="normal">PFA</mml:mi><mml:mfenced open="(" close=")"><mml:mi mathvariant="normal">HH</mml:mi></mml:mfenced><mml:mi mathvariant="normal">PFA</mml:mi><mml:mfenced close=")" open="("><mml:mi mathvariant="normal">HV</mml:mi></mml:mfenced><mml:mo>.</mml:mo></mml:mrow></mml:math></disp-formula>
+            If the PFA for the HH and HV channels are equal, we can calculate the PFA needed on the individual channels based on the desired combined PFA as
+              <disp-formula id="Ch1.Ex2"><mml:math id="M10" display="block"><mml:mrow><mml:mi mathvariant="normal">PFA</mml:mi><mml:mfenced open="(" close=")"><mml:mi mathvariant="normal">HH</mml:mi></mml:mfenced><mml:mo>=</mml:mo><mml:mi mathvariant="normal">PFA</mml:mi><mml:mfenced close=")" open="("><mml:mi mathvariant="normal">HV</mml:mi></mml:mfenced><mml:mo>=</mml:mo><mml:msqrt><mml:mrow><mml:mi mathvariant="normal">PFA</mml:mi><mml:mo>(</mml:mo><mml:mtext>HH and HV</mml:mtext><mml:mo>)</mml:mo></mml:mrow></mml:msqrt><mml:mo>.</mml:mo></mml:mrow></mml:math></disp-formula>
+            Similarly, we can calculate the corrected PFA if we are using a Boolean OR operation as
+              <disp-formula id="Ch1.Ex3"><mml:math id="M11" display="block"><mml:mrow><?xmltex \hack{\hbox\bgroup\fontsize{9}{9}\selectfont$\displaystyle}?><mml:mtable class="split" rowspacing="0.2ex" displaystyle="true" columnalign="right left"><mml:mtr><mml:mtd><mml:mrow><mml:mi mathvariant="normal">PFA</mml:mi></mml:mrow></mml:mtd><mml:mtd><mml:mrow><mml:mfenced close=")" open="("><mml:mtext>HH or HV</mml:mtext></mml:mfenced><mml:mo>=</mml:mo><mml:mi mathvariant="normal">PFA</mml:mi><mml:mfenced open="(" close=")"><mml:mi mathvariant="normal">HH</mml:mi></mml:mfenced><mml:mo>+</mml:mo><mml:mi mathvariant="normal">PFA</mml:mi><mml:mfenced open="(" close=")"><mml:mi mathvariant="normal">HV</mml:mi></mml:mfenced><mml:mo>-</mml:mo><mml:mi mathvariant="normal">PFA</mml:mi><mml:mfenced open="(" close=")"><mml:mi mathvariant="normal">HH</mml:mi></mml:mfenced><mml:mi mathvariant="normal">PFA</mml:mi><mml:mo>(</mml:mo><mml:mi mathvariant="normal">HV</mml:mi><mml:mo>)</mml:mo></mml:mrow></mml:mtd></mml:mtr><mml:mtr><mml:mtd/><mml:mtd><mml:mrow><mml:mo>⇒</mml:mo><mml:mspace width="0.125em" linebreak="nobreak"/><mml:mi mathvariant="normal">PFA</mml:mi><mml:mfenced open="(" close=")"><mml:mi mathvariant="normal">HH</mml:mi></mml:mfenced><mml:mo>=</mml:mo><mml:mi mathvariant="normal">PFA</mml:mi><mml:mfenced close=")" open="("><mml:mi mathvariant="normal">HV</mml:mi></mml:mfenced><mml:mo>=</mml:mo><mml:mn mathvariant="normal">1</mml:mn><mml:mo>±</mml:mo><mml:msqrt><mml:mrow><mml:mn mathvariant="normal">1</mml:mn><mml:mo>-</mml:mo><mml:mi mathvariant="normal">PFA</mml:mi><mml:mo>(</mml:mo><mml:mtext>HH or HV</mml:mtext><mml:mo>)</mml:mo></mml:mrow></mml:msqrt></mml:mrow></mml:mtd></mml:mtr></mml:mtable><?xmltex \hack{$\egroup}?><mml:mo>,</mml:mo></mml:mrow></mml:math></disp-formula>
+            choosing the smallest positive solution, which is also known as the Šidák correction (Salkind, 2007).</p>
+      <p id="d1e434">This means that if we want a PFA of <inline-formula><mml:math id="M12" display="inline"><mml:mrow><mml:msup><mml:mn mathvariant="normal">10</mml:mn><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">6</mml:mn></mml:mrow></mml:msup></mml:mrow></mml:math></inline-formula> after combining two detectors using an AND operation, the CFAR detectors applied to the individual channels need to be adapted by applying a PFA of <inline-formula><mml:math id="M13" display="inline"><mml:mrow><mml:msqrt><mml:mrow><mml:msup><mml:mn mathvariant="normal">10</mml:mn><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">6</mml:mn></mml:mrow></mml:msup></mml:mrow></mml:msqrt><mml:mo>=</mml:mo><mml:msup><mml:mn mathvariant="normal">10</mml:mn><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">3</mml:mn></mml:mrow></mml:msup></mml:mrow></mml:math></inline-formula>. Similarly, if combining using a OR operation, we need an individual PFA of <inline-formula><mml:math id="M14" display="inline"><mml:mrow><mml:mn mathvariant="normal">1</mml:mn><mml:mo>-</mml:mo><mml:msqrt><mml:mrow><mml:mn mathvariant="normal">1</mml:mn><mml:mo>-</mml:mo><mml:msup><mml:mn mathvariant="normal">10</mml:mn><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">6</mml:mn></mml:mrow></mml:msup></mml:mrow></mml:msqrt><mml:mspace linebreak="nobreak" width="0.125em"/><mml:mo>≈</mml:mo><mml:mn mathvariant="normal">0.5</mml:mn><mml:mo>×</mml:mo><mml:msup><mml:mn mathvariant="normal">10</mml:mn><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">6</mml:mn></mml:mrow></mml:msup></mml:mrow></mml:math></inline-formula>.</p>
+</sec>
+</sec>
+</sec>
+<sec id="Ch1.S3">
+  <label>3</label><title>Data and method</title>
+<sec id="Ch1.S3.SS1">
+  <label>3.1</label><title>Data description</title>
+      <p id="d1e533">For this study, we selected a test area covering part of the Labrador Sea because of the high density of icebergs in open water and along the coast. This area is also of great interest for operational iceberg charting and is regularly monitored by the International Ice Patrol (Dierking, 2020). An L-band SAR image was acquired by the PALSAR-2 sensor on board the ALOS-2 satellite. Overlapping Sentinel-1 C-band SAR, and Sentinel-2 optical images were found and downloaded through the CREOtech Data and Information Access Service (CREODIAS). All three images partially overlapped and were acquired on the same day within a few hours (Fig. 1). The ALOS-2 image was delivered in a pre-processed wide beam mode and consisted of dual-polarization HH and HV intensity channels. The Sentinel-1 image was acquired in extra-wide swath mode (EW) and contained dual-polarization HH and HV intensity channels. The Sentinel-1 image was pre-processed using the Sentinel Applications Platform (SNAP)<fn id="Ch1.Footn1"><p id="d1e536">The processing steps were orbit file application, grd-border-noise removal, thermal noise removal, calibration, and ellipsoid correction to 40 m pixel spacing.</p></fn>. Both SAR images were acquired from similar look geometries, both at a descending orbit and right looking. The optical Sentinel-2 image was downloaded in level-1C format.</p>
+
+      <?xmltex \floatpos{t}?><fig id="Ch1.F1" specific-use="star"><?xmltex \currentcnt{1}?><?xmltex \def\figurename{Figure}?><label>Figure 1</label><caption><p id="d1e542">Overview of the area of interest and data used for the study. The outlines of the optical (red) and SAR (blue and orange) are shown together with the location of the icebergs in the optical image (blue triangles). Meteorological data were downloaded from the weather stations at Nain Airport (W1) and Kangiqsualujjuaq Airport (W2). The Sentinel-1 and ALOS-2 images are shown to the right. The SAR images are color-coded: red – HV, green – HH, and blue – HH.</p></caption>
+          <?xmltex \igopts{width=341.433071pt}?><graphic xlink:href="https://tc.copernicus.org/articles/17/5335/2023/tc-17-5335-2023-f01.png"/>
+
+        </fig>
+
+<?xmltex \floatpos{t}?><table-wrap id="Ch1.T1" specific-use="star"><?xmltex \currentcnt{1}?><label>Table 1</label><caption><p id="d1e554">Overview of the data used in the study. n/a – not applicable.</p></caption><oasis:table frame="topbot"><oasis:tgroup cols="7">
+     <oasis:colspec colnum="1" colname="col1" align="left"/>
+     <oasis:colspec colnum="2" colname="col2" align="left"/>
+     <oasis:colspec colnum="3" colname="col3" align="justify" colwidth="2.5cm"/>
+     <oasis:colspec colnum="4" colname="col4" align="justify" colwidth="3cm"/>
+     <oasis:colspec colnum="5" colname="col5" align="justify" colwidth="2cm"/>
+     <oasis:colspec colnum="6" colname="col6" align="left"/>
+     <oasis:colspec colnum="7" colname="col7" align="right"/>
+     <oasis:thead>
+       <oasis:row rowsep="1">
+         <oasis:entry colname="col1">Sensor</oasis:entry>
+         <oasis:entry colname="col2">Format</oasis:entry>
+         <oasis:entry colname="col3">Acquisition <?xmltex \hack{\hfill\break}?>date/time</oasis:entry>
+         <oasis:entry colname="col4">Tile(s)/orbit identifier</oasis:entry>
+         <oasis:entry colname="col5">Pixel <?xmltex \hack{\hfill\break}?>spacing</oasis:entry>
+         <oasis:entry colname="col6">Bands</oasis:entry>
+         <oasis:entry colname="col7">ENL</oasis:entry>
+       </oasis:row>
+     </oasis:thead>
+     <oasis:tbody>
+       <oasis:row rowsep="1">
+         <oasis:entry colname="col1">Sentinel-2</oasis:entry>
+         <oasis:entry colname="col2">L1C</oasis:entry>
+         <oasis:entry colname="col3">4 July 2019 <?xmltex \hack{\hfill\break}?>15:36:39</oasis:entry>
+         <oasis:entry colname="col4">T20VNJ/R068 <?xmltex \hack{\hfill\break}?>T20VNL/R068 <?xmltex \hack{\hfill\break}?>T20VPJ/R068 <?xmltex \hack{\hfill\break}?>T20VPK/R068 <?xmltex \hack{\hfill\break}?>T20VPL/R068</oasis:entry>
+         <oasis:entry colname="col5">10 m</oasis:entry>
+         <oasis:entry colname="col6">B2, B3, B4, B8</oasis:entry>
+         <oasis:entry colname="col7">n/a</oasis:entry>
+       </oasis:row>
+       <oasis:row rowsep="1">
+         <oasis:entry colname="col1">Sentinel-1</oasis:entry>
+         <oasis:entry colname="col2">EW GRDH</oasis:entry>
+         <oasis:entry colname="col3">4 July 2019 <?xmltex \hack{\hfill\break}?>10:27:30</oasis:entry>
+         <oasis:entry colname="col4">–/028068</oasis:entry>
+         <oasis:entry colname="col5">40 m</oasis:entry>
+         <oasis:entry colname="col6">HH, HV</oasis:entry>
+         <oasis:entry colname="col7"><inline-formula><mml:math id="M17" display="inline"><mml:mrow><mml:msup><mml:mn mathvariant="normal">10.7</mml:mn><mml:mi mathvariant="normal">a</mml:mi></mml:msup></mml:mrow></mml:math></inline-formula></oasis:entry>
+       </oasis:row>
+       <oasis:row>
+         <oasis:entry colname="col1">ALOS-2</oasis:entry>
+         <oasis:entry colname="col2">WBDR</oasis:entry>
+         <oasis:entry colname="col3">4 July 2019 <?xmltex \hack{\hfill\break}?>16:24:43</oasis:entry>
+         <oasis:entry colname="col4">–/–</oasis:entry>
+         <oasis:entry colname="col5">25 m</oasis:entry>
+         <oasis:entry colname="col6">HH, HV</oasis:entry>
+         <oasis:entry colname="col7"><inline-formula><mml:math id="M18" display="inline"><mml:mrow><mml:msup><mml:mn mathvariant="normal">15</mml:mn><mml:mi mathvariant="normal">b</mml:mi></mml:msup></mml:mrow></mml:math></inline-formula></oasis:entry>
+       </oasis:row>
+     </oasis:tbody>
+   </oasis:tgroup></oasis:table><table-wrap-foot><p id="d1e557"><inline-formula><mml:math id="M15" display="inline"><mml:msup><mml:mi/><mml:mi mathvariant="normal">a</mml:mi></mml:msup></mml:math></inline-formula> Sentinel-1 Product Definition (Bourbigot et al., 2016). <inline-formula><mml:math id="M16" display="inline"><mml:msup><mml:mi/><mml:mi mathvariant="normal">b</mml:mi></mml:msup></mml:math></inline-formula> ALOS-2 Product Format Description (JAXA, 2012).</p></table-wrap-foot><?xmltex \gdef\@currentlabel{1}?></table-wrap>
+
+      <p id="d1e740">Visual inspection of the Sentinel-2 image revealed hundreds of white objects floating in the open water and along the coast. Although sea ice was spotted in the area 2 weeks prior to the acquisition of the data used in this study, we expect that most of the objects in the area are icebergs, since single sea ice floes generally tend to disintegrate faster in open water than icebergs due to their smaller thickness</p>
+      <p id="d1e743">An overview of the data is shown in Table 1. Originally, the ALOS-2 image was acquired at a 25 m pixel spacing, but for the comparison between C- and L-band both SAR images were resampled to a local polar stereographic coordinate system with a 40 m pixel spacing. The resampling was carried out using a nearest-neighbor interpolation to avoid averaging pixel intensities. However, the SAR images did still have a different equivalent number of looks (ENL), which should be considered in the comparison.</p>
+      <p id="d1e746">Meteorological data from two nearby weather stations were downloaded from the Meteorological Service of Canada (Government of Canada, 2023). At both weather stations the data showed temperatures between 6–15 <inline-formula><mml:math id="M19" display="inline"><mml:msup><mml:mi/><mml:mo>∘</mml:mo></mml:msup></mml:math></inline-formula>C, and wind levels between 1–5 m s<inline-formula><mml:math id="M20" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">1</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula> during the day the images were acquired. The weather stations are also shown in Fig. 1.</p>
+      <p id="d1e770">A land mask was created from OpenStreetMap land polygons (OpenStreetMap contributors, 2015). A buffer of 500 m was added to the mask to avoid any issues with SAR layover or bad geocoding.</p>
+</sec>
+<sec id="Ch1.S3.SS2">
+  <label>3.2</label><title>CFAR detectors</title>
+      <?pagebreak page5339?><p id="d1e781">Six different CFAR detectors were implemented and tested for this study. Since we are working on dual-pol data, the final detection needs to include the combination of the HH and HV channels. The selected detectors cover all three detection strategies outlined in Sect. 2. Three detectors were based on combining results from single channels using Boolean logic (method 3), namely the log-normal, gamma, and <inline-formula><mml:math id="M21" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> detectors. Another two detectors were based on transforming the dual-pol data into a single channel which is better suited for object detection (method 1). These were the normalized intensity sum (NIS) and the iDPolRAD. Finally, a multidimensional detector (method 2) based on the likelihood ratio test statistic in the Wishart distribution was tested as well.</p>
+<sec id="Ch1.S3.SS2.SSS1">
+  <label>3.2.1</label><title>Log-normal CFAR</title>
+      <p id="d1e798">The first and most simple detector used was the log-normal detector (Crisp, 2004; El-Darymli et al., 2013). In the log-normal CFAR detector, it is assumed that the logarithmic transformation from intensity to decibel, normally used for visualizing SAR images, leads to near-Gaussian background clutter. If this is valid, outliers can be detected by employing simple Gaussian statistics, i.e., by comparing the PuT against the average plus some multitude, <inline-formula><mml:math id="M22" display="inline"><mml:mi>k</mml:mi></mml:math></inline-formula>, of the standard deviation of the background backscatter.</p>
+</sec>
+<sec id="Ch1.S3.SS2.SSS2">
+  <label>3.2.2</label><title>Gamma CFAR</title>
+      <p id="d1e816">The gamma detector is based on the fact that, under fully developed speckle, the multi-looked background clutter intensity follows a gamma distribution (Oliver and Quegan, 2004; Argenti et al., 2013). Here, the threshold for determining outliers can then be found from the average clutter intensity and the number of looks, <inline-formula><mml:math id="M23" display="inline"><mml:mi>L</mml:mi></mml:math></inline-formula>, which is known.</p>
+</sec>
+<?pagebreak page5340?><sec id="Ch1.S3.SS2.SSS3">
+  <label>3.2.3</label><?xmltex \opttitle{$K$ CFAR}?><title><inline-formula><mml:math id="M24" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> CFAR</title>
+      <p id="d1e841">The gamma model only accounts for variation due to speckle, but in real SAR images, it has been observed that the clutter often exhibits variations in the backscatter in addition to the speckle. These variations, called texture, are attributed to spatial variation of intensity within the area of interest (Oliver and Quegan, 2004; Anfinsen et al., 2009; Doulgeris et al., 2011) and can in some cases falsely trigger a CFAR detector, thus leading to a higher false alarm rate. To account for this total speckle variation, clutter models incorporating both speckle and texture have been suggested in the past. The most well-known of these models is the <inline-formula><mml:math id="M25" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> distribution. Here, the PDF of the single-band <inline-formula><mml:math id="M26" display="inline"><mml:mi>L</mml:mi></mml:math></inline-formula>-looked intensity signal, <inline-formula><mml:math id="M27" display="inline"><mml:mi>I</mml:mi></mml:math></inline-formula>, can be modeled using the mean intensity, <inline-formula><mml:math id="M28" display="inline"><mml:mi mathvariant="italic">μ</mml:mi></mml:math></inline-formula>, the shape parameter (number of looks), <inline-formula><mml:math id="M29" display="inline"><mml:mi>L</mml:mi></mml:math></inline-formula>, and the order parameter, <inline-formula><mml:math id="M30" display="inline"><mml:mi mathvariant="italic">ν</mml:mi></mml:math></inline-formula>. The disadvantage of this PDF, which is a combination of the gamma function, <inline-formula><mml:math id="M31" display="inline"><mml:mrow><mml:mi mathvariant="normal">Γ</mml:mi><mml:mo>(</mml:mo><mml:mi>z</mml:mi><mml:mo>)</mml:mo></mml:mrow></mml:math></inline-formula>, and the Bessel function of the second kind, <inline-formula><mml:math id="M32" display="inline"><mml:mrow><mml:msub><mml:mi>K</mml:mi><mml:mi>n</mml:mi></mml:msub><mml:mo>(</mml:mo><mml:mi>x</mml:mi><mml:mo>)</mml:mo></mml:mrow></mml:math></inline-formula>, is that it does not have any closed-form solution. Therefore, a complex numerical integration must be executed to calculate the appropriate threshold.</p>
+</sec>
+<sec id="Ch1.S3.SS2.SSS4">
+  <label>3.2.4</label><title>NIS CFAR</title>
+      <p id="d1e927">The theory behind the normalized intensity sum (NIS) detector is closely related to the principle of the polarimetric whitening filter (PWF) (Novak and Hesse, 1993; Lee and Pottier, 2009). In its original application, the PWF creates a new channel such that the standard deviation to mean ratio is minimized. In the case of dual-polarization intensity data, this new channel can be calculated as a sum of normalized intensities (Liu, 2015) and is therefore referred to as NIS. If we assume that the individual channels, HH, and HV, follow a gamma distribution, the new channel, <inline-formula><mml:math id="M33" display="inline"><mml:mi>w</mml:mi></mml:math></inline-formula>, should also follow a gamma distribution. As such, the CFAR detection for the NIS can be carried out by feeding it into a gamma detector. The method was initially developed for ship detection but has also been tested for iceberg detection (Denbina and Collins, 2014; Bailey et al., 2021).</p>
+</sec>
+<sec id="Ch1.S3.SS2.SSS5">
+  <label>3.2.5</label><title>iDPolRAD CFAR</title>
+      <p id="d1e945">The iDPolRAD was suggested by Marino et al. (2016) specifically for detecting icebergs in sea ice. The detector is based on the observation that icebergs often exhibit a higher cross-polarization and depolarization ratio (cross- over co-polarization) than thin sea ice and open water. This observation is attributed to the fact that radar signals have a larger penetration depth into icebergs than into sea ice and open water, which leads to volume scattering and multiple reflections from within the iceberg volume. This was utilized by designing a detector that is sensitive to pixels with higher cross-polarization and depolarization ratio than their background. Specifically, the algorithm merges the co- and cross-pol channels into a new quantity that enhances the contrast of pixels with a high volume scattering relative to their background. Icebergs can then be detected in this new quantity, by either employing a global threshold or applying a CFAR detector that is tuned to the PDF of the new quantity.</p>
+</sec>
+<sec id="Ch1.S3.SS2.SSS6">
+  <label>3.2.6</label><title>Wishart CFAR</title>
+      <p id="d1e956">The idea behind the Wishart detector is that, under fully developed speckle (Anfinsen et al., 2009; Argenti et al., 2013), the complex amplitude signal of the backscatter follows a circular zero-mean Gaussian distribution, which leads to the complex polarimetric covariance matrix being Wishart distributed (Goodman, 1963; Conradsen et al., 2003). A test of equality of two complex distributed covariance matrices was suggested by Conradsen et al. (2003) for change detection applications. A CFAR-like detector for edge detection using this test statistic was used in Schou et al. (2003). There, two blocks of equal size, separated by a spatial gap, were used to detect edges in different orientations. This was done by calculating the average covariance matrix for each rectangle and then combining these two covariance matrices into a new channel <inline-formula><mml:math id="M34" display="inline"><mml:mi>Q</mml:mi></mml:math></inline-formula>, which denotes the likelihood ratio test statistic. An approximate distribution for <inline-formula><mml:math id="M35" display="inline"><mml:mi>Q</mml:mi></mml:math></inline-formula> is known, which can be used to calculate a threshold that corresponds to a specific false alarm rate. The advantages are that this threshold only depends on the block size and the dimensionality of the covariance matrix (number of polarizations). Hence, the threshold only needs to be calculated once per image, which is equivalent to applying a global threshold to the entire <inline-formula><mml:math id="M36" display="inline"><mml:mi>Q</mml:mi></mml:math></inline-formula> image. This theory can easily be extended to object detection applications, where a single multi-looked PuT is tested against a larger background. The method is developed for complex data where knowledge on the full covariance matrix is required. But with minor changes the method also works for intensity data (the block diagonal case in Conradsen et al., 2003, and Schou et al., 2003), which will be used for this study.</p>
+      <p id="d1e980">The main strength of the Wishart detector is that it is multidimensional and can be extended to quad-pol data, without changing the mathematics behind the implementation. Although a contrast enhancement technique based on the test statistic was recently used for highlighting targets with reflection symmetry, suggesting that the method could be used for ship detection (Connetable et al., 2022), this detector has not been used for iceberg detection until now.</p>
+</sec>
+</sec>
+<sec id="Ch1.S3.SS3">
+  <label>3.3</label><title>CFAR implementation details</title>
+      <p id="d1e992">All CFAR detectors were implemented using Python 3.8 with the NumPy and Numba libraries (Harris et al., 2020; Lam et al., 2015). Additionally, the SciPy library was used for calculating the statistical parameters needed for the probability density functions (Virtanen et al., 2020). Input and output operations were implemented using the Rasterio library (Gillies et al., 2013).</p>
+
+      <?xmltex \floatpos{t}?><fig id="Ch1.F2"><?xmltex \currentcnt{2}?><?xmltex \def\figurename{Figure}?><label>Figure 2</label><caption><p id="d1e997">CFAR sliding window configuration overlaid on the Sentinel-2 image.</p></caption>
+          <?xmltex \igopts{width=236.157874pt}?><graphic xlink:href="https://tc.copernicus.org/articles/17/5335/2023/tc-17-5335-2023-f02.png"/>
+
+        </fig>
+
+      <?pagebreak page5341?><p id="d1e1006">For the log-normal, gamma, and <inline-formula><mml:math id="M37" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> detector, the detectors were applied to the HH and HV channels individually. The final outliers are then found by combining the outliers from the two channels using a Boolean AND operation. The AND operation was selected to minimize false detections due to single-channel noise, e.g., in the form of speckle. Except for the iDPolRAD detector, the other detectors were implemented using the window design shown in Fig. 2. Here, a guard area of 360 m ensures that icebergs shorter than 180 m will always be excluded from the clutter estimation window regardless of orientation. The window sizes were based on the inspection of the Sentinel-2 image, in which 97 % of the icebergs are shorter than 180 m. Icebergs that are longer than 180 m but shorter than 360 m will only partly contaminate the clutter estimation, e.g., when the center of the window is located at the iceberg edges. For sizes <inline-formula><mml:math id="M38" display="inline"><mml:mrow><mml:mo>≥</mml:mo><mml:mn mathvariant="normal">360</mml:mn></mml:mrow></mml:math></inline-formula> m we found only one iceberg in the Sentinel-2 image. The size of the outer window of 520 m was selected as a trade-off between having a high number of samples for parameter estimation while avoiding capturing neighboring icebergs in the background estimation.</p>
+      <p id="d1e1027">The iDPolRAD detector was implemented using a test and a training window of 3 <inline-formula><mml:math id="M39" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 3 and 57 <inline-formula><mml:math id="M40" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 57 pixels respectively. These window sizes were chosen based on the suggestions by Marino et al. (2016) and Soldal et al. (2019). In the original paper (Marino et al., 2016), icebergs are detected using a Gaussian-based CFAR detector with an empirically set threshold, since no analytical expression of the PDF exists for the iDPolRAD transformation. However, this approach is unsatisfactory for the comparison of different detectors in this study. Instead, we have opted on using a method similar to Soldal et al. (2020). Here, a generalized gamma function proved to be a good fit for the distribution. But since it is computationally very expensive to estimate the parameters for this distribution locally, we decided to fit the generalized gamma distribution to the iDPolRAD image globally. To avoid skewing the distribution, land was masked, and pixels where the iDPolRAD was smaller than 0 and larger than 50 times the mean were excluded for the parameter estimation. Our approach enables us to test the performance of the iDPolRAD detector at varying global thresholds, avoiding computation times that are too long.</p>
+      <p id="d1e1044">Also, the <inline-formula><mml:math id="M41" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> detector is computationally expensive when estimating the threshold locally. This is normally solved by using approximations of the original PDF (Oliver and Quegan, 2004; Tunaley, 2010) or by estimating the order parameters regionally on larger image tiles (Liu, 2018). To shorten the computation time for the <inline-formula><mml:math id="M42" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> detector, we used pre-computed look-up tables for the threshold (Brekke, 2009). Threshold values corresponding to the desired PFA level and the ENL of the image were calculated for 40 different values of the order parameter <inline-formula><mml:math id="M43" display="inline"><mml:mi mathvariant="italic">ν</mml:mi></mml:math></inline-formula> on a linear interval between 1 and 20, corresponding to the observed range of <inline-formula><mml:math id="M44" display="inline"><mml:mi mathvariant="italic">ν</mml:mi></mml:math></inline-formula> for our data. For values of <inline-formula><mml:math id="M45" display="inline"><mml:mi mathvariant="italic">ν</mml:mi></mml:math></inline-formula> larger than 20, the threshold does not change significantly, since large <inline-formula><mml:math id="M46" display="inline"><mml:mi mathvariant="italic">ν</mml:mi></mml:math></inline-formula> values correspond with low texture. The order parameter <inline-formula><mml:math id="M47" display="inline"><mml:mi mathvariant="italic">ν</mml:mi></mml:math></inline-formula> could be calculated locally for each pixel using the clutter estimation window above, using the method of moments (MoM) as suggested by Wesche and Dierking (2012). Based on this order parameter a suitable threshold was selected from the look-up table for each PuT.</p>
+      <p id="d1e1097">The NIS transformation was calculated by using the window in Fig. 2. Here the PuT intensities of the two channels were normalized using the average of the clutter window and then added yielding the normalized intensity sum. A gamma CFAR detector was then applied to detect outliers in the NIS channel. The gamma CFAR requires an estimate of the ENL, which has changed after the transformation. The new ENL was estimated from the mean-squared-over-variance ratio. To avoid skewing the estimation of the ENL due to the presence of outliers, pixels with a NIS above 2 times the median NIS were excluded.</p>
+      <p id="d1e1100">The Wishart detector was implemented according to Schou et al. (2003) using the window configuration shown in Fig. 2. Here, the covariance matrix of the PuT was compared with the average covariance matrix of the background clutter. Since the Wishart detector is based on a two-sided test statistic, the CFAR filter will highlight both bright and dark features. However, for this study we are only interested in bright outliers, since we only found icebergs with bright radar returns, so outliers that are darker than the mean of the clutter window were removed.</p>
+      <p id="d1e1103">Each of the 6 detectors was applied to the images 21 times, corresponding to 21 different PFA levels varying from 1 <inline-formula><mml:math id="M48" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M49" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">21</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula> to 1 <inline-formula><mml:math id="M50" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M51" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">1</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula> on both the Sentinel-1 and ALOS-2 image. Due to issues with numerical stability of the detectors, it was not possible to test the filters at PFA levels smaller than 1 <inline-formula><mml:math id="M52" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M53" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">21</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>. The land mask mentioned earlier was applied to the SAR images before CFAR detection to avoid false detections due to land. To limit the noise in the detections, identified objects covering only a single pixel were removed from the results. Similarly, objects covering more than 500 pixels were also removed from the dataset, since no objects near that size were observed in the Sentinel-2 image, and hence it<?pagebreak page5342?> was assumed that outliers of that size were likely caused by errors in the processing.</p>
+      <p id="d1e1164">The code for the CFAR detectors has been made available on GitHub to allow testing on other SAR images by fellow researchers (Færch, 2023).</p>
+</sec>
+<sec id="Ch1.S3.SS4">
+  <label>3.4</label><title>Validation data</title>
+      <p id="d1e1175">In the Sentinel-2 image icebergs were identified by applying an N-Sigma CFAR detector to the sum of the high-resolution bands: B2, B3, B4, and B8. Pixels brighter than the mean background plus 4 times the standard deviations were marked as possible icebergs. The results were then manually checked to remove artifacts from clouds and land, and a few icebergs missed by the automatic detection were added. A total of 492 icebergs were detected in the area of interest (AOI) in the optical image. The sizes of the icebergs were then extracted from the Sentinel-2 image, and the icebergs were classified according to length (Table 2) using the WMO nomenclature (Dierking, 2020), with the length being the major axis of the icebergs. The average iceberg length was 84 m, and 97 % of the icebergs were shorter than 180 m.</p>
+
+<?xmltex \floatpos{t}?><table-wrap id="Ch1.T2"><?xmltex \currentcnt{2}?><label>Table 2</label><caption><p id="d1e1181">Classification of icebergs in the area of interest.</p></caption><oasis:table frame="topbot"><oasis:tgroup cols="2">
+     <oasis:colspec colnum="1" colname="col1" align="left"/>
+     <oasis:colspec colnum="2" colname="col2" align="right"/>
+     <oasis:thead>
+       <oasis:row rowsep="1">
+         <oasis:entry colname="col1">Iceberg type</oasis:entry>
+         <oasis:entry colname="col2">Number of icebergs</oasis:entry>
+       </oasis:row>
+     </oasis:thead>
+     <oasis:tbody>
+       <oasis:row>
+         <oasis:entry colname="col1">Small (<inline-formula><mml:math id="M54" display="inline"><mml:mrow><mml:mi mathvariant="italic">&lt;</mml:mi><mml:mn mathvariant="normal">60</mml:mn></mml:mrow></mml:math></inline-formula> m)</oasis:entry>
+         <oasis:entry colname="col2">181</oasis:entry>
+       </oasis:row>
+       <oasis:row>
+         <oasis:entry colname="col1">Medium (60–120 m)</oasis:entry>
+         <oasis:entry colname="col2">175</oasis:entry>
+       </oasis:row>
+       <oasis:row>
+         <oasis:entry colname="col1">Large (<inline-formula><mml:math id="M55" display="inline"><mml:mrow><mml:mi mathvariant="italic">&gt;</mml:mi><mml:mn mathvariant="normal">120</mml:mn></mml:mrow></mml:math></inline-formula> m)</oasis:entry>
+         <oasis:entry colname="col2">136</oasis:entry>
+       </oasis:row>
+     </oasis:tbody>
+   </oasis:tgroup></oasis:table><?xmltex \gdef\@currentlabel{2}?></table-wrap>
+
+      <p id="d1e1255">Since the optical and the SAR images were acquired at different times, the locations of the icebergs change between the images because ocean currents and wind cause the icebergs to drift between acquisitions. To correct for this drift, icebergs observed in the Sentinel-2 image were manually matched to objects in the SAR images. This matching was carried out in the geographic information system (GIS) application QGIS 3.10.13, and the process was aided by the fact that, on a large scale, icebergs arranged in clusters often drift in similar directions and over a similar distance. Hence, looking at the overall patterns of iceberg clusters across the different images helps determine the drift of individual icebergs. Using this approach, it was possible to create verified drift paths for 336 of the icebergs in the ALOS-2 image and 270 of the icebergs in the Sentinel-1 image. The reason why fewer icebergs could be manually matched between the Sentinel-1 and Sentinel-2 image was the larger time difference of approximately 5 h between their acquisitions, compared to only around 1 h difference between the ALOS-2 and Sentinel-2 image. Additionally, a higher noise level of the Sentinel-1 image made matching more difficult, especially for smaller icebergs. The average drift distance was 489 m between the ALOS-2 and Sentinel-2 acquisitions and 3953 m between the Sentinel-2 and Sentinel-1 acquisitions. Most of the icebergs that could not be matched with high confidence between the SAR images and the optical image, were very small and hence very difficult to visually identify in the SAR images because of their lower resolution and the presence of speckle noise. A linear interpolation method was used to predict the expected drift paths of these icebergs (Fig. 3). This linear interpolation method was tested on a subset of the dataset (10 %) and shown to give an average distance error of 335 m for ALOS-2 and 1789 m for Sentinel-1.</p>
+      <p id="d1e1259">A few bright objects in the SAR images that were covered by clouds in the optical data were masked out from the SAR images to avoid counting these as false detections. Similarly, icebergs drifting into the AOI from outside were removed manually from the analysis. Additionally, a single bright object visible in both the ALOS-2 and Sentinel-1 image was interpreted as a ship and removed from the analysis. The object resembling a ship was also recognized in the Sentinel-2 image, but an independent automatic identification system confirming this observation could not be found.</p>
+
+      <?xmltex \floatpos{t}?><fig id="Ch1.F3" specific-use="star"><?xmltex \currentcnt{3}?><?xmltex \def\figurename{Figure}?><label>Figure 3</label><caption><p id="d1e1264">Subset of the AOI showing the matching between the optical and SAR data. Purple outline indicates areas removed by the land mask. Several icebergs are visible in the Sentinel-2 RGB image <bold>(a)</bold>. These icebergs have drifted since the Sentinel-1 image was acquired <bold>(b)</bold>. Verified drift paths (light blue) were manually created for icebergs that could be confidently identified in the SAR imagery. Expected drift paths (dark red) were then created using linear interpolation the remaining icebergs <bold>(c)</bold>.</p></caption>
+          <?xmltex \igopts{width=497.923228pt}?><graphic xlink:href="https://tc.copernicus.org/articles/17/5335/2023/tc-17-5335-2023-f03.jpg"/>
+
+        </fig>
+
+      <p id="d1e1282">Both the verified and expected drift paths were used to validate automatic detections in the SAR images. Objects detected by the CFAR algorithms within a search radius of the expected or verified locations of icebergs were marked as true positives (TPs). This search radius was set to 250 m for the verified drift paths. For the interpolated expected drift paths, the search radius was set equal to the average distance error in the interpolation method: 335 m in the ALOS-2 image and 1789 m in the Sentinel-1 image. If several objects were detected within the search radius, only the nearest object is counted as a true positive, and the rest is interpreted as false positives. If no objects are detected in the search area, it was marked as a false negative (FN). Objects that were not within the search radius of any icebergs were marked as false positives (FPs).</p>
+</sec>
+<sec id="Ch1.S3.SS5">
+  <label>3.5</label><title>Post-processing</title>
+      <p id="d1e1294">Three different performance measures were used to check the performance of the different detectors. These were recall, precision, and <inline-formula><mml:math id="M56" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score defined as
+
+                <disp-formula specific-use="gather"><mml:math id="M57" display="block"><mml:mtable displaystyle="true"><mml:mtr><mml:mtd><mml:mrow><mml:mstyle displaystyle="true" class="stylechange"/><mml:mi mathvariant="normal">Recall</mml:mi><mml:mo>=</mml:mo><mml:mstyle displaystyle="true"><mml:mfrac style="display"><mml:mi mathvariant="normal">TP</mml:mi><mml:mrow><mml:mi mathvariant="normal">TP</mml:mi><mml:mo>+</mml:mo><mml:mi mathvariant="normal">FN</mml:mi></mml:mrow></mml:mfrac></mml:mstyle></mml:mrow></mml:mtd></mml:mtr><mml:mtr><mml:mtd><mml:mrow><mml:mstyle displaystyle="true" class="stylechange"/><mml:mi mathvariant="normal">Precision</mml:mi><mml:mo>=</mml:mo><mml:mstyle displaystyle="true"><mml:mfrac style="display"><mml:mi mathvariant="normal">TP</mml:mi><mml:mrow><mml:mi mathvariant="normal">TP</mml:mi><mml:mo>+</mml:mo><mml:mi mathvariant="normal">FP</mml:mi></mml:mrow></mml:mfrac></mml:mstyle></mml:mrow></mml:mtd></mml:mtr><mml:mtr><mml:mtd><mml:mrow><mml:mstyle displaystyle="true" class="stylechange"/><mml:mi>F</mml:mi><mml:mspace linebreak="nobreak" width="0.25em"/><mml:mtext>score</mml:mtext><mml:mo>=</mml:mo><mml:mn mathvariant="normal">2</mml:mn><mml:mstyle displaystyle="true"><mml:mfrac style="display"><mml:mrow><mml:mi mathvariant="normal">precision</mml:mi><mml:mspace width="0.125em" linebreak="nobreak"/><mml:mo>⋅</mml:mo><mml:mi mathvariant="normal">recall</mml:mi></mml:mrow><mml:mrow><mml:mi mathvariant="normal">precision</mml:mi><mml:mo>+</mml:mo><mml:mi mathvariant="normal">recall</mml:mi></mml:mrow></mml:mfrac></mml:mstyle><mml:mo>.</mml:mo></mml:mrow></mml:mtd></mml:mtr></mml:mtable></mml:math></disp-formula>
+
+            As such, recall accounts for the probability of detecting the validated icebergs, i.e., how many of the icebergs have been detected. Precision is used to assess the probability of a detected object being an iceberg. As the PFA level is increasing, each detector is more likely to detect the verified icebergs but also more likely to make false detections. The overall performance of the detectors is thus a trade-off between these two scores. For marine safety, for example, a missed detection is<?pagebreak page5343?> more critical than a false detection. For evaluating the overall performance of the detectors, we decided to evaluate missed and false detections equally by using the <inline-formula><mml:math id="M58" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score.</p>
+</sec>
+</sec>
+<sec id="Ch1.S4">
+  <label>4</label><title>Results</title>
+      <p id="d1e1396">Recall and precision as a function of increasing PFA levels are plotted in Figs. 4 and 5. For most of the detectors, the shape of the recall function can be divided into two phases. For small and intermediate PFA levels, the recall is either constant or increasing steadily with increasing PFA. For larger PFA levels, the recall increases more rapidly. The first phase can be explained by the detection of a few new icebergs for each lower threshold level, while in the second phase, the rapid increase is likely triggered by speckle or noise within our search radius. We will discuss this issue more in detail in Sect. 5.2.</p>
+
+      <?xmltex \floatpos{t}?><fig id="Ch1.F4" specific-use="star"><?xmltex \currentcnt{4}?><?xmltex \def\figurename{Figure}?><label>Figure 4</label><caption><p id="d1e1401">Recall – the probability of detecting the icebergs.</p></caption>
+        <?xmltex \igopts{width=341.433071pt}?><graphic xlink:href="https://tc.copernicus.org/articles/17/5335/2023/tc-17-5335-2023-f04.png"/>
+
+      </fig>
+
+      <?xmltex \floatpos{t}?><fig id="Ch1.F5" specific-use="star"><?xmltex \currentcnt{5}?><?xmltex \def\figurename{Figure}?><label>Figure 5</label><caption><p id="d1e1412">Precision – the probability of a detection being an iceberg.</p></caption>
+        <?xmltex \igopts{width=341.433071pt}?><graphic xlink:href="https://tc.copernicus.org/articles/17/5335/2023/tc-17-5335-2023-f05.png"/>
+
+      </fig>
+
+      <p id="d1e1422">Comparing the recall for the two sensors, we found that all six detectors behave very similarly when applied to the L- and C-band images for low PFA levels, with the exception being the log-normal detector, which show a higher recall for the L-band image. At higher PFA levels the recall for Sentinel-1 increases earlier and more strongly compared to ALOS-2. For a PFA level of 0.1, all detectors in the Sentinel-1 image detect 97 %–99 % of the icebergs, compared to only 79 %–97 % for ALOS-2 (but note that the probability of false detections is very high; see Fig. 5). The NIS, Wishart, and gamma detectors give the highest recall for both L- and C-band, whereas <inline-formula><mml:math id="M59" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> and log-normal detectors generally show a poor recall for low to medium PFA levels.</p>
+      <p id="d1e1432">Our results for the precision shown in Fig. 5 reveal that most of the detectors have a constant or slightly decreasing precision for small PFA levels. This trend is caused by a small increase in the number of false positives for each lower threshold level. With increasing PFA levels, the precision reaches a point where it starts to rapidly decrease towards zero, corresponding with a large increase in the number of false positives coupled with only a small increase in true positives. When the threshold becomes very low, intensity variations due to speckle will start triggering the detector, causing an increased number of false positives, which leads to a rapid decrease of precision. When comparing the two sensors we found a very similar performance for the gamma, log-normal, and <inline-formula><mml:math id="M60" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> detectors for C- and L-band. Especially the log-normal and <inline-formula><mml:math id="M61" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> detectors show a very high precision over a wide range of smaller PFA values. This high precision at low PFA levels is mainly driven by the fact that these detectors only detect a small number of large and bright icebergs, with almost zero false positives. However, this also means that these detectors have a high number of false negatives, which is also evident when comparing the precision (Fig. 4) with the recall (Fig. 5). The Wishart, NIS, and iDPolRAD all show lower precision at L-band compared to C-band, suggesting noise in the L-band image is triggering these detectors. Especially the iDPolRAD detector shows a very large decrease in precision. This indicates that in our dataset, more spots of strong backscattering in HV not caused by icebergs occur at L-band than at C-band.</p>
+      <p id="d1e1449">In general, high recall comes with low precision. This makes sense, as there is an overlap between the intensity backscatter distributions for open water and icebergs, and a detector that captures more icebergs will therefore likewise capture more spots of strong backscattering from the water surface as well. The exception here is the iDPolRAD filter, which for ALOS-2 shows very low precision, which suggests that this detector is triggered more often by noise than the other detectors.</p>
+
+      <?xmltex \floatpos{t}?><fig id="Ch1.F6" specific-use="star"><?xmltex \currentcnt{6}?><?xmltex \def\figurename{Figure}?><label>Figure 6</label><caption><p id="d1e1454"><inline-formula><mml:math id="M62" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score – the overall accuracy of the different detectors as a function of the PFA.</p></caption>
+        <?xmltex \igopts{width=341.433071pt}?><graphic xlink:href="https://tc.copernicus.org/articles/17/5335/2023/tc-17-5335-2023-f06.png"/>
+
+      </fig>
+
+      <?pagebreak page5344?><p id="d1e1469">The <inline-formula><mml:math id="M63" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score shown in Fig. 6 combines recall and precision, which makes an overall assessment of the different detectors much easier. In general, most of the detectors show poor <inline-formula><mml:math id="M64" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> scores for very small PFA levels due to low recall and for high PFA levels due to low precision. Between those extremes the <inline-formula><mml:math id="M65" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score is at maximum, corresponding to a region where we obtain the optimum balance between missed and false detections. However, the exact point of this optimum PFA level is very different for the different detectors and varies also between C- and L-band. The large differences in the optimal PFA level for a given detector highlight the importance of determining recall and precision at different PFA levels.</p>
+      <p id="d1e1494">Overall, the performance of iceberg detection accuracy of Sentinel-1 and ALOS-2 is comparable, with each sensor obtaining maximum <inline-formula><mml:math id="M66" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> scores of around 60 %–70 % for all detectors except for the iDPolRAD, which generally scores lower. This issue is discussed in Sect. 5.</p>
+      <p id="d1e1504">The <inline-formula><mml:math id="M67" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> detector and the log-normal detector achieve their maximum accuracy at a very narrow interval of PFA levels, whereas the gamma, iDPolRAD, NIS, and Wishart generally exhibit higher <inline-formula><mml:math id="M68" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score across a wide range of PFA levels. The comparisons between the shapes of the <inline-formula><mml:math id="M69" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score as a function of PFA reveal that there is no single detector achieving best performance over the whole range of PFAs. Results obtained at C- and L-band show that one detector may be optimal at one frequency but another detector for the other frequency. For some filters it is better to select a lower value of PFA; for others a higher value leads to higher <inline-formula><mml:math id="M70" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> scores. Nevertheless, Figs. 4, 5, and 6 are helpful in deciding which detector<?pagebreak page5345?> to use for a given PFA and radar band. Below, we include additional criteria that should be considered in the selection of a specific filter. It must be admitted, however, that the accuracy of detection is still too low for an unsupervised mapping of iceberg positions to be used for navigation. Further experiments with different modes of SAR images and combinations of images acquired simultaneously at different radar frequencies are required.</p>
+
+<?xmltex \floatpos{t}?><table-wrap id="Ch1.T3" specific-use="star"><?xmltex \currentcnt{3}?><label>Table 3</label><caption><p id="d1e1538">Sentinel-1. Number of false negatives (FNs), false positives (FPs), and true positives (TPs) for each of the detectors at the PFA level resulting in the highest <inline-formula><mml:math id="M71" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score. Bold type indicates the best score.</p></caption><oasis:table frame="topbot"><oasis:tgroup cols="7">
+     <oasis:colspec colnum="1" colname="col1" align="left"/>
+     <oasis:colspec colnum="2" colname="col2" align="right"/>
+     <oasis:colspec colnum="3" colname="col3" align="right"/>
+     <oasis:colspec colnum="4" colname="col4" align="right"/>
+     <oasis:colspec colnum="5" colname="col5" align="right"/>
+     <oasis:colspec colnum="6" colname="col6" align="right"/>
+     <oasis:colspec colnum="7" colname="col7" align="right"/>
+     <oasis:thead>
+       <oasis:row>
+         <oasis:entry colname="col1"/>
+         <oasis:entry colname="col2">Gamma</oasis:entry>
+         <oasis:entry colname="col3">iDPolRAD</oasis:entry>
+         <oasis:entry colname="col4"><inline-formula><mml:math id="M72" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula></oasis:entry>
+         <oasis:entry colname="col5">Log-normal</oasis:entry>
+         <oasis:entry colname="col6">NIS</oasis:entry>
+         <oasis:entry colname="col7">Wishart</oasis:entry>
+       </oasis:row>
+       <oasis:row rowsep="1">
+         <oasis:entry colname="col1"/>
+         <oasis:entry colname="col2">(1 <inline-formula><mml:math id="M73" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M74" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">19</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+         <oasis:entry colname="col3">(1 <inline-formula><mml:math id="M75" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M76" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">10</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+         <oasis:entry colname="col4">(1 <inline-formula><mml:math id="M77" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M78" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">4</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+         <oasis:entry colname="col5">(1 <inline-formula><mml:math id="M79" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M80" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">5</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+         <oasis:entry colname="col6">(1 <inline-formula><mml:math id="M81" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M82" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">13</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+         <oasis:entry colname="col7">(1 <inline-formula><mml:math id="M83" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M84" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">20</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+       </oasis:row>
+     </oasis:thead>
+     <oasis:tbody>
+       <oasis:row>
+         <oasis:entry colname="col1">FN</oasis:entry>
+         <oasis:entry colname="col2">254</oasis:entry>
+         <oasis:entry colname="col3">299</oasis:entry>
+         <oasis:entry colname="col4">253</oasis:entry>
+         <oasis:entry colname="col5">261</oasis:entry>
+         <oasis:entry colname="col6">219</oasis:entry>
+         <oasis:entry colname="col7"><bold>216</bold></oasis:entry>
+       </oasis:row>
+       <oasis:row>
+         <oasis:entry colname="col1">FP</oasis:entry>
+         <oasis:entry colname="col2">32</oasis:entry>
+         <oasis:entry colname="col3">74</oasis:entry>
+         <oasis:entry colname="col4">49</oasis:entry>
+         <oasis:entry colname="col5"><bold>24</bold></oasis:entry>
+         <oasis:entry colname="col6">65</oasis:entry>
+         <oasis:entry colname="col7">70</oasis:entry>
+       </oasis:row>
+       <oasis:row>
+         <oasis:entry colname="col1">TP</oasis:entry>
+         <oasis:entry colname="col2">238</oasis:entry>
+         <oasis:entry colname="col3">193</oasis:entry>
+         <oasis:entry colname="col4">239</oasis:entry>
+         <oasis:entry colname="col5">231</oasis:entry>
+         <oasis:entry colname="col6">273</oasis:entry>
+         <oasis:entry colname="col7"><bold>276</bold></oasis:entry>
+       </oasis:row>
+     </oasis:tbody>
+   </oasis:tgroup></oasis:table><?xmltex \gdef\@currentlabel{3}?></table-wrap>
+
+<?xmltex \floatpos{t}?><table-wrap id="Ch1.T4" specific-use="star"><?xmltex \currentcnt{4}?><label>Table 4</label><caption><p id="d1e1822">ALOS-2. Number of false negatives (FNs), false positives (FPs), and true positives (TPs) for each of the detectors at the PFA level resulting in the highest <inline-formula><mml:math id="M85" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score. Bold type indicates the best score.</p></caption><oasis:table frame="topbot"><oasis:tgroup cols="7">
+     <oasis:colspec colnum="1" colname="col1" align="left"/>
+     <oasis:colspec colnum="2" colname="col2" align="right"/>
+     <oasis:colspec colnum="3" colname="col3" align="right"/>
+     <oasis:colspec colnum="4" colname="col4" align="right"/>
+     <oasis:colspec colnum="5" colname="col5" align="right"/>
+     <oasis:colspec colnum="6" colname="col6" align="right"/>
+     <oasis:colspec colnum="7" colname="col7" align="right"/>
+     <oasis:thead>
+       <oasis:row>
+         <oasis:entry colname="col1"/>
+         <oasis:entry colname="col2">Gamma</oasis:entry>
+         <oasis:entry colname="col3">iDPolRAD</oasis:entry>
+         <oasis:entry colname="col4"><inline-formula><mml:math id="M86" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula></oasis:entry>
+         <oasis:entry colname="col5">Log-normal</oasis:entry>
+         <oasis:entry colname="col6">NIS</oasis:entry>
+         <oasis:entry colname="col7">Wishart</oasis:entry>
+       </oasis:row>
+       <oasis:row rowsep="1">
+         <oasis:entry colname="col1"/>
+         <oasis:entry colname="col2">(1 <inline-formula><mml:math id="M87" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M88" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">14</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+         <oasis:entry colname="col3">(1 <inline-formula><mml:math id="M89" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M90" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">16</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+         <oasis:entry colname="col4">(1 <inline-formula><mml:math id="M91" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M92" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">4</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+         <oasis:entry colname="col5">(1 <inline-formula><mml:math id="M93" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M94" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">7</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+         <oasis:entry colname="col6">(1 <inline-formula><mml:math id="M95" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M96" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">21</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+         <oasis:entry colname="col7">(1 <inline-formula><mml:math id="M97" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M98" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">18</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+       </oasis:row>
+     </oasis:thead>
+     <oasis:tbody>
+       <oasis:row>
+         <oasis:entry colname="col1">FN</oasis:entry>
+         <oasis:entry colname="col2">230</oasis:entry>
+         <oasis:entry colname="col3">285</oasis:entry>
+         <oasis:entry colname="col4">255</oasis:entry>
+         <oasis:entry colname="col5"><bold>201</bold></oasis:entry>
+         <oasis:entry colname="col6">217</oasis:entry>
+         <oasis:entry colname="col7">215</oasis:entry>
+       </oasis:row>
+       <oasis:row>
+         <oasis:entry colname="col1">FP</oasis:entry>
+         <oasis:entry colname="col2">84</oasis:entry>
+         <oasis:entry colname="col3">261</oasis:entry>
+         <oasis:entry colname="col4"><bold>43</bold></oasis:entry>
+         <oasis:entry colname="col5">44</oasis:entry>
+         <oasis:entry colname="col6">111</oasis:entry>
+         <oasis:entry colname="col7">124</oasis:entry>
+       </oasis:row>
+       <oasis:row>
+         <oasis:entry colname="col1">TP</oasis:entry>
+         <oasis:entry colname="col2">262</oasis:entry>
+         <oasis:entry colname="col3">207</oasis:entry>
+         <oasis:entry colname="col4">237</oasis:entry>
+         <oasis:entry colname="col5"><bold>291</bold></oasis:entry>
+         <oasis:entry colname="col6">275</oasis:entry>
+         <oasis:entry colname="col7">277</oasis:entry>
+       </oasis:row>
+     </oasis:tbody>
+   </oasis:tgroup></oasis:table><?xmltex \gdef\@currentlabel{4}?></table-wrap>
+
+      <p id="d1e2103">For each of the detectors, results from the optimal configuration, i.e., the PFA level that resulted in the highest <inline-formula><mml:math id="M99" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score, were extracted. The total numbers of false negatives, false positives, and true positives are shown in Table 3 for Sentinel-1 and in Table 4 for ALOS-2. For Sentinel-1, the Wishart detector obtained the highest number of true positives and the smallest number of false negatives, and for ALOS-2 this was obtained by the log-normal detector. For C-band, the smallest number of false positives was achieved by the log-normal detector and for L-band by the <inline-formula><mml:math id="M100" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> detector, but with the log-normal detector showing only a single additional false positive. It is worth noting that the number of false negatives is almost as large as of the true positives for all detectors, which means that almost half of the icebergs are missed by all the detection algorithms. To investigate why so many icebergs are missed, we have added the detection accuracy for various iceberg sizes below.</p>
+
+<?xmltex \floatpos{t}?><table-wrap id="Ch1.T5" specific-use="star"><?xmltex \currentcnt{5}?><label>Table 5</label><caption><p id="d1e2124">Sentinel-1. Percentage of detected icebergs for each of the detectors at the PFA level resulting in the highest <inline-formula><mml:math id="M101" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score. Bold type indicates the highest detection rate.</p></caption><oasis:table frame="topbot"><oasis:tgroup cols="8">
+     <oasis:colspec colnum="1" colname="col1" align="left"/>
+     <oasis:colspec colnum="2" colname="col2" align="right"/>
+     <oasis:colspec colnum="3" colname="col3" align="right"/>
+     <oasis:colspec colnum="4" colname="col4" align="right"/>
+     <oasis:colspec colnum="5" colname="col5" align="right"/>
+     <oasis:colspec colnum="6" colname="col6" align="right"/>
+     <oasis:colspec colnum="7" colname="col7" align="right"/>
+     <oasis:colspec colnum="8" colname="col8" align="right"/>
+     <oasis:thead>
+       <oasis:row>
+         <oasis:entry colname="col1">Icebergs</oasis:entry>
+         <oasis:entry colname="col2"><inline-formula><mml:math id="M102" display="inline"><mml:mi>N</mml:mi></mml:math></inline-formula></oasis:entry>
+         <oasis:entry colname="col3">Gamma</oasis:entry>
+         <oasis:entry colname="col4">iDPolRAD</oasis:entry>
+         <oasis:entry colname="col5"><inline-formula><mml:math id="M103" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula></oasis:entry>
+         <oasis:entry colname="col6">Log-normal</oasis:entry>
+         <oasis:entry colname="col7">NIS</oasis:entry>
+         <oasis:entry colname="col8">Wishart</oasis:entry>
+       </oasis:row>
+       <oasis:row rowsep="1">
+         <oasis:entry colname="col1"/>
+         <oasis:entry colname="col2"/>
+         <oasis:entry colname="col3">(1 <inline-formula><mml:math id="M104" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M105" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">9</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+         <oasis:entry colname="col4">(1 <inline-formula><mml:math id="M106" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M107" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">10</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+         <oasis:entry colname="col5">(1 <inline-formula><mml:math id="M108" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M109" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">2</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+         <oasis:entry colname="col6">(1 <inline-formula><mml:math id="M110" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M111" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">2</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+         <oasis:entry colname="col7">(1 <inline-formula><mml:math id="M112" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M113" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">13</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+         <oasis:entry colname="col8">(1 <inline-formula><mml:math id="M114" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M115" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">20</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+       </oasis:row>
+     </oasis:thead>
+     <oasis:tbody>
+       <oasis:row>
+         <oasis:entry colname="col1">Small</oasis:entry>
+         <oasis:entry colname="col2">181</oasis:entry>
+         <oasis:entry colname="col3">6.6 %</oasis:entry>
+         <oasis:entry colname="col4">5.0 %</oasis:entry>
+         <oasis:entry colname="col5">6.6 %</oasis:entry>
+         <oasis:entry colname="col6">6.6 %</oasis:entry>
+         <oasis:entry colname="col7">11.6 %</oasis:entry>
+         <oasis:entry colname="col8"><bold>13.3 %</bold></oasis:entry>
+       </oasis:row>
+       <oasis:row>
+         <oasis:entry colname="col1">Medium</oasis:entry>
+         <oasis:entry colname="col2">175</oasis:entry>
+         <oasis:entry colname="col3">57.7 %</oasis:entry>
+         <oasis:entry colname="col4">40.6 %</oasis:entry>
+         <oasis:entry colname="col5">58.9 %</oasis:entry>
+         <oasis:entry colname="col6">56.0 %</oasis:entry>
+         <oasis:entry colname="col7"><bold>70.3 %</bold></oasis:entry>
+         <oasis:entry colname="col8">69.7 %</oasis:entry>
+       </oasis:row>
+       <oasis:row>
+         <oasis:entry colname="col1">Large</oasis:entry>
+         <oasis:entry colname="col2">136</oasis:entry>
+         <oasis:entry colname="col3">91.9 %</oasis:entry>
+         <oasis:entry colname="col4">83.1 %</oasis:entry>
+         <oasis:entry colname="col5">91.2 %</oasis:entry>
+         <oasis:entry colname="col6">89.0 %</oasis:entry>
+         <oasis:entry colname="col7">94.9 %</oasis:entry>
+         <oasis:entry colname="col8"><bold>95.6 %</bold></oasis:entry>
+       </oasis:row>
+     </oasis:tbody>
+   </oasis:tgroup></oasis:table><?xmltex \gdef\@currentlabel{5}?></table-wrap>
+
+<?xmltex \floatpos{t}?><table-wrap id="Ch1.T6" specific-use="star"><?xmltex \currentcnt{6}?><label>Table 6</label><caption><p id="d1e2430">ALOS-2. Percentage of detected icebergs for each of the detectors at the PFA level resulting in the highest <inline-formula><mml:math id="M116" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score. Bold type indicates the highest detection rate.</p></caption><oasis:table frame="topbot"><oasis:tgroup cols="8">
+     <oasis:colspec colnum="1" colname="col1" align="left"/>
+     <oasis:colspec colnum="2" colname="col2" align="right"/>
+     <oasis:colspec colnum="3" colname="col3" align="right"/>
+     <oasis:colspec colnum="4" colname="col4" align="right"/>
+     <oasis:colspec colnum="5" colname="col5" align="right"/>
+     <oasis:colspec colnum="6" colname="col6" align="right"/>
+     <oasis:colspec colnum="7" colname="col7" align="right"/>
+     <oasis:colspec colnum="8" colname="col8" align="right"/>
+     <oasis:thead>
+       <oasis:row>
+         <oasis:entry colname="col1">Icebergs</oasis:entry>
+         <oasis:entry colname="col2"><inline-formula><mml:math id="M117" display="inline"><mml:mi>N</mml:mi></mml:math></inline-formula></oasis:entry>
+         <oasis:entry colname="col3">Gamma</oasis:entry>
+         <oasis:entry colname="col4">iDPolRAD</oasis:entry>
+         <oasis:entry colname="col5"><inline-formula><mml:math id="M118" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula></oasis:entry>
+         <oasis:entry colname="col6">Log-normal</oasis:entry>
+         <oasis:entry colname="col7">NIS</oasis:entry>
+         <oasis:entry colname="col8">Wishart</oasis:entry>
+       </oasis:row>
+       <oasis:row rowsep="1">
+         <oasis:entry colname="col1"/>
+         <oasis:entry colname="col2"/>
+         <oasis:entry colname="col3">(1 <inline-formula><mml:math id="M119" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M120" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">7</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+         <oasis:entry colname="col4">(1 <inline-formula><mml:math id="M121" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M122" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">16</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+         <oasis:entry colname="col5">(1 <inline-formula><mml:math id="M123" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M124" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">2</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+         <oasis:entry colname="col6">(1 <inline-formula><mml:math id="M125" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M126" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">4</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+         <oasis:entry colname="col7">(1 <inline-formula><mml:math id="M127" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M128" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">21</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+         <oasis:entry colname="col8">(1 <inline-formula><mml:math id="M129" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M130" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">18</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>)</oasis:entry>
+       </oasis:row>
+     </oasis:thead>
+     <oasis:tbody>
+       <oasis:row>
+         <oasis:entry colname="col1">Small</oasis:entry>
+         <oasis:entry colname="col2">181</oasis:entry>
+         <oasis:entry colname="col3">10.5 %</oasis:entry>
+         <oasis:entry colname="col4">5.5 %</oasis:entry>
+         <oasis:entry colname="col5">7.7 %</oasis:entry>
+         <oasis:entry colname="col6"><bold>15.5 %</bold></oasis:entry>
+         <oasis:entry colname="col7">9.9 %</oasis:entry>
+         <oasis:entry colname="col8">11.0 %</oasis:entry>
+       </oasis:row>
+       <oasis:row>
+         <oasis:entry colname="col1">Medium</oasis:entry>
+         <oasis:entry colname="col2">175</oasis:entry>
+         <oasis:entry colname="col3">65.1 %</oasis:entry>
+         <oasis:entry colname="col4">48.6 %</oasis:entry>
+         <oasis:entry colname="col5">57.1 %</oasis:entry>
+         <oasis:entry colname="col6"><bold>80.6 %</bold></oasis:entry>
+         <oasis:entry colname="col7">73.1 %</oasis:entry>
+         <oasis:entry colname="col8">72.0 %</oasis:entry>
+       </oasis:row>
+       <oasis:row>
+         <oasis:entry colname="col1">Large</oasis:entry>
+         <oasis:entry colname="col2">136</oasis:entry>
+         <oasis:entry colname="col3">94.9 %</oasis:entry>
+         <oasis:entry colname="col4">82.4 %</oasis:entry>
+         <oasis:entry colname="col5">90.4 %</oasis:entry>
+         <oasis:entry colname="col6">89.7 %</oasis:entry>
+         <oasis:entry colname="col7">94.9 %</oasis:entry>
+         <oasis:entry colname="col8"><bold>96.3 %</bold></oasis:entry>
+       </oasis:row>
+     </oasis:tbody>
+   </oasis:tgroup></oasis:table><?xmltex \gdef\@currentlabel{6}?></table-wrap>
+
+      <p id="d1e2733">Of the 492 icebergs used in the study, 181 are classified as small, 175 as medium, and 136 as large (Table 2). For each of the detectors, the optimum PFA value was chosen to determine the absolute number of detected icebergs as a function of iceberg size for Sentinel-1 (Table 5) and ALOS-2 (Table 6). The results clearly demonstrate the considerable increase of detection rates for larger icebergs and hence the influence of the effective spatial resolution of the SAR images. For small icebergs, detection rates are extremely low, emphasizing the need for employing SAR systems which acquire images with high spatial resolutions on the order of 10 m (while at the same time keeping a large swath width). As icebergs become smaller than the resolution limit of the sensors, most icebergs are no longer separable from the background clutter. A few small icebergs are still detected, which might be due to their orientation or geometry giving rise to a strong backscattering into the direction of the SAR antenna.</p>
+
+<?xmltex \floatpos{t}?><table-wrap id="Ch1.T7" specific-use="star"><?xmltex \currentcnt{7}?><label>Table 7</label><caption><p id="d1e2739">Execution times of the different detection algorithms. The speed test was done for a 1000 <inline-formula><mml:math id="M131" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 1000-pixel subset of the Sentinel-1 EW scene (left) and for the full Sentinel-1 EW image (right) of approximately 110 <inline-formula><mml:math id="M132" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M133" display="inline"><mml:msup><mml:mi/><mml:mn mathvariant="normal">6</mml:mn></mml:msup></mml:math></inline-formula> pixels.</p></caption><oasis:table frame="topbot"><oasis:tgroup cols="3">
+     <oasis:colspec colnum="1" colname="col1" align="left"/>
+     <oasis:colspec colnum="2" colname="col2" align="right"/>
+     <oasis:colspec colnum="3" colname="col3" align="right"/>
+     <oasis:thead>
+       <oasis:row rowsep="1">
+         <oasis:entry colname="col1">Algorithm</oasis:entry>
+         <oasis:entry colname="col2">Run time (1000 <inline-formula><mml:math id="M136" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 1000 px)</oasis:entry>
+         <oasis:entry colname="col3">Run time (entire S1E W scene)</oasis:entry>
+       </oasis:row>
+     </oasis:thead>
+     <oasis:tbody>
+       <oasis:row>
+         <oasis:entry colname="col1">Log-normal</oasis:entry>
+         <oasis:entry colname="col2">292 [ms]</oasis:entry>
+         <oasis:entry colname="col3">41.3 [s]</oasis:entry>
+       </oasis:row>
+       <oasis:row>
+         <oasis:entry colname="col1">Gamma</oasis:entry>
+         <oasis:entry colname="col2">144 [ms]</oasis:entry>
+         <oasis:entry colname="col3">20.1 [s]</oasis:entry>
+       </oasis:row>
+       <oasis:row>
+         <oasis:entry colname="col1"><inline-formula><mml:math id="M137" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> distribution*</oasis:entry>
+         <oasis:entry colname="col2">2157 [ms]</oasis:entry>
+         <oasis:entry colname="col3">76.0 [s]</oasis:entry>
+       </oasis:row>
+       <oasis:row>
+         <oasis:entry colname="col1">iDPolRAD</oasis:entry>
+         <oasis:entry colname="col2">1319 [ms]</oasis:entry>
+         <oasis:entry colname="col3">181.4 [s]</oasis:entry>
+       </oasis:row>
+       <oasis:row>
+         <oasis:entry colname="col1">NIS</oasis:entry>
+         <oasis:entry colname="col2">185 [ms]</oasis:entry>
+         <oasis:entry colname="col3">27.6 [s]</oasis:entry>
+       </oasis:row>
+       <oasis:row>
+         <oasis:entry colname="col1">Wishart</oasis:entry>
+         <oasis:entry colname="col2">174 [ms]</oasis:entry>
+         <oasis:entry colname="col3">27.8 [s]</oasis:entry>
+       </oasis:row>
+     </oasis:tbody>
+   </oasis:tgroup></oasis:table><table-wrap-foot><p id="d1e2765"><inline-formula><mml:math id="M134" display="inline"><mml:msup><mml:mi/><mml:mo>*</mml:mo></mml:msup></mml:math></inline-formula> For the <inline-formula><mml:math id="M135" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> detector, calculation of the look-up table takes approximately 20 s.</p></table-wrap-foot><?xmltex \gdef\@currentlabel{7}?></table-wrap>
+
+      <p id="d1e2898">The execution time for object detection is an important issue in operational iceberg mapping. Therefore, we determined it for the six detectors. Each detector was run at a PFA level of 1 <inline-formula><mml:math id="M138" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M139" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">12</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>, and the execution time was tested both on a small subset of 1000 <inline-formula><mml:math id="M140" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 1000 pixels and on the whole Sentinel-1 EW scene. The small subset covered an area containing only water and icebergs, but for the whole Sentinel-1 EW scene, about 10 % of the image was masked as being land before applying the detectors – leaving approximately 110 <inline-formula><mml:math id="M141" display="inline"><mml:mo>×</mml:mo></mml:math></inline-formula> 10<inline-formula><mml:math id="M142" display="inline"><mml:msup><mml:mi/><mml:mn mathvariant="normal">6</mml:mn></mml:msup></mml:math></inline-formula> pixels to be analyzed. The test was carried out on a 64 bit PC, equipped with an i7 processor at 2.60 GHz and 32.0 GB RAM. Four detectors could be run on a full Sentinel-1 EW scene in less than a minute, making them well suited for operational applications. For the <inline-formula><mml:math id="M143" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> detector, the execution time was 76 s, but around 20 s is attributed to the look-up table calculation, which can be carried out once and afterwards be re-used in operational systems.</p>
+
+      <?xmltex \floatpos{t}?><fig id="Ch1.F7" specific-use="star"><?xmltex \currentcnt{7}?><?xmltex \def\figurename{Figure}?><label>Figure 7</label><caption><p id="d1e2954">Detections for the six detectors for a subset of the C-band Sentinel-1 image. Green circles: true positives. Yellow squares: false negatives. Red triangles: false positives. HV in red channel, HH in green and blue channel. The background SAR composite is color-coded: red – HV, green – HH, blue – HH.</p></caption>
+        <?xmltex \igopts{width=341.433071pt}?><graphic xlink:href="https://tc.copernicus.org/articles/17/5335/2023/tc-17-5335-2023-f07.jpg"/>
+
+      </fig>
+
+      <?xmltex \floatpos{t}?><fig id="Ch1.F8" specific-use="star"><?xmltex \currentcnt{8}?><?xmltex \def\figurename{Figure}?><label>Figure 8</label><caption><p id="d1e2965">Detections for the six detectors for a subset the L-band ALOS-2 image. Green circles: true positives. Yellow squares: false negatives. Red triangles: false positives. HV in red channel, HH in green and blue channel. The background SAR composite is color-coded: red – HV, green – HH, blue – HH.</p></caption>
+        <?xmltex \igopts{width=341.433071pt}?><graphic xlink:href="https://tc.copernicus.org/articles/17/5335/2023/tc-17-5335-2023-f08.jpg"/>
+
+      </fig>
+
+      <p id="d1e2974">The performance of the different detectors was further assessed by visualizing the results on subsets of the SAR images, which are shown in Figs. 7 and 8 for Sentinel-1 and ALOS-2, respectively.</p>
+      <p id="d1e2977">The subset covers an area containing several icebergs grounded along the coast of Labrador, as well as several icebergs floating in the open water. Objects identified with the various detectors are marked on the figures, with green triangles denoting true positives (TPs), yellow squares false<?pagebreak page5346?> negatives (FNs), and red circles false positives (FPs). The same subset is shown for Sentinel-1 and ALOS-2 images, but due to the different acquisition times, the position of some icebergs has changed between the two images. Both images were acquired in ScanSAR mode, and the subsets cover the border between two subswaths, which gives rise to a diagonal line with a different signal-to-noise ratio (SNR) on each side. This is seen in the top left corner of the Sentinel-1 image and through the center of the ALOS-2 image. In the Sentinel-1 image, variations of the sea clutter are visible as brightness differences in the open water. In the ALOS-2 image bright artifacts occur in the water, likely caused by range and azimuth ambiguities from the processing. The high density of icebergs, various clutter states, and image artifacts make this subset well suited to illustrate the advantages and disadvantages of the various detectors.</p>
+      <p id="d1e2980">Figure 7 reveals that the gamma, log-normal, and <inline-formula><mml:math id="M144" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> detectors all behave similarly, with a limited number of false positives, and an approximately equal number of true positives and false negatives. The NIS and Wishart detectors both show a lower number of false negatives along the coast in the top left of the image but also show a higher number of false positives in the top center of the image. These false detections appear to be caused by linear features in the open water, possibly some sort of ocean waves, which triggers false detections. With the iDPolRAD we obtained many false positives along the boundary between the subswaths. This area is also characterized by increased levels of noise in the HV-band (red color), which may falsely trigger the detector. Additionally, the iDPolRAD detector also shows many missed detections compared with the other detectors, especially along the coast in the top left corner of the subset.</p>
+      <p id="d1e2991">For the ALOS-2 image in Fig. 8, we found a very similar performance for the log-normal and <inline-formula><mml:math id="M145" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> detectors. Both show a low number of false positives, whereas more false positives are obtained with the gamma, NIS, and Wishart detectors along the diagonal subswath boundary through the center of the image. These three detectors also identified an increased number of false positives in the bottom of the image, which appear to be caused by azimuth ambiguities. As in the Sentinel-1 image, the iDPolRAD shows the highest number of false positives.</p>
+<sec id="Ch1.S4.SS1">
+  <label>4.1</label><title>Summary</title>
+      <p id="d1e3008">The highest <inline-formula><mml:math id="M146" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score (70.4 %) was achieved by the log-normal detector on the ALOS-2 image. Besides this detector, the performance of the different methods for iceberg detection is similar on C- and L-band SAR images, with maximum <inline-formula><mml:math id="M147" display="inline"><mml:mi>f</mml:mi></mml:math></inline-formula> scores around 60 %–65 %. However, we note that we had data available only for a case study of icebergs in open water under low wind speeds and melting conditions. Hence, further comparisons between L- and C-band may show that SAR images acquired at a particular frequency should be used for conditions not investigated here.</p>
+      <?pagebreak page5347?><p id="d1e3025">When comparing the results for the <inline-formula><mml:math id="M148" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score as a function of PFA obtained for the investigated detectors, we found that all are suitable for use considering individual limits, with the exception of the iDPolRAD detector, which can be related to the melting conditions (see Sect. 5). The advantage of the gamma, NIS, and Wishart detectors provides high <inline-formula><mml:math id="M149" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> scores over a larger range of small PFA values. In wider range of low PFA levels we found an almost constant <inline-formula><mml:math id="M150" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score also for the iDPolRAD. The log-normal and <inline-formula><mml:math id="M151" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> detectors showed a narrow maximum of the <inline-formula><mml:math id="M152" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score at larger levels of the PFA, which means that the thresholds for the optimal PFA are more difficult to fix beforehand. Moreover, according to our results, they differ between C- and L-band. We expect that the position of the maximum <inline-formula><mml:math id="M153" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score on the PFA axis may also depend on the specific conditions (freezing, melting, rough or smooth water, and ice surface).</p>
+      <p id="d1e3071">Our results of the detectability as a function of iceberg size shows that as many as 20 %–40 % of the medium icebergs (60–120 m) are not found using the detection methods tested here, even though the pixel spacing of the images used is of 40 m. This indicates that many medium-sized icebergs might be missed in operational charting.</p>
+</sec>
+</sec>
+<sec id="Ch1.S5">
+  <label>5</label><title>Discussion</title>
+<sec id="Ch1.S5.SS1">
+  <label>5.1</label><title>Factors influencing the accuracy of detection rates</title>
+      <p id="d1e3091">For verifying the iceberg detections in the SAR images based on matches with icebergs identified in the Sentinel-2 image, we had to consider the drift of the icebergs between the times of acquisitions of the different images as explained above. Larger icebergs could be identified more easily in all images. For those icebergs, we used the direct displacement between the respective SAR image and the Sentinel-2 image as drift vectors. For icebergs shorter than 50 m, which were more difficult to match between the optical and the radar images, we estimated a drift path based on an interpolation between adjacent drift vectors from larger icebergs. The interpolation builds on the assumption that the smaller icebergs maintain the same heading and speed as the neighboring larger icebergs. This assumption might not always hold considering that the forces from wind and currents on icebergs depend on the cross-sections of their sails and keels (Wesche and Dierking, 2016), which causes larger uncertainties of the drift vectors, especially over large distances. Considering that the drift field between the Sentinel-1 and the Sentinel-2 image contains more interpolated drift paths and that the drift distance is larger, we may underestimate the performance of iceberg detection at C-band. In the future, more advanced drift predictions could be used to limit this type of uncertainty. Alternatively, having optical data acquired at the same time as the SAR overpasses would avoid the need for advanced drift correction. In our case, we also must take into account that the ALOS-2 images were down-sampled, which means that the identification of icebergs is made more difficult in the L-band images.</p>
+
+      <?xmltex \floatpos{t}?><fig id="Ch1.F9" specific-use="star"><?xmltex \currentcnt{9}?><?xmltex \def\figurename{Figure}?><label>Figure 9</label><caption><p id="d1e3096">Example of the internal ghost reflections. Six icebergs are marked in the Sentinel-2 image <bold>(a)</bold>, and in the ALOS-2 image <bold>(b)</bold>. Iceberg numbers 2, 5, and 6 show two distinct reflections, with an initial bright reflection followed by a reflection further downrange. The secondary reflection is typically dimmer and often dominated by HV scattering (red). The look direction of the ALOS-2 satellite is marked by the arrow.</p></caption>
+          <?xmltex \igopts{width=341.433071pt}?><graphic xlink:href="https://tc.copernicus.org/articles/17/5335/2023/tc-17-5335-2023-f09.jpg"/>
+
+        </fig>
+
+      <p id="d1e3111">Other factors that influence the results which we obtained for missed and false detections are iceberg disintegration (icebergs breaking into smaller fragments) and the occurrence of ghost reflections at L-band (Gray and Arsenault, 1991). As illustrated in Fig. 9, ghost reflections were visible in the ALOS-2 imagery as small secondary reflections downrange of the main radar returns for some icebergs.</p>
+      <p id="d1e3115">The study was carried out using only a single image pair, due to the limited availability of overlapping C- and L-band SAR and optical images. As such, the effect of different wind conditions and sea states on the detection performance could not be systematically investigated. However, based on the optical image we identified a large number of icebergs, which support the validity of the results under the conditions tested here.</p>
+      <p id="d1e3118">The ocean wind field derived from the Sentinel-1 image used in the study shows that the wind speed at acquisition time was low, between 2–8 m s<inline-formula><mml:math id="M154" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">1</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>. The time difference between the Sentinel-1 and ALOS-2 acquisitions is around 6 h. Therefore, we examined ECMWF Reanalysis v5 (ERA5) data, which revealed that the average daily wind speed for our AOI was at around 6 m s<inline-formula><mml:math id="M155" display="inline"><mml:msup><mml:mi/><mml:mrow><mml:mo>-</mml:mo><mml:mn mathvariant="normal">1</mml:mn></mml:mrow></mml:msup></mml:math></inline-formula>. Since areas with low wind also exhibit low ocean backscatter, there is a risk that the signal for some areas becomes dominated by system noise rather than the true backscatter. This, in turn, increases the risk of false positives from the system noise. In our results this is<?pagebreak page5348?> recognized as a high number of false positives along subswath transitions for both Sentinel-1 and ALOS-2 (Figs. 7–8). For these cases, a higher wind speed, and thus higher background backscatter from the ocean, might improve the performance due to an increase in signal-to-noise ratio. In an operational system, the number of false positives could also be reduced by applying improved filtering and noise reduction techniques in the pre-processing of images. This could, for example, be achieved using the methods suggested by Park et al. (2019) or Yang et al. (2021), which have shown promising results. However, these methods need to be investigated in detail to ensure that the noise removal algorithms do not affect point targets and as such degrade iceberg detection.</p>
+      <p id="d1e3145">For future work, it is of great interest to investigate how various detectors perform under varying wind and temperature conditions and to consider different radar frequencies and polarizations. It is expected that L-band SAR is less sensitive to sea surface roughness than C-band, and hence L-band should in theory be better suited for iceberg detection under rough wind conditions (Dierking and Davidson, 2020). Increasing wind also may increase the variation of backscattering (affecting the image texture), which could have the positive effect of increasing the accuracy for the <inline-formula><mml:math id="M156" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> detector. Similarly, increasing wind conditions might lead to worse performance for the detectors based on the gamma distribution, i.e., the gamma, NIS, and Wishart detectors. Colder temperatures are also expected to affect the results, with freezing conditions likely giving rise to more volume scattering from the icebergs, which might lead to a higher detection rate by, for example, the iDPolRAD detector.</p>
+      <p id="d1e3155">Our results showed that the detection rate decreased rapidly as the iceberg size decreased, and it seems unlikely that the current ScanSAR image modes from Sentinel-1 and ALOS-2 will be useful for the detection and mapping of small icebergs unless better models for clutter estimation are developed. As mentioned in Sect. 3.3, outliers covering only a single pixel were removed as these were often caused by speckle noise, which would not have been necessary had the detectors been able to accurately model the clutter noise. However, we did not investigate the effects of the multi-looking applied to the images, and it is worth considering in future studies whether using single-look images might improve the detection accuracy for small icebergs considering the trade-off between noise and resolution. Regardless of these considerations, SAR data with a higher spatial resolution will likely improve the detection accuracy for smaller icebergs in the future.</p>
+</sec>
+<sec id="Ch1.S5.SS2">
+  <label>5.2</label><title>Interpretation of results for the recall</title>
+      <p id="d1e3166">As mentioned earlier, the rapid increase in recall with increasing PFA may be caused by the way we match icebergs between the optical and the radar image. To account for uncertainties, we define a search radius in the radar image around the expected position of an iceberg identified in the optical image, based on its estimated drift path. Especially for the interpolated drift vectors, this search radius is large (Sect. 3.4). So as the PFA level increases, the detectors will be more and more triggered by speckle or other radar intensity variations (e.g., due to strong reflections from a rough water surface) within the search radius. Since the search radius is larger for Sentinel-1, and Sentinel-1 also has a lower ENL, and hence higher variance of the speckle, we expect that this issue will be more obvious for Sentinel-1 compared to ALOS-2, which may explain the sudden large increase in recall for Sentinel-1. As the number of false detections increases inside the search circle, it will also increase outside, which in turn will lead to a sharp decrease in precision. Both effects determine the shape of the <inline-formula><mml:math id="M157" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score curves shown in Fig. 6.</p>
+</sec>
+<sec id="Ch1.S5.SS3">
+  <label>5.3</label><title>Interpreting the results of different detectors</title>
+      <p id="d1e3184">The different detectors show a maximum of the <inline-formula><mml:math id="M158" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score at different PFA levels: the NIS, gamma, and Wishart detectors at very low PFA levels and the <inline-formula><mml:math id="M159" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> and log-normal detectors at higher PFA levels. Looking at the recall (Fig. 4) and precision (Fig. 5), we see that the <inline-formula><mml:math id="M160" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> and log-normal detectors are generally less sensitive to both icebergs and noise (late increase in recall and late decrease in precision). We found that the different detectors performed similarly for the two SAR sensors, except for the log-normal detector, which showed a higher <inline-formula><mml:math id="M161" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score for L-band than for C-band. This could<?pagebreak page5349?> indicate that the model of radar intensity variations due to sea clutter used in the log-normal detector is more accurate at L-band than at C-band at least for the sea states that were represented in our dataset.</p>
+      <p id="d1e3215">The similar overall performance of the gamma, NIS, and Wishart detectors is a consequence of the design of these detectors. All three assume that the noise in the HH and HV channels follows a gamma distribution. The NIS detector finds outliers in the linear combination of the normalized intensities at HH and HV polarization. The Wishart<?pagebreak page5350?> detector is based on the multi-dimensional Wishart distribution in which the contributions of the different polarizations are considered. And the gamma detector find outliers in the HH and HV bands independently and highlights outliers visible in both bands. Hence, all three detectors should be sensitive to the same outliers, with some minor variations for targets that show higher backscatter for only one of the polarizations.</p>
+      <p id="d1e3218">In general, the iDPolRAD detector shows only moderate performance across all performance measures and for both C- and L-band. The main weakness of the detector appears to be its tendency to be triggered by the noise occurring<?pagebreak page5351?> along the subswath boundaries. However, these false detections could theoretically be filtered in the post-processing. The reason we did not apply a filter like this for our study was possible complications a filter like this might add; for example, a subswath filter might remove some true positives.</p>
+      <p id="d1e3221">Another weakness of the iDPolRAD detector is its sensitivity to melting conditions. Melting at the surface of icebergs causes a considerable decrease of the penetration depth of the SAR signal at both L- and C-band, hence reducing the volume scattering component. The presence of the latter is the major criterion for separating icebergs from the background dominated by surface scattering. Additionally, since the icebergs used in this study have drifted far from their calving areas, they may have turned over underway, causing the formation of salty ice layers on the icebergs' surface, which also leads to a decrease of volume scattering. The detector should hence only be applied under freezing conditions and close to calving sites, where rolling-over is less probable.</p>
+</sec>
+<sec id="Ch1.S5.SS4">
+  <label>5.4</label><?xmltex \opttitle{Sensitivity of $F$ score to changes of PFA}?><title>Sensitivity of <inline-formula><mml:math id="M162" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score to changes of PFA</title>
+      <p id="d1e3240">The main strength of using the <inline-formula><mml:math id="M163" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score is that it reveals how changes in PFA influence the accuracy of detection. We clearly demonstrated that some detectors are quite sensitive to small changes in PFA level, whereas others are quite stable under varying PFA levels (Fig. 6). Normally, detectors are compared at similar PFA levels because it is assumed that the PFA is representative of the actual false alarm rate, but due to various implementation details or inaccurate assumptions as mentioned earlier, this might not always be the case. Our results showed that the NIS, gamma, and Wishart detectors obtain a high accuracy across a wide range of PFA levels. Similarly, the log-normal detector obtained a high <inline-formula><mml:math id="M164" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score for a wide range of PFA levels for the ALOS-2 data. But <inline-formula><mml:math id="M165" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> detector (and the log-normal detector applied to C-band) obtained a high accuracy only for a narrow range of PFA values. This could indicate that these distributions are ill-suited for fitting variations of the sea surface clutter in the tail of the distribution so that small changes in PFA level result in large changes in the cut-off threshold for determining whether pixels belong to the background or iceberg class. However, more work is required to confirm this. Nevertheless, our results underline the importance of looking at a broad range of PFA levels instead of evaluating all the detection algorithms at one fixed PFA level.</p>
+</sec>
+</sec>
+<sec id="Ch1.S6" sec-type="conclusions">
+  <label>6</label><title>Conclusion</title>
+      <p id="d1e3273">In this paper, we have compared the performance of six different CFAR detectors for iceberg detection in both a C-band Sentinel-1 SAR image and a L-band ALOS-2 SAR image. Both images were acquired over the same region of the Labrador Sea and were acquired in wide-swath dual-polarization (HH, HV) mode. A total of 492 icebergs were visually identified in the study area, using an overlapping Sentinel-2 image for validation. The performance of the detectors was assessed by counting the number of false positives, true positives, and false negatives and calculating the corresponding recall, precision, and <inline-formula><mml:math id="M166" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score. Each detector was tested at varying PFA levels, making it possible to assess the performance of the detectors as a function of the PFA level. Additionally, the results for the PFA level that gave the highest <inline-formula><mml:math id="M167" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score were analyzed to investigate the detection rate for icebergs at varying sizes.</p>
+      <?pagebreak page5352?><p id="d1e3290">Comparing the individual detection algorithms on C- and L-band revealed no large differences, except for the iDPolRAD detector, which showed a higher <inline-formula><mml:math id="M168" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score on C-band, and the log-normal detector, which showed a higher <inline-formula><mml:math id="M169" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score on L-band. This shows that not all detectors tested on C-band imagery can be applied to L-band imagery with the same expected results.</p>
+      <p id="d1e3307">Overall, the highest accuracy was obtained by applying a log-normal CFAR detector to the ALOS-2 L-band image, which gave an <inline-formula><mml:math id="M170" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score of 70.4 %. In general, the gamma, NIS, and Wishart detectors all gave <inline-formula><mml:math id="M171" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> scores above 62 % for both C- and L-band. Additionally, these three detectors were shown to be very stable to changes in the PFA level. The <inline-formula><mml:math id="M172" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula> detector resulted in <inline-formula><mml:math id="M173" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> scores comparable with the other detectors but was also shown to be very sensitive to tuning of the PFA level. A similar result was obtained by the log-normal detector applied to the C-band image. A detector developed for iceberg detection in sea ice, the iDPolRAD detector, showed only moderate performance for icebergs in open water – possibly due to the high temperatures in the study area.</p>
+      <p id="d1e3338">Three different methods were tested for merging the dual-channel HH/HV images for CFAR detection. But the methods used did not appear to give rise to any significant differences, with similar performance for the gamma, NIS, and Wishart detectors.</p>
+      <p id="d1e3342">Only 10 %–15 % of the icebergs shorter than 60 m could be detected in the dataset, suggesting that wide-swath SAR images at both C- and L-band are insufficient for detecting small icebergs. Additionally, between 20 %–50 % of the medium icebergs (60–120 m) and 5 %–20 % of the large icebergs (<inline-formula><mml:math id="M174" display="inline"><mml:mrow><mml:mi mathvariant="italic">&gt;</mml:mi><mml:mn mathvariant="normal">120</mml:mn></mml:mrow></mml:math></inline-formula> m) were missed by the detectors. This shows that a large part of icebergs that are 1.5–3 times size of a single pixel are not being detected, suggesting a risk of underestimating iceberg conditions by operational iceberg charting services.</p>
+      <p id="d1e3355">Each of the detectors obtained their highest <inline-formula><mml:math id="M175" display="inline"><mml:mi>F</mml:mi></mml:math></inline-formula> score at different PFA levels. This suggests that comparing detectors at the same PFA level will give inaccurate results. The results also revealed that some detectors were sensitive to variations in PFA level, while others proved more stable. This suggests that the sensitive detectors should be used with care or undergo manual tuning for optimum results. We therefore recommend that the detectors with stable response to changing PFA level, namely NIS, Wishart, and gamma, are used when implementing an operational iceberg detection product.</p>
+      <p id="d1e3365">L-bands appear to offer a slight improvement over C-bands on the dataset in this study. We expect this improvement to be even higher for cases with more wind, and we encourage further investigations of the use of L-band SAR data for detecting icebergs under varying wind conditions.</p>
+</sec>
+
+      
+      </body>
+    <back><notes notes-type="codeavailability"><title>Code availability</title>
+
+      <p id="d1e3372">Implementations of the different detectors are available on GitHub (<uri>https://github.com/LaustFaerch/cfar-object-detection</uri>, last access: 6 December 2023; DOI: <ext-link xlink:href="https://doi.org/10.5281/zenodo.10254677" ext-link-type="DOI">10.5281/zenodo.10254677</ext-link>, Færch, 2023).</p>
+  </notes><notes notes-type="dataavailability"><title>Data availability</title>
+
+      <p id="d1e3384">Historical weather data for Canada can be accessed here: <uri>https://climate.weather.gc.ca</uri> (Government of Canada, 2023). Historical weather data for Greenland can be accessed here: <uri>https://www.dmi.dk/vejrarkiv</uri> (Danish Meteorological Institute, 2021). Satellite images from the Sentinel-1 and Sentinel-2 satellite constellations can be accessed through the Copernicus dataspace: <uri>https://dataspace.copernicus.eu/</uri> (Copernicus, 2023). ALOS-2 images from JAXA cannot be shared per the mutual cooperation project between ESA and JAXA.</p>
+  </notes><notes notes-type="authorcontribution"><title>Author contributions</title>
+
+      <p id="d1e3399">The method was developed by LF and WD. The dataset was produced and analyzed by LF, who also led the manuscript writing. APD gave advice on the methodology and on the implementation and theory behind the detectors. NH offered advice on the operational aspects of iceberg detection services. WD, APD, and NH all contributed to the manuscript.</p>
+  </notes><notes notes-type="competinginterests"><title>Competing interests</title>
+
+      <p id="d1e3405">The contact author has declared that none of the authors has any competing interests.</p>
+  </notes><notes notes-type="disclaimer"><title>Disclaimer</title>
+
+      <p id="d1e3411">Publisher’s note: Copernicus Publications remains neutral with regard to jurisdictional claims made in the text, published maps, institutional affiliations, or any other geographical representation in this paper. While Copernicus Publications makes every effort to include appropriate place names, the final responsibility lies with the authors.</p>
+  </notes><ack><title>Acknowledgements</title><p id="d1e3417">ALOS-2/PALSAR-2 data are provided by JAXA through the 2019 to 2022 mutual cooperation project between ESA and JAXA on Using Synthetic Aperture Radar Satellites in Earth Science and Applications. We are thankful for the support received by the ESA and the Ministry of Science and Technology (MOST) of the PR China through the Dragon-5 cooperation. And we are also thankful for the discussions with our Chinese partners.</p></ack><notes notes-type="financialsupport"><title>Financial support</title>
+
+      <p id="d1e3422">This research has been supported by CIRFA partners and the Research Council of Norway (grant no. 237906). The publication charges for this article have been funded by a grant from the publication fund of UiT The Arctic University of Norway.</p>
+  </notes><notes notes-type="reviewstatement"><title>Review statement</title>
+
+      <p id="d1e3429">This paper was edited by John Yackel and reviewed by two anonymous referees.</p>
+  </notes><ref-list>
+    <title>References</title>
+
+      <ref id="bib1.bib1"><label>1</label><?label 1?><mixed-citation>Akbari, V. and Brekke, C.: Iceberg Detection in Open and Ice-Infested Waters Using C-Band Polarimetric Synthetic Aperture Radar, IEEE T. Geosci. Remote, 56, 407–421, <ext-link xlink:href="https://doi.org/10.1109/TGRS.2017.2748394" ext-link-type="DOI">10.1109/TGRS.2017.2748394</ext-link>, 2018.</mixed-citation></ref>
+      <ref id="bib1.bib2"><label>2</label><?label 1?><mixed-citation>Anfinsen, S. N., Doulgeris, A. P., and Eltoft, T.: Estimation of the Equivalent Number of Looks in Polarimetric Syntheti<?pagebreak page5353?>c Aperture Radar Imagery, IEEE T. Geosci. Remote, 47, 3795–3809, <ext-link xlink:href="https://doi.org/10.1109/TGRS.2009.2019269" ext-link-type="DOI">10.1109/TGRS.2009.2019269</ext-link>, 2009.</mixed-citation></ref>
+      <ref id="bib1.bib3"><label>3</label><?label 1?><mixed-citation>Argenti, F., Lapini, A., Bianchi, T., and Alparone, L.: A Tutorial on Speckle Reduction in Synthetic Aperture Radar Images, IEEE Geosci. Remote Sens. Mag., 1, 6–35, <ext-link xlink:href="https://doi.org/10.1109/MGRS.2013.2277512" ext-link-type="DOI">10.1109/MGRS.2013.2277512</ext-link>, 2013.</mixed-citation></ref>
+      <ref id="bib1.bib4"><label>4</label><?label 1?><mixed-citation>Bailey, J. and Marino, A.: Quad-Polarimetric Multi-Scale Analysis of Icebergs in ALOS-2 SAR Data: A Comparison between Icebergs in West and East Greenland, Remote Sensing, 12, 1864, <ext-link xlink:href="https://doi.org/10.3390/rs12111864" ext-link-type="DOI">10.3390/rs12111864</ext-link>, 2020.</mixed-citation></ref>
+      <ref id="bib1.bib5"><label>5</label><?label 1?><mixed-citation>Bailey, J., Marino, A., and Akbari, V.: Comparison of Target Detectors to Identify Icebergs in Quad-Polarimetric L-Band Synthetic Aperture Radar Data, Remote Sensing, 13, 1753, <ext-link xlink:href="https://doi.org/10.3390/rs13091753" ext-link-type="DOI">10.3390/rs13091753</ext-link>, 2021.</mixed-citation></ref>
+      <ref id="bib1.bib6"><label>6</label><?label 1?><mixed-citation>Barbat, M. M., Rackow, T., Hellmer, H. H., Wesche, C., and Mata, M. M.: Three Years of Near-Coastal Antarctic Iceberg Distribution From a Machine Learning Approach Applied to SAR Imagery, J. Geophys. Res.-Oceans, 124, 6658–6672, <ext-link xlink:href="https://doi.org/10.1029/2019JC015205" ext-link-type="DOI">10.1029/2019JC015205</ext-link>, 2019.</mixed-citation></ref>
+      <ref id="bib1.bib7"><label>7</label><?label 1?><mixed-citation>Bourbigot, M., Johnson, H., and Piantanda, R.: Sentinel-1 Product Definition, ESA, <uri>https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-1-sar/document-library/-/asset_publisher/1dO7RF5fJMbd/content/sentinel-1-product-definition</uri> (last access: 6 December 2023), 2016.</mixed-citation></ref>
+      <ref id="bib1.bib8"><label>8</label><?label 1?><mixed-citation>Brekke, C.: Automatic ship detection based on satellite SAR, FFI, ISBN 978-82-464-1582-6, <uri>http://hdl.handle.net/20.500.12242/2139</uri> (last access: 6 December 2023), 2009.</mixed-citation></ref>
+      <ref id="bib1.bib9"><label>9</label><?label 1?><mixed-citation>Brekke, C. and Anfinsen, S. N.: Ship Detection in Ice-Infested Waters Based on Dual-Polarization SAR Imagery, IEEE Geosci. Remote Sensing Lett., 8, 391–395, <ext-link xlink:href="https://doi.org/10.1109/LGRS.2010.2078796" ext-link-type="DOI">10.1109/LGRS.2010.2078796</ext-link>, 2011.</mixed-citation></ref>
+      <ref id="bib1.bib10"><label>10</label><?label 1?><mixed-citation>Buus-Hinkler, J., Qvistgaard, K., and Krane, K. A. H.: Iceberg number density – Reaching a full picture of the Greenland waters, in: 2014 IEEE Geoscience and Remote Sensing Symposium, IGARSS 2014–2014 IEEE International Geoscience and Remote Sensing Symposium, Quebec City, QC, 270–273, <ext-link xlink:href="https://doi.org/10.1109/IGARSS.2014.6946409" ext-link-type="DOI">10.1109/IGARSS.2014.6946409</ext-link>, 2014.</mixed-citation></ref>
+      <ref id="bib1.bib11"><label>11</label><?label 1?><mixed-citation>Connetable, P., Conradsen, K., Nielsen, A. A., and Skriver, H.: Test Statistics for Reflection Symmetry: Applications to Quad-Polarimetric SAR Data for Detection of Man-Made Structures, IEEE J. Sel. Top. Appl., 15, 2877–2890, <ext-link xlink:href="https://doi.org/10.1109/JSTARS.2022.3162670" ext-link-type="DOI">10.1109/JSTARS.2022.3162670</ext-link>, 2022.</mixed-citation></ref>
+      <ref id="bib1.bib12"><label>12</label><?label 1?><mixed-citation>Conradsen, K., Nielsen, A. A., Schou, J., and Skriver, H.: A test statistic in the complex wishart distribution and its application to change detection in polarimetric SAR data, IEEE T. Geosci. Remote, 41, 4–19, <ext-link xlink:href="https://doi.org/10.1109/TGRS.2002.808066" ext-link-type="DOI">10.1109/TGRS.2002.808066</ext-link>, 2003.</mixed-citation></ref>
+      <ref id="bib1.bib13"><label>13</label><?label 1?><mixed-citation>Copernicus: Data Space Eco System, Copernicus [data set], <uri>https://dataspace.copernicus.eu/</uri>, last access: 6 December 2023.</mixed-citation></ref>
+      <ref id="bib1.bib14"><label>14</label><?label 1?><mixed-citation>Crisp, D. J.: The state-of-the-art in ship detection in synthetic aperture radar imagery, DSTO, Dept. Defense, Australian Government, Canberra, IC, Australia, 2004.</mixed-citation></ref>
+      <ref id="bib1.bib15"><label>15</label><?label 1?><mixed-citation>Danish Meteorological Institute: Verjarkiv, Danish Meteorological Institute [data set], <uri>https://www.dmi.dk/vejrarkiv/</uri>, last access: 14 September 2021.</mixed-citation></ref>
+      <ref id="bib1.bib16"><label>16</label><?label 1?><mixed-citation>Das, A., Kumar, R., and Rosen, P.: Nisar Mission Overview and Updates on ISRO Science Plan, in: 2021 IEEE International India Geoscience and Remote Sensing Symposium (InGARSS), 2021 IEEE International India Geoscience and Remote Sensing Symposium (InGARSS), Ahmedabad, India, 269–272, <ext-link xlink:href="https://doi.org/10.1109/InGARSS51564.2021.9791979" ext-link-type="DOI">10.1109/InGARSS51564.2021.9791979</ext-link>, 2021.</mixed-citation></ref>
+      <ref id="bib1.bib17"><label>17</label><?label 1?><mixed-citation>Davidson, M., Gebert, N., and Giulicchi, L.: ROSE-L – The L-band SAR Mission for Copernicus, in: EUSAR 2021; 13th European Conference on Synthetic Aperture Radar, Leipzig, Germany 29 March 2021–1 April 2021, <uri>https://ieeexplore.ieee.org/servlet/opac?punumber=9472486</uri> (last access: 9 December 2023), 2021.</mixed-citation></ref>
+      <ref id="bib1.bib18"><label>18</label><?label 1?><mixed-citation>Denbina, M. and Collins, M. J.: Iceberg Detection Using Compact Polarimetric Synthetic Aperture Radar, Atmos. Ocean, 50, 437–446, <ext-link xlink:href="https://doi.org/10.1080/07055900.2012.733307" ext-link-type="DOI">10.1080/07055900.2012.733307</ext-link>, 2012.</mixed-citation></ref>
+      <ref id="bib1.bib19"><label>19</label><?label 1?><mixed-citation>Denbina, M. and Collins, M. J.: Iceberg Detection Using Simulated Dual-Polarized Radarsat Constellation Data, Can. J. Remote Sens., 40, 165–178, <ext-link xlink:href="https://doi.org/10.1080/07038992.2014.945517" ext-link-type="DOI">10.1080/07038992.2014.945517</ext-link>, 2014.</mixed-citation></ref>
+      <ref id="bib1.bib20"><label>20</label><?label 1?><mixed-citation>Dierking, W.: Sea Ice And Icebergs. Maritime Surveillance with Synthetic Aperture Radar, edited by: Di Martino, G. and Iodice, A., Institution of Engineering and Technology, 346 pp., ISBN 9781785616013, <ext-link xlink:href="https://doi.org/10.1049/SBRA521E" ext-link-type="DOI">10.1049/SBRA521E</ext-link>, 2020.</mixed-citation></ref>
+      <ref id="bib1.bib21"><label>21</label><?label 1?><mixed-citation>Dierking, W. and Davidson, M.: Enhanced Sea Ice Monitoring At L- and C-Bands using Rose-L and Sentinel-1, in: IGARSS 2020–2020 IEEE International Geoscience and Remote Sensing Symposium, IGARSS 2020–2020 IEEE International Geoscience and Remote Sensing Symposium, Waikoloa, HI, USA, 4059–4060, <ext-link xlink:href="https://doi.org/10.1109/IGARSS39084.2020.9323886" ext-link-type="DOI">10.1109/IGARSS39084.2020.9323886</ext-link>, 2020.</mixed-citation></ref>
+      <ref id="bib1.bib22"><label>22</label><?label 1?><mixed-citation>Dierking, W. and Wesche, C.: C-Band Radar Polarimetry – Useful for Detection of Icebergs in Sea Ice?, IEEE T. Geosci. Remote, 52, 25–37, <ext-link xlink:href="https://doi.org/10.1109/TGRS.2012.2234756" ext-link-type="DOI">10.1109/TGRS.2012.2234756</ext-link>, 2014.</mixed-citation></ref>
+      <ref id="bib1.bib23"><label>23</label><?label 1?><mixed-citation>Doulgeris, A. P., Anfinsen, S. N., and Eltoft, T.: Automated non-gaussian clustering of polarimetric synthetic aperture radar images, IEEE T. Geosci. Remote, 49, 3665–3676, <ext-link xlink:href="https://doi.org/10.1109/TGRS.2011.2140120" ext-link-type="DOI">10.1109/TGRS.2011.2140120</ext-link>, 2011.</mixed-citation></ref>
+      <ref id="bib1.bib24"><label>24</label><?label 1?><mixed-citation>El-Darymli, K., McGuire, P., Power, D., and Moloney, C.: Target detection in synthetic aperture radar imagery: a state-of-the-art survey, J. Appl. Remote Sens, 7, 071598, <ext-link xlink:href="https://doi.org/10.1117/1.JRS.7.071598" ext-link-type="DOI">10.1117/1.JRS.7.071598</ext-link>, 2013.</mixed-citation></ref>
+      <ref id="bib1.bib25"><label>25</label><?label 1?><mixed-citation>Færch, L.: CFAR Object Detection Library (Version v1), Zenodo [code], <ext-link xlink:href="https://doi.org/10.5281/zenodo.10254677" ext-link-type="DOI">10.5281/zenodo.10254677</ext-link>, 2023.</mixed-citation></ref>
+      <ref id="bib1.bib26"><label>26</label><?label 1?><mixed-citation>Gill, R. S.: Operational Detection of Sea Ice Edges and Icebergs Using SAR, Can. J. Remote Sens., 27, 411–432, <ext-link xlink:href="https://doi.org/10.1080/07038992.2001.10854884" ext-link-type="DOI">10.1080/07038992.2001.10854884</ext-link>, 2001.</mixed-citation></ref>
+      <ref id="bib1.bib27"><label>27</label><?label 1?><mixed-citation>Gillies, S. et al.: Rasterio: geospatial raster I/O for Python programmers, GitHub [code], <uri>https://github.com/rasterio/rasterio</uri> (last access: 17 November 2022), 2013.</mixed-citation></ref>
+      <ref id="bib1.bib28"><label>28</label><?label 1?><mixed-citation>Goodman, N. R.: Statistical Analysis Based on a Certain Multivariate Complex Gaussian Distribution (An Introduction), Ann. Math. Statist., 34, 152–177, <ext-link xlink:href="https://doi.org/10.1214/aoms/1177704250" ext-link-type="DOI">10.1214/aoms/1177704250</ext-link>, 1963.</mixed-citation></ref>
+      <ref id="bib1.bib29"><label>29</label><?label 1?><mixed-citation>Government of Canada: Environment and natural resources, Weather, Climate and Hazards, Past weather and climate, Historical Data, Government of Canada [data set], <uri>https://climate.weather.gc.ca</uri>, last access: 18 January 2023.</mixed-citation></ref>
+      <ref id="bib1.bib30"><label>30</label><?label 1?><mixed-citation>Gray, A. L. and Arsenault, L. D.: Time-delayed reflections in L-band synthetic aperture radar imagery of icebergs, IEEE T. Geosci. Remote, 29, 284–291, <ext-link xlink:href="https://doi.org/10.1109/36.73670" ext-link-type="DOI">10.1109/36.73670</ext-link>, 1991.</mixed-citation></ref>
+      <ref id="bib1.bib31"><label>31</label><?label 1?><mixed-citation>Harris, C. R., Millman, K. J., van der Walt, S. J., Gommers, R., Virtanen, P., Cournapeau, D., Wieser, E., Taylor, J., Berg, S., Smith, N. J., Kern, R., Picus, M., Hoyer, S., van Kerkwijk, M. H., Brett, M., Haldane, A., del Río, J. F., Wiebe, M., Peterson, P.<?pagebreak page5354?>, Gérard-Marchant, P., Sheppard, K., Reddy, T., Weckesser, W., Abbasi, H., Gohlke, C., and Oliphant, T. E.: Array programming with NumPy, Nature, 585, 357–362, <ext-link xlink:href="https://doi.org/10.1038/s41586-020-2649-2" ext-link-type="DOI">10.1038/s41586-020-2649-2</ext-link>, 2020.</mixed-citation></ref>
+      <ref id="bib1.bib32"><label>32</label><?label 1?><mixed-citation>Howell, C., Youden, J., Lane, K., Power, D., Randell, C., and Flett, D.: Iceberg and ship discrimination with ENVISAT multi-polarization ASAR, in: IGARSS 2004. 2004 IEEE International Geoscience and Remote Sensing Symposium, Anchorage, AK, USA, 2004, 113–116, <ext-link xlink:href="https://doi.org/10.1109/IGARSS.2004.1368958" ext-link-type="DOI">10.1109/IGARSS.2004.1368958</ext-link>, 2004.</mixed-citation></ref>
+      <ref id="bib1.bib33"><label>33</label><?label 1?><mixed-citation>JAXA: ALOS-2/PALSAR-2 Level 1.1/1.5/2.1/3.1 CEOS SAR Product Format Description, Rev. G, Japanese Aerospace Exploration Agency, <uri>https://www.eorc.jaxa.jp/ALOS/en/alos-2/datause/a2_format_e.htm</uri> (last access: 6 December 2023), 2012.</mixed-citation></ref>
+      <ref id="bib1.bib34"><label>34</label><?label 1?><mixed-citation>Karvonen, J., Gegiuc, A., Niskanen, T., Montonen, A., Buus-Hinkler, J., and Rinne, E.: Iceberg Detection in Dual-Polarized C-Band SAR Imagery by Segmentation and Nonparametric CFAR (SnP-CFAR), IEEE T. Geosci. Remote, 60, 4300812, <ext-link xlink:href="https://doi.org/10.1109/TGRS.2021.3070312" ext-link-type="DOI">10.1109/TGRS.2021.3070312</ext-link>, 2022.</mixed-citation></ref>
+      <ref id="bib1.bib35"><label>35</label><?label 1?><mixed-citation>Kim, J.-W., Kim, D.-J., Kim, S.-H., and Hwang, B.-J.: Iceberg detection using full-polarimetric RADARSAT-2 SAR data in west antarctica, in: 3rd International Asia-Pacific Conference on Synthetic Aperture Radar (APSAR), Seoul, Korea (South), 26–30 September 2011, 1–4, 2011.</mixed-citation></ref>
+      <ref id="bib1.bib36"><label>36</label><?label 1?><mixed-citation>Lam, S. K., Pitrou, A., and Seibert, S.: Numba: a LLVM-based Python JIT compiler, in: Proceedings of the Second Workshop on the LLVM Compiler Infrastructure in HPC, SC15: The International Conference for High Performance Computing, Networking, Storage and Analysis, Austin Texas, 1–6, <ext-link xlink:href="https://doi.org/10.1145/2833157.2833162" ext-link-type="DOI">10.1145/2833157.2833162</ext-link>, 2015.</mixed-citation></ref>
+      <ref id="bib1.bib37"><label>37</label><?label 1?><mixed-citation>Lee, J.-S. and Pottier, E.: Polarimetric Radar Imaging: From Basics to Applications, 1st edn., edited by: Lee, J.-S. and Pottier, E., CRC Press, <ext-link xlink:href="https://doi.org/10.1201/9781420054989" ext-link-type="DOI">10.1201/9781420054989</ext-link>, 2009.</mixed-citation></ref>
+      <ref id="bib1.bib38"><label>38</label><?label 1?><mixed-citation>Liu, C.: A dual-polarization ship detection algorithm,  DRDC-RDDC-2015-R109, Ottawa Research Centre, 2015.</mixed-citation></ref>
+      <ref id="bib1.bib39"><label>39</label><?label 1?><mixed-citation>Liu, C.: Method for Fitting <inline-formula><mml:math id="M176" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula>-Distributed Probability Density Function to Ocean Pixels in Dual-Polarization SAR, Can. J. Remote Sens., 44, 299–310, <ext-link xlink:href="https://doi.org/10.1080/07038992.2018.1491789" ext-link-type="DOI">10.1080/07038992.2018.1491789</ext-link>, 2018.</mixed-citation></ref>
+      <ref id="bib1.bib40"><label>40</label><?label 1?><mixed-citation>Marino, A.: Iceberg Detection with L-Band ALOS-2 Data Using the Dual-POL Ratio Anomaly Detector, in: IGARSS 2018–2018 IEEE International Geoscience and Remote Sensing Symposium, Valencia, Spain, 2018, 6067–6070, <ext-link xlink:href="https://doi.org/10.1109/IGARSS.2018.8519206" ext-link-type="DOI">10.1109/IGARSS.2018.8519206</ext-link>, 2018.</mixed-citation></ref>
+      <ref id="bib1.bib41"><label>41</label><?label 1?><mixed-citation>Marino, A., Dierking, W., and Wesche, C.: A Depolarization Ratio Anomaly Detector to Identify Icebergs in Sea Ice Using Dual-Polarization SAR Images, IEEE T. Geosci. Remote, 54, 5602–5615, <ext-link xlink:href="https://doi.org/10.1109/TGRS.2016.2569450" ext-link-type="DOI">10.1109/TGRS.2016.2569450</ext-link>, 2016.</mixed-citation></ref>
+      <ref id="bib1.bib42"><label>42</label><?label 1?><mixed-citation>Novak, L. M. and Hesse, S. R.: Optimal Polarizations for Radar Detection and Recognition of Targets in Clutter, The Record of the 1993 IEEE National Radar Conference, Lynnfield, MA, USA, 79–83, <ext-link xlink:href="https://doi.org/10.1109/NRC.1993.270489" ext-link-type="DOI">10.1109/NRC.1993.270489</ext-link>, 1993.</mixed-citation></ref>
+      <ref id="bib1.bib43"><label>43</label><?label 1?><mixed-citation>Oliver, C. and Quegan, S.: Understanding synthetic aperture radar images, SciTech Publishing Inc. Raleigh, NC 27613, ISBN 1-891121-31-6, 2004.</mixed-citation></ref>
+      <ref id="bib1.bib44"><label>44</label><?label 1?><mixed-citation>OpenStreetMap contributors: Land Polygons, <uri>https://osmdata.openstreetmap.de/data/land-polygons.html</uri>, last access: 18 January 2023, 2015.</mixed-citation></ref>
+      <ref id="bib1.bib45"><label>45</label><?label 1?><mixed-citation>Park, J.-W., Won, J.-S., Korosov, A. A., Babiker, M., and Miranda, N.: Textural Noise Correction for Sentinel-1 TOPSAR Cross-Polarization Channel Images, IEEE T. Geosci. Remote, 57, 4040–4049, <ext-link xlink:href="https://doi.org/10.1109/TGRS.2018.2889381" ext-link-type="DOI">10.1109/TGRS.2018.2889381</ext-link>, 2019.</mixed-citation></ref>
+      <ref id="bib1.bib46"><label>46</label><?label 1?><mixed-citation>Power, D., Youden, J., Lane, K., Randell, C., and Flett, D.: Iceberg Detection Capabilities of RADARSAT Synthetic Aperture Radar, Can. J. Remote Sens., 27, 476–486, <ext-link xlink:href="https://doi.org/10.1080/07038992.2001.10854888" ext-link-type="DOI">10.1080/07038992.2001.10854888</ext-link>, 2001.</mixed-citation></ref>
+      <ref id="bib1.bib47"><label>47</label><?label 1?><mixed-citation>Salkind, N. J.: Bonferroni test, in: Encyclopedia of Measurement and Statistics, Vol. 0, Sage Publications, Inc.,  104–107, <ext-link xlink:href="https://doi.org/10.4135/9781412952644" ext-link-type="DOI">10.4135/9781412952644</ext-link>, 2007.</mixed-citation></ref>
+      <ref id="bib1.bib48"><label>48</label><?label 1?><mixed-citation>Sandven, S., Babiker, M., and Kloster, K.: Iceberg observations in the Barents Sea by radar and optical satellite images, in: Proceedings of the ENVISAT Symposium, Montreux, Switzerland, 23–27 April 2007, ISBN 92-9291-200-1, 2007.  2007.</mixed-citation></ref>
+      <ref id="bib1.bib49"><label>49</label><?label 1?><mixed-citation>Schou, J., Skriver, H., Nielsen, A. A., and Conradsen, K.: CFAR edge detector for polarimetric SAR images, IEEE T. Geosci. Remote, 41, 20–32, <ext-link xlink:href="https://doi.org/10.1109/TGRS.2002.808063" ext-link-type="DOI">10.1109/TGRS.2002.808063</ext-link>, 2003.</mixed-citation></ref>
+      <ref id="bib1.bib50"><label>50</label><?label 1?><mixed-citation>Soldal, I., Dierking, W., Korosov, A., and Marino, A.: Automatic Detection of Small Icebergs in Fast Ice Using Satellite Wide-Swath SAR Images, Remote Sensing, 11, 806, <ext-link xlink:href="https://doi.org/10.3390/rs11070806" ext-link-type="DOI">10.3390/rs11070806</ext-link>, 2019.</mixed-citation></ref>
+      <ref id="bib1.bib51"><label>51</label><?label 1?><mixed-citation>Tao, D., Doulgeris, A. P., and Brekke, C.: A Segmentation-Based CFAR Detection Algorithm Using Truncated Statistics, IEEE T. Geosci. Remote, 54, 2887–2898, <ext-link xlink:href="https://doi.org/10.1109/TGRS.2015.2506822" ext-link-type="DOI">10.1109/TGRS.2015.2506822</ext-link>, 2016a.</mixed-citation></ref>
+      <ref id="bib1.bib52"><label>52</label><?label 1?><mixed-citation>Tao, D., Anfinsen, S. N., and Brekke, C.: Robust CFAR Detector Based on Truncated Statistics in Multiple-Target Situations, IEEE T. Geosci. Remote, 54, 117–134, <ext-link xlink:href="https://doi.org/10.1109/TGRS.2015.2451311" ext-link-type="DOI">10.1109/TGRS.2015.2451311</ext-link>, 2016b.</mixed-citation></ref>
+      <ref id="bib1.bib53"><label>53</label><?label 1?><mixed-citation>Tunaley, J. K. E.: <inline-formula><mml:math id="M177" display="inline"><mml:mi>K</mml:mi></mml:math></inline-formula>-Distribution Algorithm, LRDC Technical Report, August, 2010.</mixed-citation></ref>
+      <ref id="bib1.bib54"><label>54</label><?label 1?><mixed-citation>Virtanen, P., Gommers, R., Oliphant, T. E., Haberland, M., Reddy, T., Cournapeau, D., Burovski, E., Peterson, P., Weckesser, W., Bright, J., van der Walt, S. J., Brett, M., Wilson, J., Millman, K. J., Mayorov, N., Nelson, A. R. J., Jones, E., Kern, R., Larson, E., Carey, C. J., Polat, İ., Feng, Y., Moore, E. W., VanderPlas, J., Laxalde, D., Perktold, J., Cimrman, R., Henriksen, I., Quintero, E. A., Harris, C. R., Archibald, A. M., Ribeiro, A. H., Pedregosa, F., van Mulbregt, P., and SciPy 1.0 Contributors: SciPy 1.0: fundamental algorithms for scientific computing in Python, Nat. Methods, 17, 261–272, <ext-link xlink:href="https://doi.org/10.1038/s41592-019-0686-2" ext-link-type="DOI">10.1038/s41592-019-0686-2</ext-link>, 2020.</mixed-citation></ref>
+      <ref id="bib1.bib55"><label>55</label><?label 1?><mixed-citation>Wesche, C. and Dierking, W.: Iceberg signatures and detection in SAR images in two test regions of the Weddell Sea, Antarctica, J. Glaciol., 58, 325–339, <ext-link xlink:href="https://doi.org/10.3189/2012J0G11J020" ext-link-type="DOI">10.3189/2012J0G11J020</ext-link>, 2012.</mixed-citation></ref>
+      <ref id="bib1.bib56"><label>56</label><?label 1?><mixed-citation>Wesche, C. and Dierking, W.: Estimating iceberg paths using a wind-driven drift model, Cold Reg. Sci. Technol., 125, 31–39, <ext-link xlink:href="https://doi.org/10.1016/j.coldregions.2016.01.008" ext-link-type="DOI">10.1016/j.coldregions.2016.01.008</ext-link>, 2016.</mixed-citation></ref>
+      <ref id="bib1.bib57"><label>57</label><?label 1?><mixed-citation>Willis, C. J., Macklin, J. T., Partington, K. C., Teleki, K. A., Rees, W. G., and Williams, R. G.: Iceberg detection using ERS-1 Synthetic Aperture Radar, Int. J. Remote Sens., 17, 1777–1795, <ext-link xlink:href="https://doi.org/10.1080/01431169608948739" ext-link-type="DOI">10.1080/01431169608948739</ext-link>, 1996.</mixed-citation></ref>
+      <ref id="bib1.bib58"><label>58</label><?label 1?><mixed-citation>Yang, W., Li, Y., Liu, W., Chen, J., Li, C., and Men, Z.: Scalloping Suppression for ScanSAR Images Based on Modified Kalman Filter With Preprocessing, IEEE T. Geosci. Remote, 59, 7535–7546, <ext-link xlink:href="https://doi.org/10.1109/TGRS.2020.3034098" ext-link-type="DOI">10.1109/TGRS.2020.3034098</ext-link>, 2021.</mixed-citation></ref>
+      <?pagebreak page5355?><ref id="bib1.bib59"><label>59</label><?label 1?><mixed-citation>Zakharov, I., Power, D., Howell, M., and Warren, S.: Improved detection of icebergs in sea ice with RADARSAT-2 polarimetric data, in: 2017 IEEE International Geoscience and Remote Sensing Symposium (IGARSS), Fort Worth, TX, USA, 2017, 2294–2297, <ext-link xlink:href="https://doi.org/10.1109/IGARSS.2017.8127448" ext-link-type="DOI">10.1109/IGARSS.2017.8127448</ext-link>, 2017.</mixed-citation></ref>
+
+  </ref-list></back>
+    <!--<article-title-html>A comparison of constant false alarm rate object detection algorithms for iceberg identification in L- and C-band SAR imagery of the Labrador Sea</article-title-html>
+<abstract-html/>
+<ref-html id="bib1.bib1"><label>1</label><mixed-citation>
+      Akbari, V. and Brekke, C.: Iceberg Detection in Open and Ice-Infested Waters
+Using C-Band Polarimetric Synthetic Aperture Radar, IEEE T. Geosci.
+Remote, 56, 407–421, <a href="https://doi.org/10.1109/TGRS.2017.2748394" target="_blank">https://doi.org/10.1109/TGRS.2017.2748394</a>,
+2018.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib2"><label>2</label><mixed-citation>
+      Anfinsen, S. N., Doulgeris, A. P., and Eltoft, T.: Estimation of the
+Equivalent Number of Looks in Polarimetric Synthetic Aperture Radar Imagery,
+IEEE T. Geosci. Remote, 47, 3795–3809,
+<a href="https://doi.org/10.1109/TGRS.2009.2019269" target="_blank">https://doi.org/10.1109/TGRS.2009.2019269</a>, 2009.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib3"><label>3</label><mixed-citation>
+      Argenti, F., Lapini, A., Bianchi, T., and Alparone, L.: A Tutorial on
+Speckle Reduction in Synthetic Aperture Radar Images, IEEE Geosci. Remote
+Sens. Mag., 1, 6–35, <a href="https://doi.org/10.1109/MGRS.2013.2277512" target="_blank">https://doi.org/10.1109/MGRS.2013.2277512</a>, 2013.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib4"><label>4</label><mixed-citation>
+      Bailey, J. and Marino, A.: Quad-Polarimetric Multi-Scale Analysis of
+Icebergs in ALOS-2 SAR Data: A Comparison between Icebergs in West and East
+Greenland, Remote Sensing, 12, 1864, <a href="https://doi.org/10.3390/rs12111864" target="_blank">https://doi.org/10.3390/rs12111864</a>,
+2020.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib5"><label>5</label><mixed-citation>
+      Bailey, J., Marino, A., and Akbari, V.: Comparison of Target Detectors to
+Identify Icebergs in Quad-Polarimetric L-Band Synthetic Aperture Radar Data,
+Remote Sensing, 13, 1753, <a href="https://doi.org/10.3390/rs13091753" target="_blank">https://doi.org/10.3390/rs13091753</a>, 2021.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib6"><label>6</label><mixed-citation>
+      Barbat, M. M., Rackow, T., Hellmer, H. H., Wesche, C., and Mata, M. M.:
+Three Years of Near-Coastal Antarctic Iceberg Distribution From a Machine
+Learning Approach Applied to SAR Imagery, J. Geophys. Res.-Oceans, 124, 6658–6672,
+<a href="https://doi.org/10.1029/2019JC015205" target="_blank">https://doi.org/10.1029/2019JC015205</a>, 2019.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib7"><label>7</label><mixed-citation>
+      Bourbigot, M., Johnson, H., and Piantanda, R.: Sentinel-1 Product Definition, ESA, <a href="https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-1-sar/document-library/-/asset_publisher/1dO7RF5fJMbd/content/sentinel-1-product-definition" target="_blank"/> (last access: 6 December 2023), 2016.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib8"><label>8</label><mixed-citation>
+      Brekke, C.: Automatic ship detection based on satellite SAR, FFI, ISBN 978-82-464-1582-6, <a href="http://hdl.handle.net/20.500.12242/2139" target="_blank"/> (last access: 6 December 2023), 2009.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib9"><label>9</label><mixed-citation>
+      Brekke, C. and Anfinsen, S. N.: Ship Detection in Ice-Infested Waters Based
+on Dual-Polarization SAR Imagery, IEEE Geosci. Remote Sensing Lett., 8,
+391–395, <a href="https://doi.org/10.1109/LGRS.2010.2078796" target="_blank">https://doi.org/10.1109/LGRS.2010.2078796</a>, 2011.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib10"><label>10</label><mixed-citation>
+      Buus-Hinkler, J., Qvistgaard, K., and Krane, K. A. H.: Iceberg number
+density – Reaching a full picture of the Greenland waters, in: 2014 IEEE
+Geoscience and Remote Sensing Symposium, IGARSS 2014–2014 IEEE
+International Geoscience and Remote Sensing Symposium, Quebec City, QC,
+270–273, <a href="https://doi.org/10.1109/IGARSS.2014.6946409" target="_blank">https://doi.org/10.1109/IGARSS.2014.6946409</a>, 2014.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib11"><label>11</label><mixed-citation>
+      Connetable, P., Conradsen, K., Nielsen, A. A., and Skriver, H.: Test
+Statistics for Reflection Symmetry: Applications to Quad-Polarimetric SAR
+Data for Detection of Man-Made Structures, IEEE J. Sel. Top. Appl., 15, 2877–2890,
+<a href="https://doi.org/10.1109/JSTARS.2022.3162670" target="_blank">https://doi.org/10.1109/JSTARS.2022.3162670</a>, 2022.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib12"><label>12</label><mixed-citation>
+      Conradsen, K., Nielsen, A. A., Schou, J., and Skriver, H.: A test statistic
+in the complex wishart distribution and its application to change detection
+in polarimetric SAR data, IEEE T. Geosci. Remote, 41, 4–19,
+<a href="https://doi.org/10.1109/TGRS.2002.808066" target="_blank">https://doi.org/10.1109/TGRS.2002.808066</a>, 2003.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib13"><label>13</label><mixed-citation>
+      Copernicus: Data Space Eco System, Copernicus [data set], <a href="https://dataspace.copernicus.eu/" target="_blank"/>, last access: 6 December 2023.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib14"><label>14</label><mixed-citation>
+      Crisp, D. J.: The state-of-the-art in ship detection in synthetic aperture radar imagery, DSTO, Dept. Defense, Australian Government,
+Canberra, IC, Australia, 2004.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib15"><label>15</label><mixed-citation>
+      Danish Meteorological Institute: Verjarkiv, Danish Meteorological Institute [data set], <a href="https://www.dmi.dk/vejrarkiv/" target="_blank"/>, last access: 14 September 2021.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib16"><label>16</label><mixed-citation>
+      Das, A., Kumar, R., and Rosen, P.: Nisar Mission Overview and Updates on
+ISRO Science Plan, in: 2021 IEEE International India Geoscience and Remote
+Sensing Symposium (InGARSS), 2021 IEEE International India Geoscience and
+Remote Sensing Symposium (InGARSS), Ahmedabad, India, 269–272,
+<a href="https://doi.org/10.1109/InGARSS51564.2021.9791979" target="_blank">https://doi.org/10.1109/InGARSS51564.2021.9791979</a>, 2021.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib17"><label>17</label><mixed-citation>
+      Davidson, M., Gebert, N., and Giulicchi, L.: ROSE-L – The L-band
+SAR Mission for Copernicus, in: EUSAR 2021; 13th European Conference on Synthetic Aperture Radar, Leipzig, Germany
+29 March 2021–1 April 2021, <a href="https://ieeexplore.ieee.org/servlet/opac?punumber=9472486" target="_blank"/> (last access: 9 December 2023),
+2021.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib18"><label>18</label><mixed-citation>
+      Denbina, M. and Collins, M. J.: Iceberg Detection Using Compact Polarimetric
+Synthetic Aperture Radar, Atmos. Ocean, 50, 437–446,
+<a href="https://doi.org/10.1080/07055900.2012.733307" target="_blank">https://doi.org/10.1080/07055900.2012.733307</a>, 2012.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib19"><label>19</label><mixed-citation>
+      Denbina, M. and Collins, M. J.: Iceberg Detection Using Simulated
+Dual-Polarized Radarsat Constellation Data, Can. J. Remote
+Sens., 40, 165–178, <a href="https://doi.org/10.1080/07038992.2014.945517" target="_blank">https://doi.org/10.1080/07038992.2014.945517</a>, 2014.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib20"><label>20</label><mixed-citation>
+      Dierking, W.: Sea Ice And Icebergs. Maritime Surveillance with Synthetic Aperture Radar, edited by: Di Martino, G. and Iodice, A., Institution of Engineering and Technology, 346 pp., ISBN 9781785616013, <a href="https://doi.org/10.1049/SBRA521E" target="_blank">https://doi.org/10.1049/SBRA521E</a>, 2020.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib21"><label>21</label><mixed-citation>
+      Dierking, W. and Davidson, M.: Enhanced Sea Ice Monitoring At L- and C-Bands
+using Rose-L and Sentinel-1, in: IGARSS 2020–2020 IEEE International
+Geoscience and Remote Sensing Symposium, IGARSS 2020–2020 IEEE
+International Geoscience and Remote Sensing Symposium, Waikoloa, HI, USA,
+4059–4060, <a href="https://doi.org/10.1109/IGARSS39084.2020.9323886" target="_blank">https://doi.org/10.1109/IGARSS39084.2020.9323886</a>, 2020.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib22"><label>22</label><mixed-citation>
+      Dierking, W. and Wesche, C.: C-Band Radar Polarimetry – Useful for Detection
+of Icebergs in Sea Ice?, IEEE T. Geosci. Remote, 52, 25–37,
+<a href="https://doi.org/10.1109/TGRS.2012.2234756" target="_blank">https://doi.org/10.1109/TGRS.2012.2234756</a>, 2014.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib23"><label>23</label><mixed-citation>
+      Doulgeris, A. P., Anfinsen, S. N., and Eltoft, T.: Automated non-gaussian clustering of polarimetric synthetic aperture radar images, IEEE T. Geosci. Remote, 49, 3665–3676, <a href="https://doi.org/10.1109/TGRS.2011.2140120" target="_blank">https://doi.org/10.1109/TGRS.2011.2140120</a>, 2011.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib24"><label>24</label><mixed-citation>
+      El-Darymli, K., McGuire, P., Power, D., and Moloney, C.: Target detection in
+synthetic aperture radar imagery: a state-of-the-art survey, J. Appl. Remote
+Sens, 7, 071598, <a href="https://doi.org/10.1117/1.JRS.7.071598" target="_blank">https://doi.org/10.1117/1.JRS.7.071598</a>, 2013.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib25"><label>25</label><mixed-citation>
+      Færch, L.: CFAR Object Detection Library (Version v1), Zenodo [code], <a href="https://doi.org/10.5281/zenodo.10254677" target="_blank">https://doi.org/10.5281/zenodo.10254677</a>, 2023.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib26"><label>26</label><mixed-citation>
+      Gill, R. S.: Operational Detection of Sea Ice Edges and Icebergs Using SAR,
+Can. J. Remote Sens., 27, 411–432,
+<a href="https://doi.org/10.1080/07038992.2001.10854884" target="_blank">https://doi.org/10.1080/07038992.2001.10854884</a>, 2001.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib27"><label>27</label><mixed-citation>
+      Gillies, S. et al.: Rasterio: geospatial raster I/O for Python programmers, GitHub [code],
+<a href="https://github.com/rasterio/rasterio" target="_blank"/> (last access: 17 November 2022), 2013.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib28"><label>28</label><mixed-citation>
+      Goodman, N. R.: Statistical Analysis Based on a Certain Multivariate Complex
+Gaussian Distribution (An Introduction), Ann. Math. Statist., 34, 152–177,
+<a href="https://doi.org/10.1214/aoms/1177704250" target="_blank">https://doi.org/10.1214/aoms/1177704250</a>, 1963.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib29"><label>29</label><mixed-citation>
+      Government of Canada: Environment and natural resources, Weather, Climate
+and Hazards, Past weather and climate, Historical Data, Government of Canada [data set],
+<a href="https://climate.weather.gc.ca" target="_blank"/>, last access: 18 January 2023.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib30"><label>30</label><mixed-citation>
+      Gray, A. L. and Arsenault, L. D.: Time-delayed reflections in L-band
+synthetic aperture radar imagery of icebergs, IEEE T. Geosci. Remote, 29, 284–291, <a href="https://doi.org/10.1109/36.73670" target="_blank">https://doi.org/10.1109/36.73670</a>, 1991.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib31"><label>31</label><mixed-citation>
+      Harris, C. R., Millman, K. J., van der Walt, S. J., Gommers, R., Virtanen,
+P., Cournapeau, D., Wieser, E., Taylor, J., Berg, S., Smith, N. J., Kern,
+R., Picus, M., Hoyer, S., van Kerkwijk, M. H., Brett, M., Haldane, A., del
+Río, J. F., Wiebe, M., Peterson, P., Gérard-Marchant, P., Sheppard,
+K., Reddy, T., Weckesser, W., Abbasi, H., Gohlke, C., and Oliphant, T. E.:
+Array programming with NumPy, Nature, 585, 357–362,
+<a href="https://doi.org/10.1038/s41586-020-2649-2" target="_blank">https://doi.org/10.1038/s41586-020-2649-2</a>, 2020.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib32"><label>32</label><mixed-citation>
+      Howell, C., Youden, J., Lane, K., Power, D., Randell, C., and Flett, D.:
+Iceberg and ship discrimination with ENVISAT multi-polarization ASAR, in:
+IGARSS 2004. 2004 IEEE International Geoscience and Remote Sensing Symposium, Anchorage, AK, USA, 2004,
+113–116, <a href="https://doi.org/10.1109/IGARSS.2004.1368958" target="_blank">https://doi.org/10.1109/IGARSS.2004.1368958</a>, 2004.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib33"><label>33</label><mixed-citation>
+      JAXA: ALOS-2/PALSAR-2 Level 1.1/1.5/2.1/3.1 CEOS SAR Product Format Description, Rev. G, Japanese Aerospace Exploration Agency, <a href="https://www.eorc.jaxa.jp/ALOS/en/alos-2/datause/a2_format_e.htm" target="_blank"/>
+(last access: 6 December 2023), 2012.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib34"><label>34</label><mixed-citation>
+      Karvonen, J., Gegiuc, A., Niskanen, T., Montonen, A., Buus-Hinkler, J., and
+Rinne, E.: Iceberg Detection in Dual-Polarized C-Band SAR Imagery by
+Segmentation and Nonparametric CFAR (SnP-CFAR), IEEE T. Geosci. Remote, 60, 4300812, <a href="https://doi.org/10.1109/TGRS.2021.3070312" target="_blank">https://doi.org/10.1109/TGRS.2021.3070312</a>, 2022.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib35"><label>35</label><mixed-citation>
+      Kim, J.-W., Kim, D.-J., Kim, S.-H., and Hwang, B.-J.: Iceberg detection using
+full-polarimetric RADARSAT-2 SAR data in west antarctica, in: 3rd International Asia-Pacific Conference on Synthetic Aperture Radar (APSAR), Seoul, Korea (South), 26–30 September 2011, 1–4, 2011.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib36"><label>36</label><mixed-citation>
+      Lam, S. K., Pitrou, A., and Seibert, S.: Numba: a LLVM-based Python JIT
+compiler, in: Proceedings of the Second Workshop on the LLVM Compiler
+Infrastructure in HPC, SC15: The International Conference for High
+Performance Computing, Networking, Storage and Analysis, Austin Texas, 1–6,
+<a href="https://doi.org/10.1145/2833157.2833162" target="_blank">https://doi.org/10.1145/2833157.2833162</a>, 2015.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib37"><label>37</label><mixed-citation>
+      Lee, J.-S. and Pottier, E.: Polarimetric Radar Imaging: From Basics to
+Applications, 1st edn., edited by: Lee, J.-S. and Pottier, E., CRC Press,
+<a href="https://doi.org/10.1201/9781420054989" target="_blank">https://doi.org/10.1201/9781420054989</a>, 2009.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib38"><label>38</label><mixed-citation>
+      Liu, C.: A dual-polarization ship detection algorithm,  DRDC-RDDC-2015-R109, Ottawa Research Centre, 2015.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib39"><label>39</label><mixed-citation>
+      Liu, C.: Method for Fitting <i>K</i>-Distributed Probability Density Function to
+Ocean Pixels in Dual-Polarization SAR, Can. J. Remote Sens.,
+44, 299–310, <a href="https://doi.org/10.1080/07038992.2018.1491789" target="_blank">https://doi.org/10.1080/07038992.2018.1491789</a>, 2018.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib40"><label>40</label><mixed-citation>
+      Marino, A.: Iceberg Detection with L-Band ALOS-2 Data Using the Dual-POL
+Ratio Anomaly Detector, in: IGARSS 2018–2018 IEEE International Geoscience and Remote Sensing Symposium, Valencia, Spain, 2018, 6067–6070,
+<a href="https://doi.org/10.1109/IGARSS.2018.8519206" target="_blank">https://doi.org/10.1109/IGARSS.2018.8519206</a>, 2018.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib41"><label>41</label><mixed-citation>
+      Marino, A., Dierking, W., and Wesche, C.: A Depolarization Ratio Anomaly
+Detector to Identify Icebergs in Sea Ice Using Dual-Polarization SAR Images,
+IEEE T. Geosci. Remote, 54, 5602–5615,
+<a href="https://doi.org/10.1109/TGRS.2016.2569450" target="_blank">https://doi.org/10.1109/TGRS.2016.2569450</a>, 2016.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib42"><label>42</label><mixed-citation>
+      Novak, L. M. and Hesse, S. R.: Optimal Polarizations for Radar Detection and Recognition of Targets in Clutter, The Record of the 1993 IEEE National Radar Conference, Lynnfield, MA, USA, 79–83, <a href="https://doi.org/10.1109/NRC.1993.270489" target="_blank">https://doi.org/10.1109/NRC.1993.270489</a>, 1993.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib43"><label>43</label><mixed-citation>
+      Oliver, C. and Quegan, S.: Understanding synthetic aperture radar images, SciTech Publishing Inc. Raleigh, NC 27613,
+ISBN 1-891121-31-6, 2004.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib44"><label>44</label><mixed-citation>
+      OpenStreetMap contributors: Land Polygons,
+<a href="https://osmdata.openstreetmap.de/data/land-polygons.html" target="_blank"/>, last access:
+18 January 2023, 2015.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib45"><label>45</label><mixed-citation>
+      Park, J.-W., Won, J.-S., Korosov, A. A., Babiker, M., and Miranda, N.:
+Textural Noise Correction for Sentinel-1 TOPSAR Cross-Polarization Channel
+Images, IEEE T. Geosci. Remote, 57, 4040–4049,
+<a href="https://doi.org/10.1109/TGRS.2018.2889381" target="_blank">https://doi.org/10.1109/TGRS.2018.2889381</a>, 2019.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib46"><label>46</label><mixed-citation>
+      Power, D., Youden, J., Lane, K., Randell, C., and Flett, D.: Iceberg
+Detection Capabilities of RADARSAT Synthetic Aperture Radar, Can. J. Remote Sens., 27, 476–486,
+<a href="https://doi.org/10.1080/07038992.2001.10854888" target="_blank">https://doi.org/10.1080/07038992.2001.10854888</a>, 2001.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib47"><label>47</label><mixed-citation>
+      Salkind, N. J.: Bonferroni test, in: Encyclopedia of Measurement and Statistics, Vol. 0, Sage Publications, Inc.,  104–107, <a href="https://doi.org/10.4135/9781412952644" target="_blank">https://doi.org/10.4135/9781412952644</a>, 2007.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib48"><label>48</label><mixed-citation>
+      Sandven, S., Babiker, M., and Kloster, K.: Iceberg observations in the
+Barents Sea by radar and optical satellite images, in: Proceedings of the
+ENVISAT Symposium, Montreux, Switzerland, 23–27 April 2007, ISBN 92-9291-200-1, 2007.  2007.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib49"><label>49</label><mixed-citation>
+      Schou, J., Skriver, H., Nielsen, A. A., and Conradsen, K.: CFAR edge
+detector for polarimetric SAR images, IEEE T. Geosci. Remote,
+41, 20–32, <a href="https://doi.org/10.1109/TGRS.2002.808063" target="_blank">https://doi.org/10.1109/TGRS.2002.808063</a>, 2003.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib50"><label>50</label><mixed-citation>
+      Soldal, I., Dierking, W., Korosov, A., and Marino, A.: Automatic Detection
+of Small Icebergs in Fast Ice Using Satellite Wide-Swath SAR Images, Remote
+Sensing, 11, 806, <a href="https://doi.org/10.3390/rs11070806" target="_blank">https://doi.org/10.3390/rs11070806</a>, 2019.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib51"><label>51</label><mixed-citation>
+      Tao, D., Doulgeris, A. P., and Brekke, C.: A Segmentation-Based CFAR
+Detection Algorithm Using Truncated Statistics, IEEE T. Geosci. Remote, 54, 2887–2898, <a href="https://doi.org/10.1109/TGRS.2015.2506822" target="_blank">https://doi.org/10.1109/TGRS.2015.2506822</a>, 2016a.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib52"><label>52</label><mixed-citation>
+      Tao, D., Anfinsen, S. N., and Brekke, C.: Robust CFAR Detector Based on
+Truncated Statistics in Multiple-Target Situations, IEEE T. Geosci.
+Remote, 54, 117–134, <a href="https://doi.org/10.1109/TGRS.2015.2451311" target="_blank">https://doi.org/10.1109/TGRS.2015.2451311</a>,
+2016b.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib53"><label>53</label><mixed-citation>
+      Tunaley, J. K. E.: <i>K</i>-Distribution Algorithm, LRDC Technical Report, August, 2010.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib54"><label>54</label><mixed-citation>
+      Virtanen, P., Gommers, R., Oliphant, T. E., Haberland, M., Reddy, T.,
+Cournapeau, D., Burovski, E., Peterson, P., Weckesser, W., Bright, J., van
+der Walt, S. J., Brett, M., Wilson, J., Millman, K. J., Mayorov, N., Nelson,
+A. R. J., Jones, E., Kern, R., Larson, E., Carey, C. J., Polat, İ.,
+Feng, Y., Moore, E. W., VanderPlas, J., Laxalde, D., Perktold, J., Cimrman,
+R., Henriksen, I., Quintero, E. A., Harris, C. R., Archibald, A. M.,
+Ribeiro, A. H., Pedregosa, F., van Mulbregt, P., and SciPy 1.0 Contributors: SciPy 1.0: fundamental algorithms for
+scientific computing in Python, Nat. Methods, 17, 261–272,
+<a href="https://doi.org/10.1038/s41592-019-0686-2" target="_blank">https://doi.org/10.1038/s41592-019-0686-2</a>, 2020.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib55"><label>55</label><mixed-citation>
+      Wesche, C. and Dierking, W.: Iceberg signatures and detection in SAR images
+in two test regions of the Weddell Sea, Antarctica, J. Glaciol., 58,
+325–339, <a href="https://doi.org/10.3189/2012J0G11J020" target="_blank">https://doi.org/10.3189/2012J0G11J020</a>, 2012.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib56"><label>56</label><mixed-citation>
+      Wesche, C. and Dierking, W.: Estimating iceberg paths using a wind-driven drift model, Cold Reg. Sci. Technol., 125, 31–39, <a href="https://doi.org/10.1016/j.coldregions.2016.01.008" target="_blank">https://doi.org/10.1016/j.coldregions.2016.01.008</a>, 2016.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib57"><label>57</label><mixed-citation>
+      Willis, C. J., Macklin, J. T., Partington, K. C., Teleki, K. A., Rees, W.
+G., and Williams, R. G.: Iceberg detection using ERS-1 Synthetic Aperture
+Radar, Int. J. Remote Sens., 17, 1777–1795,
+<a href="https://doi.org/10.1080/01431169608948739" target="_blank">https://doi.org/10.1080/01431169608948739</a>, 1996.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib58"><label>58</label><mixed-citation>
+      Yang, W., Li, Y., Liu, W., Chen, J., Li, C., and Men, Z.: Scalloping
+Suppression for ScanSAR Images Based on Modified Kalman Filter With
+Preprocessing, IEEE T. Geosci. Remote, 59, 7535–7546,
+<a href="https://doi.org/10.1109/TGRS.2020.3034098" target="_blank">https://doi.org/10.1109/TGRS.2020.3034098</a>, 2021.
+
+    </mixed-citation></ref-html>
+<ref-html id="bib1.bib59"><label>59</label><mixed-citation>
+      Zakharov, I., Power, D., Howell, M., and Warren, S.: Improved detection of
+icebergs in sea ice with RADARSAT-2 polarimetric data, in: 2017 IEEE International Geoscience and Remote Sensing Symposium (IGARSS), Fort Worth, TX, USA, 2017, 2294–2297, <a href="https://doi.org/10.1109/IGARSS.2017.8127448" target="_blank">https://doi.org/10.1109/IGARSS.2017.8127448</a>, 2017.
+
+    </mixed-citation></ref-html>--></article>

@@ -731,5 +731,22 @@ def thor_compare(
 THOR_JOB_NAME = "iceberg-alley-thor"
 
 
+@app.command("bench-smoke")
+def bench_smoke(
+    force: Annotated[bool, typer.Option(help="Redo the multilook and ENL estimate.")] = False,
+    report: Annotated[Path, typer.Option(help="Counts table (Markdown).")] = Path(
+        "benchmarks/m0_smoke.md"),
+    config: ConfigOption = DEFAULT_CONFIG,
+) -> None:
+    """Stage 2 / 0c: all reference CFAR detectors on `benchmark.smoke.scene` at one PFA.
+
+    Runs the GPL-3.0 library in the `cfar-bench` env (`benchmark.cfar_env_python`).
+    """
+    from iceberg_sar.benchmark.smoke import run_smoke
+
+    cfg = load_config(config)
+    typer.echo(f"ok  {run_smoke(cfg, cfg.root / report, force)}")
+
+
 if __name__ == "__main__":
     app()

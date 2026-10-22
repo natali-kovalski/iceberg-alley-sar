@@ -289,6 +289,43 @@ thor:
     ice_bins_km: [0, 5, 20, 1000]     # truth distance to (buffered) pack ice
     incidence_bins_deg: [29, 35, 40, 47]
 
+benchmark:
+  # Stage 2: published CFAR detectors (Færch et al. 2023, The Cryosphere 17, 5335). The GPL-3.0
+  # library runs in its own env through external/cfar_runner/run_cfar.py, files in and out.
+  # Library behaviour behind these settings: benchmarks/cfar_api_notes.md.
+  cfar_env_python: external/cfar-bench/Scripts/python.exe
+  cfar_runner: external/cfar_runner/run_cfar.py
+  out_dir: data/benchmark
+  window_limit_px: 41       # library stencil is +-20 px; wider windows are silently cropped
+  merge: AND                # HH/HV merge for gamma, lognorm, k (paper sec. 3.3)
+  minsize_px: 2             # library drops objects smaller than this (paper: no 1-px objects)
+  max_object_px: 500        # paper sec. 3.3: larger objects dropped as processing errors
+  object_connectivity: 4    # same as the library's small-object filter
+  masked_as_nan: true       # keep masked pixels out of the clutter ring (library checks the centre only)
+  min_ring_fraction: 0.5    # skip pixels whose ring is mostly masked, as cfar.min_background_fraction; 0 = as-is
+  # per_band: gamma / K use each band's own ENL (HyP3 HV water ENL << HH). single: the
+  # library's one ENL for both (smoke.enl_combine). Wishart always takes the single value.
+  enl_mode: per_band
+  # Window diameters in metres -> nearest odd pixel count per raster (360 / 520 m = 9 / 13 px at 40 m)
+  detectors:
+    gamma:    {inner_m: 360, outer_m: 520}
+    lognorm:  {inner_m: 360, outer_m: 520}
+    k:        {inner_m: 360, outer_m: 520}
+    nis:      {inner_m: 360, outer_m: 520}
+    wishart:  {inner_m: 360, outer_m: 520}
+    # iDPolRAD: test / training window, 3x3 / 57x57 px at 40 m in the paper. 57 px exceeds the
+    # 41 px stencil, so the library crops it to 41x41 (as it must have for the paper).
+    idpolrad: {inner_m: 120, outer_m: 2280, allow_window_crop: true}
+  smoke:                    # Milestone 0c: all detectors on one IW frame
+    scene: S1A_IW_20190429T094108_DHP_RTC10_G_gpuned_671B
+    multilook: 4            # 10 m -> 40 m, mean of linear intensity
+    multilook_min_valid: 1.0  # share of the 4x4 block that must be valid
+    pfa: 1.0e-9             # total PFA (per channel 3.16e-5 for AND)
+    enl_box_m: 2000         # side of the open-water boxes the ENL is estimated in
+    enl_box: auto           # auto = the median-ENL box among fully valid boxes; or [W, S, E, N] in EPSG:4326
+    enl_combine: min        # the single ENL (Wishart, or all in enl_mode single): min, mean, HH or HV
+    quicklook_max_px: 2400
+
 output:
   crs: EPSG:4326
 

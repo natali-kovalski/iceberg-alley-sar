@@ -85,6 +85,11 @@ iceberg-alley-sar/
 - **Milestone 7 (branch `milestone7-thor-first`, 2026-10-15):** viewer is THOR-first (7a), `run` runs THOR +
   CFAR with a skip path (7b), `thor-fetch-head` pulls the head from a GitHub release pinned by SHA-256 (7c),
   screenshots retaken (7d). Head checkpoints now load with `weights_only=True`.
+- **Stage 2 / Milestone 0 (branch `Establishing-benchmark`, 2026-10-21): 0a–0c done** (0d is mine).
+  `cfar-bench` is a uv venv (no conda), Python 3.10.9, library at commit `4136b4c`
+  (`benchmarks/ENVIRONMENT.md`). API quirks (dB input, NaN masking, 41 px stencil, K LUT index)
+  in `benchmarks/cfar_api_notes.md`. `bench-smoke` runs all six detectors on 2019-04-29 at 40 m
+  (`benchmarks/m0_smoke.md`). 40 m HH/HV ENLs are 6.0 / 1.8, so gamma/K run with per-band ENL (`benchmark.enl_mode`, decided 2026-10-22).
 - **Milestones 0–3: done.** Search, HyP3 RTC (10 m), land + pack-ice masks, CA-CFAR on HV with strip rejection and an HH co-pol check, GeoJSON detections, and the Vue + Cesium viewer.
 - **Scenes:** spring 2025 (2025-05-02, 05-08, 05-14) in the viewer, checked against NAIS charts. Spring 2019 (2019-04-15, 04-29) and 2020-06-10 for point-level validation.
 - **Validation (beyond the plan):** 78% recall (207/267) against same-pass IIP analyst labels on 2019-04-29, median offset 67 m (IIP positions are truncated to 0.1'; corrected to cell centres). Precision is not measurable without AIS. Large bergs (>120 m) are missed: their grown blobs exceed `max_structure_m` (the ice-strip rule). See `docs/validation-findings.md`.
@@ -107,6 +112,7 @@ iceberg-alley-sar/
   PFA sweep runs in one pass (`detect_raster_multi`); `component_table` stats now reduce over
   labelled pixels only (same output, much faster). Not done: 4x4 patches, AIS precision.
 
+#### Stage 1
 ## Milestones
 
 ### Milestone 0: Setup (short)
@@ -369,3 +375,213 @@ CA-CFAR as the baseline; the viewer and `cli.py run` still treat the CFAR as pri
   A `--detectors thor` run still preprocesses, but the CZML lists scenes by their CFAR output.
 - 7d: only the Project Brief v2 deck (slide 11) holds the full screenshot; the other decks use a
   globe-only crop that 7a didn't change. The deck's PDF was re-exported with PowerPoint.
+
+
+## Stage 2: Establishing Benchmark
+
+Goal: validate my detectors against published, peer-reviewed CFAR detectors on a
+scene with independent optical ground truth, before choosing a research direction.
+Reference: Færch et al. 2023, "Iceberg detection in Sentinel-1 and ALOS-2 SAR
+imagery using CFAR detectors" (The Cryosphere 17, 5335). Code:
+github.com/LaustFaerch/cfar-object-detection (GPL-3.0, Zenodo 10.5281/zenodo.11504039).
+Milestone numbering restarts at 0 for Stage 2. Stage 1 milestones stay as they are.
+
+### Stage 2 conventions
+
+- New code lives in `src/iceberg_sar/benchmark/` (`adapter.py`, `pfa.py`,
+  `preprocess.py`, `landmask.py`, `labels.py`, `sweep.py`, `score.py`, `plots.py`).
+  Parameters go in a `benchmark:` block in `config.yaml`. Nothing hardcoded.
+- The GPL-3.0 CFAR library is NEVER imported into `src/iceberg_sar/` and never
+  copied into this repo. It runs in its own environment, called through a small
+  runner script in `external/cfar_runner/` (own LICENSE file, GPL-3.0), which
+  talks to the main package through files only: GeoTIFF in, GeoTIFF/GeoJSON out.
+- Benchmark inputs (committed to the repo):
+  - `benchmarks/faerch2023/scenes.csv`: scene info for the benchmark (Sentinel-1 EW
+    and Sentinel-2 scenes from Table 1 of the paper).
+  - `benchmarks/faerch2023/faerch2023.xml`: the paper as full-text JATS XML
+    (Færch et al. 2023, The Cryosphere, CC BY 4.0). This is the source of truth
+    for processing steps, parameters and published results. Read it with an XML
+    parser, don't rely on memory of the paper, and don't fetch it from the web.
+- Generated outputs go under `data/benchmark/faerch2023/` (gitignored). Never
+  commit scenes, masks, labels or detection rasters.
+- Published results go into `benchmarks/faerch2023/reference.yaml`, parsed from
+  Tables 3 and 5 in `faerch2023.xml`. Each entry records its table number and row.
+  Show me the result before using it; I check it against the paper.
+  Never fill in a value from memory. If something isn't in the XML, stop and ask.
+- Fig. 6 curves come only from `benchmarks/faerch2023/reference_fig6.csv`, which I
+  digitize myself. If the file doesn't exist, skip the curve overlay and compare
+  against the tables only.
+- Explain SAR-specific concepts briefly when they first come up (ENL, PFA
+  correction, multilooking). One or two sentences, not a lecture.
+- I'm on Windows 11 (RTX 3070 Laptop 8 GB, 16 GB RAM). Paths via pathlib,
+  no bash-only scripts.
+
+### Milestone 0: Benchmark environment
+
+#### 0a: Run the reference code as-is
+- Clone cfar-object-detection to `external/cfar-object-detection/` (gitignored).
+- Create a separate conda env `cfar-bench` from the repo's requirements.
+  Do not install it into the main project env (Numba/NumPy pins may clash).
+- Run `examples.ipynb` end to end. Record the exact repo commit hash and package
+  versions in `benchmarks/ENVIRONMENT.md`.
+- Read the README and code, and write `benchmarks/cfar_api_notes.md`: the detector
+  names and function signatures, expected input (linear intensity vs dB, band order,
+  dtype), how the mask is passed, the units of `wi`/`wo`, the 41 px window limit,
+  and how ENL is supplied or estimated. Cross-check the detector list against the
+  detectors named in `faerch2023.xml`.
+- **Done when:** the notebook runs cleanly and the API notes list every
+  detector the paper uses with its call signature.
+
+#### 0b: Thin adapter
+- `external/cfar_runner/run_cfar.py` (runs in `cfar-bench`): CLI that takes an
+  input GeoTIFF (HH, HV bands, linear intensity), a mask GeoTIFF, a detector name,
+  a list of PFA values, `wi`, `wo`, ENL, and writes one binary detection GeoTIFF per
+  PFA, preserving georeferencing.
+- `src/iceberg_sar/benchmark/adapter.py` (main env): builds the inputs, calls the
+  runner with `subprocess` using `benchmark.cfar_env_python` from config, then
+  converts each detection raster into objects (connected components → centroid,
+  area, length) as GeoJSON with the **same schema as the CA-CFAR output**, plus
+  `detector`, `pfa`, `pfa_per_channel`.
+- `pfa.py`: function that converts a target total PFA into per-channel PFA for
+  HH AND HV and for HH OR HV, following sec. 2.1.1 of `faerch2023.xml`. Unit-test
+  it against a hand-worked example that I check.
+- Window sizes are given in metres in config and converted to odd pixel counts
+  from the raster's pixel spacing. Fail loudly if a window exceeds the library limit.
+- **Done when:** one call to `adapter.run(detector, raster, mask, pfas)` returns
+  GeoJSON for any detector, and the PFA unit tests pass.
+
+#### 0c: All detectors on one of my frames
+- Pick one April 2019 IW frame (HyP3 RTC, HH/HV).
+- Window problem: 360 m / 520 m at 10 m is 37 / 53 px, over the 41 px limit.
+  Multilook the frame 4×4 to 40 m (mean of linear intensity) for this run, and
+  note that multilooking raises the ENL.
+- Estimate ENL from a homogeneous open-water box (mean²/variance in linear
+  intensity), store it per scene in a sidecar JSON.
+- Run every detector at one mid-range PFA (e.g. 1e-9 total) with the existing land mask.
+- Output: quicklook PNG per detector with detections over the HV dB image, and a
+  table of detection counts per detector.
+- **Done when:** I can see all detectors' detections side by side on the same frame
+  and the counts table is in `benchmarks/m0_smoke.md`.
+
+#### 0d: (me, not Claude Code) Ask Færch for the labels
+- Email Laust Færch for the 492-berg validation set with drift paths.
+  Milestone 1 can start without them; 1d has a fallback.
+
+### Milestone 1: Reproduce Færch 2023 on C-band
+
+#### 1a: Download the benchmark scenes
+- Read `benchmarks/faerch2023/scenes.csv`, print the parsed scene list, and check
+  it against Table 1 in `faerch2023.xml`. Report any mismatch before downloading.
+- Load the scenes into `benchmark.faerch2023.scenes` in config, generated from
+  the CSV rather than typed by hand.
+- `search.py` gains a `--product-ids` mode for the Copernicus Data Space
+  (CDSE OData API, credentials from `.env`).
+- Download the Sentinel-1 EW GRDM and Sentinel-2 L1C products to
+  `data/benchmark/faerch2023/raw/`, and verify checksums.
+- **Done when:** both products are on disk with checksums verified, and a
+  footprint map PNG shows they overlap.
+
+#### 1b: SNAP preprocessing
+- Write a SNAP GPT graph `benchmarks/faerch2023/s1_ew_preprocess.xml`:
+  Apply-Orbit-File → Remove-GRD-Border-Noise → ThermalNoiseRemoval → Calibration
+  (sigma0, HH and HV) → Ellipsoid-Correction at 40 m. Take the operator choice and
+  settings from the processing description in `faerch2023.xml` and quote the
+  relevant passage in a comment in the graph file.
+- `preprocess.py` calls `gpt` with `-c` cache set from config (~10 GB) and tiles if
+  memory runs out. Output: GeoTIFF, linear sigma0, HH/HV bands, in a UTM CRS.
+- Keep it linear: the CFARs run on linear intensity, dB is for quicklooks only.
+- **Done when:** a quicklook of HH and HV in dB shows the scene with no border-noise
+  stripes, and pixel spacing is 40 m.
+
+#### 1c: Land mask
+- `landmask.py`: OSM land polygons (osmdata.openstreetmap.de, split, EPSG:4326),
+  clipped to the scene, reprojected to the scene's UTM CRS, buffered 500 m
+  (buffer in metres, from config), rasterized to the scene grid.
+- **Done when:** mask overlay quicklook shows the coast fully covered with the buffer.
+
+#### 1d: Ground truth
+- Path A (labels arrive): `labels.py` loads them as-is into GeoJSON, keeps the
+  verified vs interpolated flag and drift info, reports counts (expect 492 total,
+  ~270 confident).
+- Path B (no labels): rebuild from the Sentinel-2 scene with the method as described
+  in `faerch2023.xml` (4-sigma threshold on the optical band). Write the exact
+  steps used, and quote the section followed, in
+  `benchmarks/faerch2023/labels_rebuilt.md`. Every output file and plot from
+  Path B is marked "reconstructed labels".
+- **Done when:** a quicklook shows labels over the SAR image, and the counts
+  table matches the paper (Path A) or is documented with its differences (Path B).
+
+#### 1e: Detector sweep
+- `sweep.py`: every detector × 21 PFA levels (log-spaced 1e-21 to 1e-1), with the
+  paper's windows (360 m guard, 520 m outer) and HH AND HV merging via `pfa.py`.
+- Cache detections per (detector, pfa) as GeoJSON; skip finished runs on restart.
+  The sweep must be resumable, I run it overnight.
+- **Done when:** all detector/PFA combinations exist on disk and a log reports
+  runtime per detector.
+
+#### 1f: Score and compare
+- `score.py`: nearest-object matching between detection objects and labels, one
+  label per detection. Radii from config: 250 m for verified positions, 1789 m for
+  interpolated ones. Recall, precision, F1 per (detector, pfa).
+- Report verified-only and all-labels results separately.
+- Table of F1 at optimum PFA next to `reference.yaml`, with the difference column.
+- Plot F1 vs PFA per detector. If `reference_fig6.csv` exists, overlay the
+  digitized Fig. 6 curves; otherwise plot my curves only.
+- Tolerance from config (`benchmark.repro_tolerance_f1`, start at 0.05).
+- **Done when:** the table and figure are in `docs/faerch2023-reproduction.md`,
+  with each detector marked within or outside tolerance and a short explanation
+  for any that are outside.
+
+### Milestone 2: Validate my CA-CFAR
+
+#### 2a: CA-CFAR on the Færch scene
+- Run my CA-CFAR on the 40 m EW scene under the Milestone 1 protocol: same land mask,
+  same windows (converted to pixels), same labels, same scorer.
+- Map my threshold to a PFA scale so it can sweep the same 21 levels. If my detector
+  isn't parameterized by PFA, sweep its own threshold and plot F1 vs detection count
+  for all detectors instead (both views go in the note).
+- Run two variants: as it is (HV only, with the length rule) and without the
+  length rule.
+- Add both as extra curves to the 1f figure.
+- **Done when:** the 1f figure and table include my CA-CFAR as two extra rows.
+
+#### 2b: Reference detectors on my IW frames
+- Run the gamma and NIS detectors (via the adapter) on all four April 2019 IW frames,
+  multilooked to 40 m as in 0c, with my land/ice masks.
+- Also run my CA-CFAR on the same 40 m frames, so resolution isn't a variable.
+- Compare against IIP labels with `pointval.py` and the existing matching radius.
+  Precision isn't measurable here, so compare **recall at matched detection counts**:
+  sweep PFA / threshold, plot recall vs detections per frame for all three.
+- **Done when:** one recall-vs-detections figure per frame, plus a combined one.
+
+#### 2c: Validation note
+- `docs/cacfar-validation.md`: where my CA-CFAR sits relative to the published
+  detectors on both datasets, and every place it behaves differently (length rule,
+  single-channel HV vs dual-pol merge, window sizes, ENL handling).
+- **Done when:** the note answers, in one page with figures: does my baseline
+  behave like a standard gamma CA-CFAR, and where doesn't it, and why.
+
+### Stage 2 decisions
+- CFAR library stays external, behind a file-based subprocess boundary (GPL-3.0).
+- The paper is read from local JATS XML, never from memory or a web fetch.
+- C-band only: the ALOS-2 scene from the paper is out of scope.
+- Benchmark resolution is 40 m. IW frames are multilooked to 40 m when compared
+  with the reference detectors.
+- Reproduction is judged on F1 at optimum PFA and on curve shape, not single points.
+- ENL per band for gamma / K on our IW frames (`benchmark.enl_mode: per_band`, 2026-10-22):
+  HyP3 HV water has a much lower ENL than HH (1.8 vs 6.0 at 40 m). Wishart keeps one ENL (min).
+  For the Færch EW scene the paper used one ENL (10.7) for both; use `single` there.
+
+### Stage 2 pitfalls
+- Per-channel PFA ≠ final PFA. Always log both.
+- The 1789 m radius makes speckle count as hits at high PFA. Never report
+  all-labels recall without the verified-only number next to it.
+- EW GRDM and IW RTC differ in resolution, ENL, radiometry (sigma0 vs gamma0)
+  and processing. Don't mix them in one table without saying so.
+- Multilooking changes the ENL: re-estimate it after resampling, never reuse the 10 m value.
+- SNAP on 16 GB: set the cache explicitly, close other apps, tile if needed.
+- Numba compiles on first call; don't count that in runtime.
+
+### Stage 2 open questions
+- Did the labels arrive (Path A) or am I rebuilding them (Path B)?
+- If a detector misses tolerance in 1f: is it preprocessing, ENL, or the labels?

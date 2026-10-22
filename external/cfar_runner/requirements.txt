@@ -1,0 +1,12 @@
+# cfar-bench environment (Python 3.10). Exact versions: requirements.lock
+numpy>=1.26,<2
+numba>=0.59,<0.61
+scipy>=1.11,<1.14
+pandas>=2.1,<2.3
+scikit-image>=0.22,<0.25
+rasterio>=1.3,<1.5
+matplotlib>=3.8,<3.10
+# notebook run (0a only)
+nbconvert
+ipykernel
+ipympl

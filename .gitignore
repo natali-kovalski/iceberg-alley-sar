@@ -38,3 +38,8 @@ Thumbs.db
 ~$*
 .vscode/
 .idea/
+
+# Stage 2 benchmark: the GPL-3.0 reference library and its env stay out of the repo
+# (only external/cfar_runner/ is committed)
+external/cfar-object-detection/
+external/cfar-bench/
