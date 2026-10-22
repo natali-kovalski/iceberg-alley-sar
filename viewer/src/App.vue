@@ -10,8 +10,11 @@ import {
   createViewer,
   jumpTo,
   loadDetections,
+  sarImagery,
   sceneAt,
+  setHollowDots,
   type Layers,
+  type SarUpdate,
   type Legend,
   type SceneInfo,
 } from "./scene";
@@ -28,11 +31,20 @@ const showAbout = ref(!storageGet(ABOUT_SEEN));
 // THOR is the detector; the CFAR baseline stays on so "found by both" (dot in ring) reads at a glance.
 const layers = reactive<Layers>({
   thor: true, cfar: true, nearIce: true, seaIce: true, footprints: true, unobserved: true, truth: true,
+  sar: true,
 });
 
 // Plain variables, not refs: Cesium objects must stay out of Vue's reactivity.
 let viewer: Viewer | undefined;
 let dataSource: CzmlDataSource | undefined;
+let updateSar: SarUpdate | undefined;
+
+// SAR image of the pass on screen, and hollow CFAR dots while it shows.
+function syncSar(): void {
+  const scene = scenes.value.find((s) => s.id === currentId.value);
+  updateSar?.(scene, layers.sar);
+  if (dataSource) setHollowDots(dataSource, layers.sar && !!scene?.hasSar);
+}
 
 onMounted(async () => {
   viewer = createViewer(container.value!);
@@ -44,6 +56,7 @@ onMounted(async () => {
     return;
   }
   applyLayers(dataSource, layers);
+  updateSar = sarImagery(viewer);
   viewer.clock.onTick.addEventListener((clock) => {
     const id = sceneAt(scenes.value, clock.currentTime)?.id;
     if (id !== currentId.value) currentId.value = id;
@@ -53,6 +66,7 @@ onMounted(async () => {
 onBeforeUnmount(() => viewer?.destroy());
 
 watch(layers, () => dataSource && applyLayers(dataSource, layers));
+watch([currentId, () => layers.sar], syncSar);
 
 function storageGet(key: string): string | null {
   try {

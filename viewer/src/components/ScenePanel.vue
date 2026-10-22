@@ -24,6 +24,10 @@ const sizeClasses = computed(() => {
 });
 const hasThor = computed(() => props.scenes.some((s) => s.nThor !== undefined));
 const hasTruth = computed(() => props.scenes.some((s) => s.nTruth !== undefined));
+const hasSar = computed(() => props.scenes.some((s) => s.hasSar));
+const currentHasSar = computed(() => current.value?.hasSar ?? false);
+// Over the SAR image the map draws CFAR dots hollow (setHollowDots); the legend follows.
+const hollow = computed(() => layers.value.sar && currentHasSar.value);
 const SPLIT_BADGE: Record<string, string> = { train: "THOR train", val: "THOR val" };
 function splitTitle(s: SceneInfo): string | undefined {
   if (!s.split) return undefined;
@@ -57,20 +61,20 @@ const currentHasIce = computed(() => (current.value ? hasIce(current.value) : pr
 
     <h2>Legend</h2>
     <div v-if="hasThor" class="key"><span class="ring" /> THOR detection, score ≥ {{ legend.thorScore ?? 0.35 }}</div>
-    <div class="key"><span class="dot cfar" /> CA-CFAR <template v-if="hasThor">baseline </template>candidate</div>
-    <div v-if="hasThor" class="key"><span class="ring both"><span class="dot cfar" /></span> found by both</div>
+    <div class="key"><span class="dot cfar" :class="{ hollow }" /> CA-CFAR <template v-if="hasThor">baseline </template>candidate</div>
+    <div v-if="hasThor" class="key"><span class="ring both"><span class="dot cfar" :class="{ hollow }" /></span> found by both</div>
     <div v-if="hasTruth" class="key"><span class="cross">✕</span> IIP analyst label, same pass (THOR training frames)</div>
     <div class="sizes-title">Size = target extent, same classes for both</div>
     <div class="sizes">
       <div v-for="c in sizeClasses" :key="c.label" class="size">
         <span class="slot">
           <span v-if="hasThor" class="ring" :style="{ width: `${c.px}px`, height: `${c.px}px` }" />
-          <span v-else class="dot cfar" :style="{ width: `${c.px}px`, height: `${c.px}px` }" />
+          <span v-else class="dot cfar" :class="{ hollow }" :style="{ width: `${c.px}px`, height: `${c.px}px` }" />
         </span>
         <span>{{ c.label }}</span><span class="muted">{{ c.range }}</span>
       </div>
     </div>
-    <div class="key" :class="{ off: !currentHasIce }"><span class="dot grey" /> within {{ legend.nearIceKm }} km of pack ice (either detector)</div>
+    <div class="key" :class="{ off: !currentHasIce }"><span class="dot grey" :class="{ hollow }" /> within {{ legend.nearIceKm }} km of pack ice (either detector)</div>
     <div class="key" :class="{ off: !currentHasIce }"><span class="swatch ice" /> pack-ice mask</div>
     <div class="key"><span class="swatch footprint" /> scene footprint</div>
     <div v-if="hasCoverage" class="key"><span class="swatch aoi" /> AOI, dimmed where the pass didn't image it</div>
@@ -102,6 +106,9 @@ const currentHasIce = computed(() => (current.value ? hasIce(current.value) : pr
     <label :class="{ off: !currentHasIce }">
       <input v-model="layers.seaIce" type="checkbox" :disabled="!currentHasIce" /> Pack-ice mask
       <span v-if="!currentHasIce" class="muted">(none in this scene)</span>
+    </label>
+    <label v-if="hasSar" title="Sentinel-1 HV backscatter, −36 to −14 dB, 20 m. Only some passes have it.">
+      <input v-model="layers.sar" type="checkbox" :disabled="!currentHasSar" /> SAR image (HV)
     </label>
     <label><input v-model="layers.footprints" type="checkbox" /> Scene footprint</label>
     <label v-if="hasCoverage"><input v-model="layers.unobserved" type="checkbox" /> Dim area not imaged</label>
@@ -162,6 +169,8 @@ label.off { cursor: default; }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 1px solid #000; flex: none; }
 .dot.cfar { background: rgb(251, 162, 56); }
 .dot.grey { width: 8px; height: 8px; background: #969696; }
+.dot.hollow { width: 8px; height: 8px; background: transparent; border: 2px solid rgb(251, 162, 56); }
+.dot.grey.hollow { width: 6px; height: 6px; border-color: #969696; }
 .sizes-title { margin: 8px 0 2px; }
 .sizes { display: flex; gap: 10px; margin-bottom: 6px; }
 .size { display: flex; flex-direction: column; align-items: center; font-size: 11px; }
@@ -173,5 +182,6 @@ label.off { cursor: default; }
 .ring { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 2px solid rgb(0, 229, 255); flex: none; }
 .ring.both { display: inline-flex; align-items: center; justify-content: center; width: 12px; height: 12px; }
 .ring.both .dot { width: 8px; height: 8px; }
+.ring.both .dot.hollow { width: 6px; height: 6px; }
 .note { margin: 10px 0 0; font-size: 11px; color: #8fa3bb; }
 </style>

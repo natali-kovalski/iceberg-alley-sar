@@ -2,10 +2,13 @@
 // Kept out of Vue reactivity on purpose: Cesium objects must not be wrapped in proxies.
 import {
   ArcGISTiledElevationTerrainProvider,
+  Color,
+  ConstantProperty,
   CzmlDataSource,
   Credit,
   ImageryLayer,
   Ion,
+  IonImageryProvider,
   JulianDate,
   Rectangle,
   Terrain,
@@ -67,6 +70,7 @@ export interface SceneInfo {
   // trained on. Undefined for every other pass.
   split?: string;
   nTruth?: number; // IIP analyst labels shown on a training frame
+  hasSar?: boolean; // at least one frame has SAR imagery on ion
 }
 
 export interface Compare {
@@ -89,6 +93,7 @@ export interface Layers {
   footprints: boolean;
   unobserved: boolean;
   truth: boolean;
+  sar: boolean; // SAR backscatter image under the detections
 }
 
 function esriImagery(): ImageryLayer {
@@ -101,20 +106,18 @@ function esriImagery(): ImageryLayer {
   );
 }
 
-// Cesium World Terrain with an ion token; otherwise Esri's World Elevation, which needs no key.
-function worldTerrain(hasIonToken: boolean): Terrain {
-  return hasIonToken
-    ? Terrain.fromWorldTerrain()
-    : new Terrain(ArcGISTiledElevationTerrainProvider.fromUrl(ESRI_ELEVATION_URL));
+// Esri World Elevation needs no key. Terrain stays off ion even with a token, so the free ion
+// streaming quota goes to the SAR imagery.
+function worldTerrain(): Terrain {
+  return new Terrain(ArcGISTiledElevationTerrainProvider.fromUrl(ESRI_ELEVATION_URL));
 }
 
 export function createViewer(container: HTMLElement): Viewer {
-  const token = import.meta.env.VITE_CESIUM_ION_TOKEN;
-  if (token) Ion.defaultAccessToken = token;
+  if (CESIUM_ION_TOKEN) Ion.defaultAccessToken = CESIUM_ION_TOKEN;
 
   const viewer = new Viewer(container, {
     baseLayer: esriImagery(),
-    terrain: worldTerrain(Boolean(token)),
+    terrain: worldTerrain(),
     baseLayerPicker: false,
     geocoder: false,
     navigationHelpButton: false,
@@ -215,6 +218,8 @@ export async function loadDetections(viewer: Viewer): Promise<{
     s.split ??= f.split;
   }
   const scenes = [...byDate.values()];
+  const sar = sarAssets();
+  for (const s of scenes) s.hasSar = s.frames.some((f) => sar.has(f));
   const compare = await loadCompare(manifest.compare_index);
   for (const s of scenes) s.compare = compare.get(s.date);
   const l = dataSource.entities.getById("legend");
@@ -268,6 +273,78 @@ export function applyLayers(dataSource: CzmlDataSource, layers: Layers): void {
     else if (e.id.startsWith("footprint/")) e.show = layers.footprints;
     else if (e.id.startsWith("unobserved/")) e.show = layers.unobserved;
   }
+}
+
+// A filled CFAR dot covers the target it marks. Over the SAR image the dots are drawn hollow, at
+// the same outer size (Cesium draws pixelSize + 2 * outlineWidth), so the berg shows inside and
+// "found by both" becomes an orange circle inside the THOR ring.
+const HOLLOW_OUTLINE_PX = 2;
+const HOLLOW_FILL = Color.BLACK.withAlpha(1 / 255); // near-transparent keeps it clickable
+interface DotStyle {
+  color: Color;
+  outlineColor: Color;
+  outlineWidth: number;
+  pixelSize: number;
+}
+const dotStyles = new WeakMap<Entity, DotStyle>();
+let dotsHollow = false;
+
+export function setHollowDots(dataSource: CzmlDataSource, hollow: boolean): void {
+  if (hollow === dotsHollow) return;
+  dotsHollow = hollow;
+  const t = JulianDate.now();
+  for (const e of dataSource.entities.values) {
+    const p = e.point;
+    if (!p || !e.id.startsWith("det/")) continue;
+    let s = dotStyles.get(e);
+    if (!s) {
+      s = {
+        color: p.color?.getValue(t),
+        outlineColor: p.outlineColor?.getValue(t),
+        outlineWidth: p.outlineWidth?.getValue(t) ?? 0,
+        pixelSize: p.pixelSize?.getValue(t) ?? 1,
+      };
+      dotStyles.set(e, s);
+    }
+    const outer = s.pixelSize + 2 * s.outlineWidth;
+    p.color = new ConstantProperty(hollow ? HOLLOW_FILL : s.color);
+    p.outlineColor = new ConstantProperty(hollow ? s.color : s.outlineColor);
+    p.outlineWidth = new ConstantProperty(hollow ? HOLLOW_OUTLINE_PX : s.outlineWidth);
+    p.pixelSize = new ConstantProperty(hollow ? Math.max(1, outer - 2 * HOLLOW_OUTLINE_PX) : s.pixelSize);
+  }
+}
+
+// SAR backscatter tiled by Cesium ion, one asset per frame (test of the ion route: the mapping
+// lives in SAR_ION_ASSETS for now, and moves to the manifest if ion is kept).
+function sarAssets(): Map<string, number> {
+  if (!CESIUM_ION_TOKEN) return new Map();
+  return new Map(
+    SAR_ION_ASSETS.split(",")
+      .map((pair) => pair.trim().split("="))
+      .filter(([id, asset]) => id && Number.isInteger(Number(asset)))
+      .map(([id, asset]) => [id, Number(asset)]),
+  );
+}
+
+export type SarUpdate = (scene: SceneInfo | undefined, on: boolean) => void;
+
+// Shows the SAR layers of the current pass only. A frame's layer is created the first time its
+// pass is shown, so visitors stream only the passes they look at.
+export function sarImagery(viewer: Viewer): SarUpdate {
+  const assets = sarAssets();
+  const layers = new Map<string, ImageryLayer>();
+  return (scene, on) => {
+    for (const [id, layer] of layers) layer.show = on && !!scene?.frames.includes(id);
+    if (!on || !scene) return;
+    for (const frame of scene.frames) {
+      const asset = assets.get(frame);
+      if (asset === undefined || layers.has(frame)) continue;
+      const layer = ImageryLayer.fromProviderAsync(IonImageryProvider.fromAssetId(asset));
+      layer.errorEvent.addEventListener((e) => console.warn(`SAR imagery ${frame} (ion ${asset}):`, e));
+      viewer.imageryLayers.add(layer); // above the basemap; CZML entities draw on top of imagery
+      layers.set(frame, layer);
+    }
+  };
 }
 
 export function sceneAt(scenes: SceneInfo[], time: JulianDate): SceneInfo | undefined {

@@ -1,11 +1,10 @@
 /// <reference types="vite/client" />
 
 declare const CESIUM_BASE_URL: string;
-
-interface ImportMetaEnv {
-  /** Optional Cesium ion token. Without it the viewer uses Esri imagery + Esri World Elevation terrain and no ion services. */
-  readonly VITE_CESIUM_ION_TOKEN?: string;
-}
+/** Cesium ion token from the repo-root .env or the build env; "" = no ion (no SAR imagery layer). */
+declare const CESIUM_ION_TOKEN: string;
+/** SAR imagery tiled by ion: "<scene_id>=<asset id>,..."; "" = none. */
+declare const SAR_ION_ASSETS: string;
 
 declare module "*.vue" {
   import type { DefineComponent } from "vue";
