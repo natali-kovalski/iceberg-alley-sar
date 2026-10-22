@@ -48,11 +48,19 @@ def init_dirs(config: ConfigOption = DEFAULT_CONFIG) -> None:
 def search(
     config: ConfigOption = DEFAULT_CONFIG,
     pol: Annotated[str | None, typer.Option(help="Filter, e.g. 'HH+HV' or 'VV+VH'.")] = None,
+    product_ids: Annotated[str | None, typer.Option(
+        "--product-ids", help="Comma-separated product names: look them up on CDSE instead "
+        "of searching ASF over the AOI.")] = None,
 ) -> None:
     """List Sentinel-1 GRD scenes over the AOI and save them as GeoJSON footprints."""
-    from iceberg_sar.search import save_scenes, search_scenes
+    from iceberg_sar.search import cdse_lookup, save_scenes, search_scenes
 
     cfg = load_config(config)
+    if product_ids:
+        url = cfg.section("benchmark")["faerch2023"]["cdse"]["catalogue_url"]
+        found = cdse_lookup([p.strip() for p in product_ids.split(",")], url)
+        typer.echo(found.drop(columns="geometry").to_string())
+        return
     gdf = search_scenes(cfg)
     if pol:
         gdf = gdf[gdf.polarization == pol]
@@ -746,6 +754,85 @@ def bench_smoke(
 
     cfg = load_config(config)
     typer.echo(f"ok  {run_smoke(cfg, cfg.root / report, force)}")
+
+
+@app.command("bench-scenes")
+def bench_scenes(
+    write_config: Annotated[bool, typer.Option(
+        help="Write the scene list into config.yaml (benchmark.faerch2023.scenes).")] = False,
+    config: ConfigOption = DEFAULT_CONFIG,
+) -> None:
+    """Stage 2 / 1a: parse scenes.csv and check it against Table 1 of faerch2023.xml."""
+    from iceberg_sar.benchmark.scenes import check_scenes, load_scenes, table1, write_config_block
+
+    cfg = load_config(config)
+    fc = cfg.section("benchmark")["faerch2023"]
+    scenes = load_scenes(cfg.root / fc["scenes_csv"])
+    for s in scenes:
+        typer.echo(f"{s['sensor']:<11} {s['source']:<5} {s['product_id']}")
+    checks = check_scenes(scenes, table1(cfg.root / fc["paper_xml"]))
+    bad = [c for c in checks if not c.ok]
+    typer.echo(f"\n{len(checks) - len(bad)}/{len(checks)} checks agree with Table 1.")
+    for c in bad:
+        typer.echo(f"MISMATCH  {c.product}\n          {c.field}: paper {c.paper!r}, ours {c.ours!r}")
+    if write_config:
+        write_config_block(cfg.root / Path(config).name, scenes)
+        typer.echo(f"ok  benchmark.faerch2023.scenes written ({len(scenes)} products)")
+
+
+@app.command("bench-download")
+def bench_download(config: ConfigOption = DEFAULT_CONFIG) -> None:
+    """Stage 2 / 1a: download the benchmark products (MD5-checked) and map their footprints."""
+    from iceberg_sar.benchmark.download import download_all, footprint_map, footprints
+    from iceberg_sar.benchmark.landmask import land_polygons
+
+    cfg = load_config(config)
+    for pid, path in download_all(cfg, log=typer.echo).items():
+        typer.echo(f"ok  {pid} -> {path}")
+    fp = footprints(cfg)
+    land = land_polygons(cfg, tuple(fp.total_bounds), "EPSG:4326")
+    png = footprint_map(fp, cfg.root / cfg.section("benchmark")["faerch2023"]["footprint_png"],
+                        land)
+    typer.echo(f"ok  {png}")
+
+
+@app.command("bench-preprocess")
+def bench_preprocess(
+    force: Annotated[bool, typer.Option(help="Re-run SNAP and the split.")] = False,
+    config: ConfigOption = DEFAULT_CONFIG,
+) -> None:
+    """Stage 2 / 1b: SNAP GPT on the Sentinel-1 EW scene -> 40 m linear sigma0 HH/HV."""
+    from iceberg_sar.benchmark.reproduce import preprocess_scene
+
+    info = preprocess_scene(load_config(config), force, log=typer.echo)
+    typer.echo(f"grid {info['shape']} px, spacing {info['pixel_m']} m")
+    if "hv_zero_in_swath" in info:
+        typer.echo(f"HV clipped to 0 by thermal noise removal: {info['hv_zero_in_swath']:.2%}")
+    for png in info["quicklooks"]:
+        typer.echo(f"ok  {png}")
+
+
+@app.command("bench-landmask")
+def bench_landmask(config: ConfigOption = DEFAULT_CONFIG) -> None:
+    """Stage 2 / 1c: OSM land polygons + buffer on the scene grid, and the open-water ENL."""
+    from iceberg_sar.benchmark.reproduce import build_land_mask
+
+    res = build_land_mask(load_config(config), log=typer.echo)
+    typer.echo(f"land (in swath) {res['land_px_in_swath']} px, valid {res['valid_px']} px")
+    typer.echo(f"ok  {res['overlay']}")
+
+
+@app.command("bench-labels")
+def bench_labels(
+    force_s2: Annotated[bool, typer.Option(help="Redo the Sentinel-2 detection (cached).")] = False,
+    config: ConfigOption = DEFAULT_CONFIG,
+) -> None:
+    """Stage 2 / 1d Path B: rebuild labels from Sentinel-2 (RECONSTRUCTED LABELS)."""
+    from iceberg_sar.benchmark.pathb import run_pathb
+
+    res = run_pathb(load_config(config), force_s2, log=typer.echo)
+    for f in [*res["files"].values(), *res["pngs"].values(), res["report"]]:
+        typer.echo(f"ok  {f}")
 
 
 if __name__ == "__main__":

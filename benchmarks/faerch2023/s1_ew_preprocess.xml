@@ -1,0 +1,106 @@
+<!--
+  Færch et al. 2023 (The Cryosphere 17, 5335), sec. 3.1 "Data description", as given in
+  benchmarks/faerch2023/faerch2023.xml:
+
+    "The Sentinel-1 image was pre-processed using the Sentinel Applications Platform (SNAP).
+     The processing steps were orbit file application, grd-border-noise removal, thermal noise
+     removal, calibration, and ellipsoid correction to 40 m pixel spacing."
+
+  and, on resampling (same section):
+
+    "The resampling was carried out using a nearest-neighbor interpolation to avoid averaging
+     pixel intensities."
+
+  Operator choices where the paper leaves them open (decided 2026-10-22, SNAP 14.0.0):
+  - Ellipsoid correction: Ellipsoid-Correction-RD (Range-Doppler with the scene's average
+    height). Ellipsoid-Correction-GG has no pixel-spacing parameter, so it cannot give the
+    paper's 40 m. nodataValueAtSea=false, or the operator blanks the ocean.
+  - Calibration: sigma0 only (the CFARs run on linear sigma0 intensity).
+  - Thermal noise removal: SNAP defaults (negative values clipped to 0).
+  - Map projection: ${crs} from config (UTM 20N, the Sentinel-2 tiles' grid). The paper's
+    final grid was a local polar stereographic projection, chosen for its C- vs L-band
+    comparison.
+
+  Run through `python -m iceberg_sar.cli bench-preprocess`, which fills in the ${...} variables.
+-->
+<graph id="faerch2023_s1_ew_preprocess">
+  <version>1.0</version>
+  <node id="Read">
+    <operator>Read</operator>
+    <parameters>
+      <file>${input}</file>
+    </parameters>
+  </node>
+  <node id="Apply-Orbit-File">
+    <operator>Apply-Orbit-File</operator>
+    <sources>
+      <sourceProduct refid="Read"/>
+    </sources>
+    <parameters>
+      <orbitType>Sentinel Precise (Auto Download)</orbitType>
+      <polyDegree>3</polyDegree>
+      <continueOnFail>false</continueOnFail>
+    </parameters>
+  </node>
+  <node id="Remove-GRD-Border-Noise">
+    <operator>Remove-GRD-Border-Noise</operator>
+    <sources>
+      <sourceProduct refid="Apply-Orbit-File"/>
+    </sources>
+    <parameters>
+      <selectedPolarisations>HH,HV</selectedPolarisations>
+      <borderLimit>500</borderLimit>
+      <trimThreshold>0.5</trimThreshold>
+    </parameters>
+  </node>
+  <node id="ThermalNoiseRemoval">
+    <operator>ThermalNoiseRemoval</operator>
+    <sources>
+      <sourceProduct refid="Remove-GRD-Border-Noise"/>
+    </sources>
+    <parameters>
+      <selectedPolarisations>HH,HV</selectedPolarisations>
+      <removeThermalNoise>true</removeThermalNoise>
+      <reIntroduceThermalNoise>false</reIntroduceThermalNoise>
+      <clipNegativeValues>true</clipNegativeValues>
+    </parameters>
+  </node>
+  <node id="Calibration">
+    <operator>Calibration</operator>
+    <sources>
+      <sourceProduct refid="ThermalNoiseRemoval"/>
+    </sources>
+    <parameters>
+      <selectedPolarisations>HH,HV</selectedPolarisations>
+      <outputSigmaBand>true</outputSigmaBand>
+      <outputGammaBand>false</outputGammaBand>
+      <outputBetaBand>false</outputBetaBand>
+      <outputImageScaleInDb>false</outputImageScaleInDb>
+    </parameters>
+  </node>
+  <node id="Ellipsoid-Correction-RD">
+    <operator>Ellipsoid-Correction-RD</operator>
+    <sources>
+      <sourceProduct refid="Calibration"/>
+    </sources>
+    <parameters>
+      <sourceBands>Sigma0_HH,Sigma0_HV</sourceBands>
+      <pixelSpacingInMeter>${pixelSpacing}</pixelSpacingInMeter>
+      <mapProjection>${crs}</mapProjection>
+      <imgResamplingMethod>${resampling}</imgResamplingMethod>
+      <nodataValueAtSea>false</nodataValueAtSea>
+      <saveSelectedSourceBand>true</saveSelectedSourceBand>
+      <saveIncidenceAngleFromEllipsoid>true</saveIncidenceAngleFromEllipsoid>
+    </parameters>
+  </node>
+  <node id="Write">
+    <operator>Write</operator>
+    <sources>
+      <sourceProduct refid="Ellipsoid-Correction-RD"/>
+    </sources>
+    <parameters>
+      <file>${output}</file>
+      <formatName>GeoTIFF-BigTIFF</formatName>
+    </parameters>
+  </node>
+</graph>

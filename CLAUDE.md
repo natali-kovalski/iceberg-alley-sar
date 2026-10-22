@@ -90,6 +90,24 @@ iceberg-alley-sar/
   (`benchmarks/ENVIRONMENT.md`). API quirks (dB input, NaN masking, 41 px stencil, K LUT index)
   in `benchmarks/cfar_api_notes.md`. `bench-smoke` runs all six detectors on 2019-04-29 at 40 m
   (`benchmarks/m0_smoke.md`). 40 m HH/HV ENLs are 6.0 / 1.8, so gamma/K run with per-band ENL (`benchmark.enl_mode`, decided 2026-10-22).
+- **Stage 2 / Milestone 1 (branch `Establishing-benchmark`, 2026-10-22): 1a–1d done (1d as Path B), 1e–1f not started.**
+  Commands: `bench-scenes`, `bench-download`, `bench-preprocess`, `bench-landmask`, `bench-labels`.
+  - 1a: `scenes.csv` checked against Table 1. Open mismatches: S1 orbit (paper 028068, product
+    027966 / rel. 069) and S2 rel. orbit (paper R068, product R111). S1 EW GRDH (slice 10:27:30) came
+    from ASF (no CDSE login in `.env`; CDSE download is used once `CDSE_USERNAME/PASSWORD` exist).
+    S2 is the original N0207 product from Google's public bucket (CDSE only has N0500). The S1
+    slice is the last of the pass and covers 71 % of the S2 area.
+  - 1b: SNAP 14 at `%LOCALAPPDATA%\Programs\esa-snap` (installed 2026-10-22). Ellipsoid-Correction-RD
+    (GG has no pixel spacing), nearest neighbour, 40 m, UTM 20N; `nodataValueAtSea=false` is required.
+  - 1c: osmdata.openstreetmap.de was unreachable, so land comes from the coastline ways in
+    `data/land/newfoundland-and-labrador-261020.osm.pbf` (`benchmark.faerch2023.land.osm_pbf`).
+  - ENL at 40 m on GRDH: HH 2.45 / HV 0.52, vs the paper's 10.7. Suggests the paper used GRDM;
+    open question whether to process GRDM too before 1e.
+  - 1d (RECONSTRUCTED LABELS, `benchmarks/faerch2023/labels_rebuilt.md`): 394 S2 bergs in the overlap
+    vs 492 (large 135 vs 136). Two rules replace the paper's manual check: contrast >= 2x the water
+    and B11 <= 0.035. Weak step: drift. Only 18 verified paths vs 270; most S2 bergs don't stand out
+    in 40 m EW, and looser settings verify chance pairs (mean drift ~7 km = random). Open: wait for
+    Færch's labels, match by hand, or score all-labels only.
 - **Milestones 0–3: done.** Search, HyP3 RTC (10 m), land + pack-ice masks, CA-CFAR on HV with strip rejection and an HH co-pol check, GeoJSON detections, and the Vue + Cesium viewer.
 - **Scenes:** spring 2025 (2025-05-02, 05-08, 05-14) in the viewer, checked against NAIS charts. Spring 2019 (2019-04-15, 04-29) and 2020-06-10 for point-level validation.
 - **Validation (beyond the plan):** 78% recall (207/267) against same-pass IIP analyst labels on 2019-04-29, median offset 67 m (IIP positions are truncated to 0.1'; corrected to cell centres). Precision is not measurable without AIS. Large bergs (>120 m) are missed: their grown blobs exceed `max_structure_m` (the ice-strip rule). See `docs/validation-findings.md`.

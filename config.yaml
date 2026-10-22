@@ -325,6 +325,81 @@ benchmark:
     enl_box: auto           # auto = the median-ENL box among fully valid boxes; or [W, S, E, N] in EPSG:4326
     enl_combine: min        # the single ENL (Wishart, or all in enl_mode single): min, mean, HH or HV
     quicklook_max_px: 2400
+  faerch2023:               # Stage 2 / Milestone 1: reproduce Færch 2023 on the Sentinel-1 EW scene
+    paper_xml: benchmarks/faerch2023/faerch2023.xml
+    scenes_csv: benchmarks/faerch2023/scenes.csv
+    dir: data/benchmark/faerch2023   # raw/, interim/, labels/, quicklooks/ below this
+    # Scene grid: UTM 20N is the five S2 tiles' own CRS, so labels need no reprojection.
+    # The paper resampled to a local polar stereographic grid for its C- vs L-band comparison.
+    crs: EPSG:32620
+    pixel_m: 40
+    cdse:                   # Copernicus Data Space; search is public, download needs CDSE_USERNAME / CDSE_PASSWORD in .env
+      catalogue_url: https://catalogue.dataspace.copernicus.eu/odata/v1/Products
+      token_url: https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token
+      download_url: https://download.dataspace.copernicus.eu/odata/v1/Products({id})/$value
+    # Sentinel-2: CDSE only has the 2022 reprocessing (N0500); Google's public bucket still has the
+    # original 2019 product (N0207), the one the paper could use. Only these files are fetched.
+    s2_bucket_url: https://storage.googleapis.com/storage/v1/b/gcp-public-data-sentinel-2/o
+    s2_files: [_B02.jp2, _B03.jp2, _B04.jp2, _B08.jp2, _B11.jp2, MTD_MSIL1C.xml, MTD_TL.xml, MSK_CLOUDS_B00.gml]
+    footprint_png: data/benchmark/faerch2023/quicklooks/footprints.png
+    snap:                   # 1b: SNAP GPT preprocessing (graph quotes the paper's processing text)
+      gpt: ~/AppData/Local/Programs/esa-snap/bin/gpt.exe   # SNAP 14.0.0, installed 2026-10-22
+      graph: benchmarks/faerch2023/s1_ew_preprocess.xml
+      cache: 6G             # gpt -c; must stay below -Xmx10G in gpt.vmoptions (16 GB RAM)
+      threads: 8
+      resampling: NEAREST_NEIGHBOUR   # paper: nearest neighbour, "to avoid averaging pixel intensities"
+    land:
+      buffer_m: 500         # paper sec. 3.1
+      # Fallback when osmdata.openstreetmap.de is unreachable: land built from the coastline ways
+      # of this Geofabrik extract (same OSM data the land polygons are made from).
+      osm_pbf: data/land/newfoundland-and-labrador-261020.osm.pbf
+    labels:                 # 1d Path B: labels rebuilt from Sentinel-2 -> RECONSTRUCTED LABELS
+      dir: data/benchmark/faerch2023/labels
+      report: benchmarks/faerch2023/labels_rebuilt.md
+      bands: [B02, B03, B04, B08]   # paper sec. 3.4: sum of the 10 m bands B2, B3, B4, B8
+      n_sigma: 4                    # paper: mean background + 4 standard deviations
+      guard_m: 360                  # window not given for S2; the paper's SAR window is reused
+      outer_m: 520
+      min_ring_fraction: 0.5        # skip pixels whose ring is mostly land / cloud / nodata
+      min_area_px: 2                # 1 px (10 m) objects are mostly noise at 4 sigma
+      max_area_m2: 300000           # paper: one berg >= 360 m long; larger objects are floes / glitches
+      swir_band: B11                # ice is dark in SWIR, clouds are bright
+      # The paper removed artifacts by eye. These two rules stand in for that; both were read off a
+      # gallery of 4-sigma targets on T20VNL (2026-10-22): 4-sigma alone keeps ~55k objects per tile,
+      # almost all wave texture at ~1.3x the water level; bergs have B11 <= 0.026, haze/cloud 0.04-0.09.
+      min_contrast: 2.0             # object peak / ring mean (open water ~0.2 summed reflectance)
+      max_swir: 0.035               # mean B11 TOA reflectance over the object
+      land_buffer_m: 100            # OSM land + 100 m: coastline surf and beaches (the SAR mask is 500 m)
+      cloud_min_area_m2: 1000000    # L1C cloud-mask polygons smaller than this are ignored (bergs get flagged)
+      cloud_buffer_m: 500
+      dedupe_m: 30                  # tiles overlap: one target per object
+      drift:
+        incidence_bin_deg: 0.5      # SAR targets: intensity / median at the same incidence angle
+        sar_threshold_db: 12        # global threshold on that ratio, HH AND HV (8 dB: 88k objects, HV speckle)
+        max_area_px: 500            # paper's object size limit at 40 m
+        search_m: 10000             # max drift per axis; paper mean drift 3953 m
+        bin_m: 100                  # displacement histogram
+        node_spacing_m: 5000
+        neighbourhood_m: 15000      # labels within this of a node share its drift
+        min_node_labels: 5
+        # Labels that must line up with SAR objects at a node's drift. Swept 3/4/6 x SAR rules
+        # (2026-10-22): looser settings "verify" chance alignments (mean drift ~7 km = random in
+        # +-10 km); 6 keeps only matches that several bergs agree on.
+        min_support: 6
+        verify_radius_m: 300        # moved-back label to SAR target, one-to-one
+        radius_verified_m: 250      # paper sec. 3.4 search radii, used by the scorer in 1f
+        radius_interpolated_m: 1789
+        holdout_fraction: 0.1       # paper: interpolation tested on 10 % of the data
+    quicklook_max_px: 2400
+    # >>> scenes: generated from scenes.csv by `bench-scenes --write-config`
+    scenes:
+      - {sensor: Sentinel-1, product_id: S1A_EW_GRDH_1SDH_20190704T102730_20190704T102831_027966_032866_DEF7, source: cdse, start: '2019-07-04T10:27:30'}
+      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VNJ_20190704T190623, source: gcs, start: '2019-07-04T15:36:09'}
+      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VNL_20190704T190623, source: gcs, start: '2019-07-04T15:36:09'}
+      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VPJ_20190704T190623, source: gcs, start: '2019-07-04T15:36:09'}
+      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VPK_20190704T190623, source: gcs, start: '2019-07-04T15:36:09'}
+      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VPL_20190704T190623, source: gcs, start: '2019-07-04T15:36:09'}
+    # <<< scenes
 
 output:
   crs: EPSG:4326
