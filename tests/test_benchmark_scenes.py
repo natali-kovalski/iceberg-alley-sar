@@ -55,10 +55,17 @@ def test_table1_from_xml_and_committed_csv() -> None:
     t = table1(XML)
     assert [r["Sensor"] for r in t] == ["Sentinel-2", "Sentinel-1", "ALOS-2"]
     checks = check_scenes(load_scenes(CSV), t)
-    # The CSV transcribes Table 1 faithfully; only the orbit identifiers disagree with the
-    # products (documented mismatches, see benchmarks/faerch2023/scenes.csv).
-    assert all(c.ok for c in checks if c.field.startswith("csv."))
-    assert {c.field for c in checks if not c.ok} == {"product.abs_orbit", "product.rel_orbit"}
+    # The CSV transcribes Table 1 faithfully, except the tiles added from Fig. 1. Products: the
+    # orbit identifiers disagree, and the GRDM row is not the format Table 1 names.
+    scenes = {s["product_id"]: s for s in load_scenes(CSV)}
+    bad_csv = {c.product for c in checks if c.field.startswith("csv.") and not c.ok}
+    assert bad_csv == {p for p, s in scenes.items() if s["basis"] == "fig1"}
+    assert all(c.field == "csv.tile_orbit" for c in checks
+               if c.field.startswith("csv.") and not c.ok)
+    assert {c.field for c in checks if not c.ok} == {
+        "csv.tile_orbit", "product.abs_orbit", "product.rel_orbit", "product.format"}
+    assert [c.product for c in checks if c.field == "product.format" and not c.ok] == [
+        "S1A_EW_GRDM_1SDH_20190704T102730_20190704T102831_027966_032866_4053"]
 
 
 def test_write_config_block(tmp_path: Path) -> None:

@@ -1,0 +1,18 @@
+kind,name,px_x,px_y,lon,lat,note
+control,s1_top_right,985,419,-56.0259,60.8185,"S1 EW slice corner (CDSE footprint of the 10:27:30 slice); orange box in Fig. 1"
+control,s1_bottom_right,854,1052,-57.8894,57.1901,"S1 EW slice corner (CDSE footprint)"
+control,s1_bottom_left,194,938,-64.7538,57.9177,"S1 EW slice corner (CDSE footprint)"
+control,w1_nain_airport,470,1197,-61.6820,56.5511,"weather station W1; OSM Nominatim aerodrome node"
+control,w2_kangiqsualujjuaq_airport,78,788,-65.9934,58.7118,"weather station W2; OSM Nominatim aerodrome node"
+pink_s2,v1,277,494,,,"outline runs under the inset map here: the S2 area's north edge is not visible"
+pink_s2,v2,199,703,,,
+pink_s2,v3,187,987,,,
+pink_s2,v4,348,994,,,
+pink_s2,v5,341,1155,,,
+pink_s2,v6,535,1165,,,
+pink_s2,v7,737,628,,,
+pink_s2,v8,393,498,,,"outline runs under the inset map here"
+alos2,v1,271,639,,,
+alos2,v2,839,751,,,
+alos2,v3,758,1285,,,"corner partly under the legend box; estimated"
+alos2,v4,159,1201,,,

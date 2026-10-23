@@ -799,12 +799,14 @@ def bench_download(config: ConfigOption = DEFAULT_CONFIG) -> None:
 @app.command("bench-preprocess")
 def bench_preprocess(
     force: Annotated[bool, typer.Option(help="Re-run SNAP and the split.")] = False,
+    s1: Annotated[str | None, typer.Option(
+        help="Sentinel-1 product: GRDH or GRDM (default: benchmark.faerch2023.s1_format).")] = None,
     config: ConfigOption = DEFAULT_CONFIG,
 ) -> None:
     """Stage 2 / 1b: SNAP GPT on the Sentinel-1 EW scene -> 40 m linear sigma0 HH/HV."""
     from iceberg_sar.benchmark.reproduce import preprocess_scene
 
-    info = preprocess_scene(load_config(config), force, log=typer.echo)
+    info = preprocess_scene(load_config(config), force, s1, log=typer.echo)
     typer.echo(f"grid {info['shape']} px, spacing {info['pixel_m']} m")
     if "hv_zero_in_swath" in info:
         typer.echo(f"HV clipped to 0 by thermal noise removal: {info['hv_zero_in_swath']:.2%}")
@@ -813,13 +815,32 @@ def bench_preprocess(
 
 
 @app.command("bench-landmask")
-def bench_landmask(config: ConfigOption = DEFAULT_CONFIG) -> None:
+def bench_landmask(
+    s1: Annotated[str | None, typer.Option(
+        help="Sentinel-1 product: GRDH or GRDM (default: benchmark.faerch2023.s1_format).")] = None,
+    config: ConfigOption = DEFAULT_CONFIG,
+) -> None:
     """Stage 2 / 1c: OSM land polygons + buffer on the scene grid, and the open-water ENL."""
     from iceberg_sar.benchmark.reproduce import build_land_mask
 
-    res = build_land_mask(load_config(config), log=typer.echo)
+    res = build_land_mask(load_config(config), s1, log=typer.echo)
     typer.echo(f"land (in swath) {res['land_px_in_swath']} px, valid {res['valid_px']} px")
     typer.echo(f"ok  {res['overlay']}")
+
+
+@app.command("bench-fig1")
+def bench_fig1(config: ConfigOption = DEFAULT_CONFIG) -> None:
+    """Stage 2 / 1d: georeference Fig. 1 of the paper -> S2 and ALOS-2 outlines (GeoJSON)."""
+    from iceberg_sar.benchmark.fig1 import outlines
+
+    cfg = load_config(config)
+    fc = cfg.section("benchmark")["faerch2023"]
+    gdf, info = outlines(cfg.root / fc["fig1_points"], fc["crs"])
+    out = cfg.root / fc["fig1_outlines"]
+    gdf.to_file(out, driver="GeoJSON")
+    typer.echo(f"{info['control_points']} control points, {info['m_per_px']} m/px, residuals "
+               f"{info['residual_px']} px, rms {info['rms_km']} km")
+    typer.echo(f"ok  {out}")
 
 
 @app.command("bench-labels")

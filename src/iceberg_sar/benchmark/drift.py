@@ -43,23 +43,28 @@ from iceberg_sar.matching import match_points
 
 
 def normalized_intensity(stack: np.ndarray, inc: np.ndarray, valid: np.ndarray,
-                         bin_deg: float) -> np.ndarray:
+                         bin_deg: float, sample_step: int = 4) -> np.ndarray:
     """Each band divided by its median over valid pixels in the same incidence-angle bin;
     returns the smaller of the two normalized bands (1 = typical clutter at that angle), so a
-    threshold on it requires HH AND HV to be bright (HyP3-style HV speckle alone can't pass)."""
-    bins = np.floor(np.where(valid, inc, np.nan) / bin_deg)
+    threshold on it requires HH AND HV to be bright (HyP3-style HV speckle alone can't pass).
+
+    The medians come from every `sample_step`-th pixel in both directions (1/16 of a scene by
+    default) and are applied through a lookup table, so no full-scene index arrays are built.
+    """
+    ok = valid & np.isfinite(inc)
+    bins = np.zeros(inc.shape, np.int16)
+    bins[ok] = np.floor(inc[ok] / bin_deg).astype(np.int16)
+    s = (slice(None, None, sample_step), slice(None, None, sample_step))
+    ok_s, bins_s = ok[s], bins[s][ok[s]]
     out = np.full(inc.shape, np.inf, np.float32)
-    ok = valid & np.isfinite(bins)
-    keys = bins[ok].astype(int)
-    for i in range(stack.shape[0]):
-        band = stack[i]
-        vals = band[ok]
-        med = pd.Series(vals).groupby(keys).median()
-        ref = med.reindex(keys).to_numpy()
-        norm = np.zeros(inc.shape, np.float32)
+    for band in stack:
+        med = pd.Series(band[s][ok_s]).groupby(bins_s).median()
+        lut = np.full(int(bins.max()) + 1, np.nan, np.float32)
+        lut[med.index.to_numpy()] = med.to_numpy()
         with np.errstate(invalid="ignore", divide="ignore"):
-            norm[ok] = vals / ref
-        out = np.minimum(out, np.nan_to_num(norm))
+            norm = np.where(ok, band / lut[bins], 0.0).astype(np.float32)
+        np.minimum(out, np.nan_to_num(norm), out=out)
+    out[~ok] = 0.0
     return out
 
 

@@ -20,8 +20,11 @@ these labels are not directly comparable with Tables 3 and 5.
 
 ## Steps used here
 
-1. **Data:** Sentinel-2B L1C, 2019-07-04 15:36, tiles T20VNJ/VNL/VPJ/VPK/VPL, original
-   processing baseline N0207 (Google public bucket). TOA reflectance = DN / 10000.
+1. **Data:** Sentinel-2B L1C, 2019-07-04 15:36, tiles T20VNJ/T20VNL/T20VPJ/T20VPK/T20VPL (Table 1) and
+   T20VNK/T20VMK/T20VML (not in Table 1, but inside the S2 outline of the paper's Fig. 1;
+   Table 1's five tiles cover about half of the paper's iceberg area). Original processing
+   baseline N0207 (Google public bucket); TOA reflectance = DN / 10000.
+   SAR: `S1A_EW_GRDM_1SDH_20190704T102730_20190704T102831_027966_032866_4053`, 40 m sigma0 from SNAP.
 2. **N-sigma CFAR:** sum of B02, B03, B04, B08. Background mean and standard
    deviation over a square ring, 360 m guard / 520 m outer (the
    paper gives no window for S2; this is its SAR window). A pixel is a target if it is
@@ -33,11 +36,12 @@ these labels are not directly comparable with Tables 3 and 5.
    - objects of 2 px or more and at most 300000 m²; 8-connected;
    - the paper's manually added missed bergs cannot be reproduced.
 4. **Size:** length = major axis of the object (second moments), Table 2 classes.
-5. **AOI:** the paper's AOI is only drawn in its Fig. 1. Used here: S1 swath x usable
-   S2 area (no land, large clouds or nodata), 28,030 km².
+5. **AOI:** the paper's AOI is only drawn in its Fig. 1, where all icebergs lie inside
+   S1 x S2 x ALOS-2. Used here: S1 swath x usable S2 area (no land, large clouds or
+   nodata) x the ALOS-2 outline georeferenced from Fig. 1 (`bench-fig1`, a few km accuracy), 32,415 km².
 6. **Drift, automated** (`drift.py`):
-   - bright SAR objects for matching: one global threshold on intensity normalized by its median at the same incidence angle (12 dB in both HH and HV, 0.5° bins). Not one of the benchmarked detectors;
-   - local drift at nodes every 5 km: the shift (within ±10 km) that lines up the most S2 labels within 15 km of the node with a SAR object (300 m), kept if at least 6 labels agree; ties go to the smaller drift (44 nodes kept);
+   - bright SAR objects for matching: one global threshold on intensity normalized by its median at the same incidence angle (8 dB in both HH and HV, 0.5° bins). Not one of the benchmarked detectors;
+   - local drift at nodes every 5 km: the shift (within ±10 km) that lines up the most S2 labels within 15 km of the node with a SAR object (300 m), kept if at least 6 labels agree; ties go to the smaller drift (111 nodes kept);
    - **verified:** label moved back by its node's drift, matched one-to-one to a SAR object within 300 m; its position is that SAR object's;
    - **interpolated:** drift linearly interpolated (Delaunay) from the verified drift
      vectors, nearest vector outside their hull;
@@ -47,28 +51,34 @@ these labels are not directly comparable with Tables 3 and 5.
 
 | | Paper | Rebuilt (all) | Rebuilt, outside the SAR land buffer |
 |---|---|---|---|
-| small | 181 | 138 | 138 |
-| medium | 175 | 121 | 113 |
-| large | 136 | 135 | 128 |
-| **total** | 492 | 394 | 379 |
-| verified drift paths (S1) | 270 | 18 | 18 |
-| mean drift, verified (m) | 3953 | 1477 | |
-| interpolation error, 10 % holdout (m) | 1789 | 331 (median 331, n=2) | |
-| mean length (m) | 84 | 101 | |
+| small | 181 | 181 | 174 |
+| medium | 175 | 188 | 147 |
+| large | 136 | 220 | 197 |
+| **total** | 492 | 589 | 518 |
+| verified drift paths (S1) | 270 | 53 | 53 |
+| mean drift, verified (m) | 3953 | 300 | |
+| interpolation error, 10 % holdout (m) | 1789 | 218 (median 94, n=5) | |
+| mean length (m) | 84 | 105 | |
 
-Bright SAR objects used for matching: 1799. Median distance of a
-verified match (moved-back label to SAR object): 199 m.
+Bright SAR objects used for matching: 2072. Median distance of a
+verified match (moved-back label to SAR object): 118 m.
 
 ## Known differences from the paper's labels
 
-- **Drift matching is the weak step: 18 verified paths vs the paper's 270.** Most S2 bergs are small and do not stand out from speckle in
+- **Drift matching is the weak step: 53 verified paths vs the paper's 270.** Most S2 bergs are small and do not stand out from speckle in
   40 m EW HH/HV, so few line up with a SAR object. Looser settings (more SAR objects,
   fewer labels required to agree) verified more, but with a mean drift near 7 km, which is
   what random pairs in a ±10 km search give: chance alignments, not drift. The verified
   paths that remain are mostly slow or grounded bergs near the coast. The other labels
   keep a drift interpolated from these few vectors, so their positions are uncertain by
-  more than the 1789 m radius suggests. The holdout error (n=2) is too small a sample to mean much.
+  more than the 1789 m radius suggests. The holdout error (n=5) is too small a sample to mean much.
 - Cloud and land artifacts are removed by rules, not by eye; missed bergs are not added.
+  A gallery of 30 random large labels (2026-10-23) had 2 artifacts: a rocky islet missing
+  from OSM, and an aircraft streak (moving objects smear across the S2 bands).
+- Sizes: mean length 105 m vs the paper's 84 m. The 4-sigma region
+  includes half-bright edge pixels (about +10 m per side). Shortening every length by
+  20 m matches the paper's mean but not its class split (more small, still more large),
+  so lengths are kept as measured and the size classes are compared with that caveat.
 - Verified paths require a SAR object found by one global threshold, so verified labels
   lean towards bergs that are bright in SAR. The paper's manual matching has the same
   lean (it notes small bergs were hard to match), but not necessarily the same amount.
@@ -91,14 +101,14 @@ Checks (JSON):
 
 ```json
 {
-  "n_labels": 394,
-  "n_verified": 18,
-  "n_drift_nodes": 44,
-  "n_sar_targets": 1799,
-  "mean_drift_verified_m": 1477.0790025985311,
-  "median_match_dist_m": 199.29312389669875,
-  "holdout_n": 2,
-  "holdout_mean_error_m": 330.88547602033066,
-  "holdout_median_error_m": 330.88547602033066
+  "n_labels": 589,
+  "n_verified": 53,
+  "n_drift_nodes": 111,
+  "n_sar_targets": 2072,
+  "mean_drift_verified_m": 299.63059547207297,
+  "median_match_dist_m": 117.87948547425124,
+  "holdout_n": 5,
+  "holdout_mean_error_m": 218.27597825774956,
+  "holdout_median_error_m": 94.00412419728406
 }
 ```

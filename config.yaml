@@ -342,6 +342,12 @@ benchmark:
     s2_bucket_url: https://storage.googleapis.com/storage/v1/b/gcp-public-data-sentinel-2/o
     s2_files: [_B02.jp2, _B03.jp2, _B04.jp2, _B08.jp2, _B11.jp2, MTD_MSIL1C.xml, MTD_TL.xml, MSK_CLOUDS_B00.gml]
     footprint_png: data/benchmark/faerch2023/quicklooks/footprints.png
+    # Table 1 says EW GRDH, but its ENL (10.7) and 40 m spacing point to GRDM; both are in the
+    # scene list. This picks the one the pipeline (labels, detectors) uses; --s1 overrides it.
+    s1_format: GRDM         # 2026-10-23: open-water ENL at 40 m is HH 9.5 for GRDM vs 2.45 for GRDH (Table 1: 10.7)
+    # The paper's AOI is only drawn in Fig. 1; `bench-fig1` georeferences it from these points.
+    fig1_points: benchmarks/faerch2023/fig1_points.csv
+    fig1_outlines: benchmarks/faerch2023/fig1_outlines.geojson
     snap:                   # 1b: SNAP GPT preprocessing (graph quotes the paper's processing text)
       gpt: ~/AppData/Local/Programs/esa-snap/bin/gpt.exe   # SNAP 14.0.0, installed 2026-10-22
       graph: benchmarks/faerch2023/s1_ew_preprocess.xml
@@ -373,9 +379,13 @@ benchmark:
       cloud_min_area_m2: 1000000    # L1C cloud-mask polygons smaller than this are ignored (bergs get flagged)
       cloud_buffer_m: 500
       dedupe_m: 30                  # tiles overlap: one target per object
+      aoi_alos2: true               # AOI also inside the ALOS-2 scene (Fig. 1: all bergs are in S1 x S2 x ALOS-2)
       drift:
         incidence_bin_deg: 0.5      # SAR targets: intensity / median at the same incidence angle
-        sar_threshold_db: 12        # global threshold on that ratio, HH AND HV (8 dB: 88k objects, HV speckle)
+        # Global threshold on that ratio, HH AND HV. GRDH needed 12 dB (8 dB: 88k objects of HV
+        # speckle); on GRDM (HH ENL 9.5) 8 dB is clean: ~2k objects. Swept 6-10 dB x support
+        # 3/4/6 on GRDM (2026-10-23): coherent settings verify 50-60 labels, all slow bergs.
+        sar_threshold_db: 8
         max_area_px: 500            # paper's object size limit at 40 m
         search_m: 10000             # max drift per axis; paper mean drift 3953 m
         bin_m: 100                  # displacement histogram
@@ -393,12 +403,16 @@ benchmark:
     quicklook_max_px: 2400
     # >>> scenes: generated from scenes.csv by `bench-scenes --write-config`
     scenes:
-      - {sensor: Sentinel-1, product_id: S1A_EW_GRDH_1SDH_20190704T102730_20190704T102831_027966_032866_DEF7, source: cdse, start: '2019-07-04T10:27:30'}
-      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VNJ_20190704T190623, source: gcs, start: '2019-07-04T15:36:09'}
-      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VNL_20190704T190623, source: gcs, start: '2019-07-04T15:36:09'}
-      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VPJ_20190704T190623, source: gcs, start: '2019-07-04T15:36:09'}
-      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VPK_20190704T190623, source: gcs, start: '2019-07-04T15:36:09'}
-      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VPL_20190704T190623, source: gcs, start: '2019-07-04T15:36:09'}
+      - {sensor: Sentinel-1, product_id: S1A_EW_GRDH_1SDH_20190704T102730_20190704T102831_027966_032866_DEF7, source: cdse, basis: table1, start: '2019-07-04T10:27:30'}
+      - {sensor: Sentinel-1, product_id: S1A_EW_GRDM_1SDH_20190704T102730_20190704T102831_027966_032866_4053, source: cdse, basis: table1_note_format, start: '2019-07-04T10:27:30'}
+      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VNJ_20190704T190623, source: gcs, basis: table1, start: '2019-07-04T15:36:09'}
+      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VNL_20190704T190623, source: gcs, basis: table1, start: '2019-07-04T15:36:09'}
+      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VPJ_20190704T190623, source: gcs, basis: table1, start: '2019-07-04T15:36:09'}
+      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VPK_20190704T190623, source: gcs, basis: table1, start: '2019-07-04T15:36:09'}
+      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VPL_20190704T190623, source: gcs, basis: table1, start: '2019-07-04T15:36:09'}
+      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VNK_20190704T190623, source: gcs, basis: fig1, start: '2019-07-04T15:36:09'}
+      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VMK_20190704T190623, source: gcs, basis: fig1, start: '2019-07-04T15:36:09'}
+      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VML_20190704T190623, source: gcs, basis: fig1, start: '2019-07-04T15:36:09'}
     # <<< scenes
 
 output:

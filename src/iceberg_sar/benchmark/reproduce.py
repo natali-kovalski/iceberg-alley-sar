@@ -42,9 +42,20 @@ class ScenePaths:
     quicklooks: Path
 
 
-def scene_paths(cfg: Config) -> ScenePaths:
+def s1_product(cfg: Config, s1_format: str | None = None) -> str:
+    """The Sentinel-1 product to use: `s1_format` (GRDH / GRDM), else `benchmark.faerch2023.s1_format`."""
     fc = cfg.section("benchmark")["faerch2023"]
-    s1 = next(s["product_id"] for s in fc["scenes"] if s["sensor"] == "Sentinel-1")
+    fmt = (s1_format or fc["s1_format"]).upper()
+    hits = [s["product_id"] for s in fc["scenes"]
+            if s["sensor"] == "Sentinel-1" and f"_EW_{fmt}_" in s["product_id"]]
+    if len(hits) != 1:
+        raise ValueError(f"Expected one Sentinel-1 EW {fmt} product in the scene list, got {hits}")
+    return hits[0]
+
+
+def scene_paths(cfg: Config, s1_format: str | None = None) -> ScenePaths:
+    fc = cfg.section("benchmark")["faerch2023"]
+    s1 = s1_product(cfg, s1_format)
     base = cfg.root / fc["dir"]
     res = f"{fc['pixel_m']:g}m"
     i = base / "interim"
@@ -56,10 +67,11 @@ def scene_paths(cfg: Config) -> ScenePaths:
         quicklooks=base / "quicklooks")
 
 
-def preprocess_scene(cfg: Config, force: bool = False, log: Any = print) -> dict[str, Any]:
+def preprocess_scene(cfg: Config, force: bool = False, s1_format: str | None = None,
+                     log: Any = print) -> dict[str, Any]:
     """1b: SNAP graph -> [HH, HV] stack, incidence, swath mask, HH / HV dB quicklooks."""
     fc = cfg.section("benchmark")["faerch2023"]
-    p = scene_paths(cfg)
+    p = scene_paths(cfg, s1_format)
     if not p.raw_zip.is_file():
         raise FileNotFoundError(f"{p.raw_zip} missing; run `bench-download` first")
     if force:
@@ -94,10 +106,11 @@ def db_quicklooks(p: ScenePaths, max_px: int) -> list[Path]:
     return out
 
 
-def build_land_mask(cfg: Config, log: Any = print) -> dict[str, Any]:
+def build_land_mask(cfg: Config, s1_format: str | None = None, log: Any = print
+                    ) -> dict[str, Any]:
     """1c: land mask on the scene grid, CFAR valid mask, overlay quicklook, ENL sidecar."""
     fc = cfg.section("benchmark")["faerch2023"]
-    p = scene_paths(cfg)
+    p = scene_paths(cfg, s1_format)
     if not p.stack.is_file():
         raise FileNotFoundError(f"{p.stack} missing; run `bench-preprocess` first")
     buffer_m = float(fc["land"]["buffer_m"])

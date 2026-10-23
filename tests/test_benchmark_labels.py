@@ -96,3 +96,17 @@ def test_rebuild_recovers_drift() -> None:
 
 def test_holdout_error_too_few() -> None:
     assert holdout_error(np.zeros((3, 2)), np.zeros((3, 2)), 0.1, 0)["holdout_n"] == 0
+
+
+def test_normalized_intensity_flattens_incidence_trend() -> None:
+    from iceberg_sar.benchmark.drift import normalized_intensity
+
+    rng = np.random.default_rng(4)
+    inc = np.tile(np.linspace(20, 45, 200, dtype=np.float32), (200, 1))
+    trend = 10 ** (-(inc - 20) / 25)  # 10 dB darker at far range
+    stack = np.stack([trend * rng.gamma(9, 1 / 9, inc.shape), trend * rng.gamma(9, 1 / 9, inc.shape)])
+    stack[:, 100, 150] = 50 * trend[100, 150]  # one bright target in both bands, far range
+    valid = np.ones(inc.shape, bool)
+    valid[:5] = False
+    n = normalized_intensity(stack.astype(np.float32), inc, valid, 0.5)
+    assert n[100, 150] > 20 and np.median(n[valid]) < 1.1 and (n[~valid] == 0).all()

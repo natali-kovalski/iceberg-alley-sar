@@ -28,7 +28,7 @@ from iceberg_sar.benchmark import plots
 from iceberg_sar.benchmark.drift import rebuild, sar_targets
 from iceberg_sar.benchmark.labels import SIZE_CLASSES, s2_targets
 from iceberg_sar.benchmark.reproduce import scene_paths
-from iceberg_sar.benchmark.scenes import TABLE_NS, _text
+from iceberg_sar.benchmark.scenes import TABLE_NS, _text, parse_product
 from iceberg_sar.config import Config
 
 MARK = "RECONSTRUCTED LABELS"
@@ -102,9 +102,17 @@ def run_pathb(cfg: Config, force_s2: bool = False, log: Any = print) -> dict[str
         targets.to_file(cache, layer="targets", driver="GPKG")
         s2_area.to_file(cache, layer="area", driver="GPKG")
     aoi = s2_area.overlay(_swath_polygon(sp.swath), how="intersection")
+    what = "S1 swath x usable S2 area"
+    if p.get("aoi_alos2"):
+        outl = cfg.root / fc["fig1_outlines"]
+        if not outl.is_file():
+            raise FileNotFoundError(f"{outl} missing; run `bench-fig1` first")
+        alos = gpd.read_file(outl).query("name == 'alos2'").to_crs(fc["crs"])
+        aoi = aoi.overlay(alos[["geometry"]], how="intersection")
+        what += " x ALOS-2 (Fig. 1)"
     targets = targets[targets.within(aoi.union_all())].reset_index(drop=True)
     targets.insert(0, "label_id", np.arange(len(targets)))
-    log(f"{len(targets)} S2 targets inside the AOI (S1 swath x usable S2 area)")
+    log(f"{len(targets)} S2 targets inside the AOI ({what}), {aoi.area.sum() / 1e6:,.0f} km2")
 
     sar = sar_targets(sp.stack, sp.inc, sp.valid, p["drift"])
     log(f"{len(sar)} bright SAR objects for matching")
@@ -212,6 +220,10 @@ def _report(cfg: Config, labels: gpd.GeoDataFrame, info: dict[str, Any], paper: 
     p = fc["labels"]
     d = p["drift"]
     c = info["checks"]
+    s2 = [s for s in fc["scenes"] if s["sensor"] == "Sentinel-2"]
+    tiles = lambda basis: "/".join(parse_product(s["product_id"])["tile"]  # noqa: E731
+                                   for s in s2 if s.get("basis", "table1") == basis) or "none"
+    s1 = scene_paths(cfg).product
     rel = lambda f: f.relative_to(cfg.root).as_posix()  # noqa: E731
     sea = labels[~labels.in_sar_land_buffer]
     counts = labels["size_class"].value_counts()
@@ -241,8 +253,11 @@ def _report(cfg: Config, labels: gpd.GeoDataFrame, info: dict[str, Any], paper: 
         "",
         "## Steps used here",
         "",
-        "1. **Data:** Sentinel-2B L1C, 2019-07-04 15:36, tiles T20VNJ/VNL/VPJ/VPK/VPL, original",
-        "   processing baseline N0207 (Google public bucket). TOA reflectance = DN / 10000.",
+        f"1. **Data:** Sentinel-2B L1C, 2019-07-04 15:36, tiles {tiles('table1')} (Table 1) and",
+        f"   {tiles('fig1')} (not in Table 1, but inside the S2 outline of the paper's Fig. 1;",
+        "   Table 1's five tiles cover about half of the paper's iceberg area). Original processing",
+        "   baseline N0207 (Google public bucket); TOA reflectance = DN / 10000.",
+        f"   SAR: `{s1}`, 40 m sigma0 from SNAP.",
         f"2. **N-sigma CFAR:** sum of {', '.join(p['bands'])}. Background mean and standard",
         f"   deviation over a square ring, {p['guard_m']} m guard / {p['outer_m']} m outer (the",
         "   paper gives no window for S2; this is its SAR window). A pixel is a target if it is",
@@ -257,8 +272,11 @@ def _report(cfg: Config, labels: gpd.GeoDataFrame, info: dict[str, Any], paper: 
         "8-connected;",
         "   - the paper's manually added missed bergs cannot be reproduced.",
         "4. **Size:** length = major axis of the object (second moments), Table 2 classes.",
-        "5. **AOI:** the paper's AOI is only drawn in its Fig. 1. Used here: S1 swath x usable",
-        f"   S2 area (no land, large clouds or nodata), {aoi.area.sum() / 1e6:,.0f} km².",
+        "5. **AOI:** the paper's AOI is only drawn in its Fig. 1, where all icebergs lie inside",
+        "   S1 x S2 x ALOS-2. Used here: S1 swath x usable S2 area (no land, large clouds or",
+        "   nodata)" + (" x the ALOS-2 outline georeferenced from Fig. 1 (`bench-fig1`, a few km"
+                      " accuracy)" if p.get("aoi_alos2") else "") +
+        f", {aoi.area.sum() / 1e6:,.0f} km².",
         "6. **Drift, automated** (`drift.py`):",
         "   - bright SAR objects for matching: one global threshold on intensity normalized by "
         f"its median at the same incidence angle ({d['sar_threshold_db']} dB in both HH and HV,"
@@ -308,6 +326,13 @@ def _report(cfg: Config, labels: gpd.GeoDataFrame, info: dict[str, Any], paper: 
         f"  more than the {d['radius_interpolated_m']} m radius suggests. The holdout error "
         f"(n={c['holdout_n']}) is too small a sample to mean much.",
         "- Cloud and land artifacts are removed by rules, not by eye; missed bergs are not added.",
+        "  A gallery of 30 random large labels (2026-10-23) had 2 artifacts: a rocky islet missing",
+        "  from OSM, and an aircraft streak (moving objects smear across the S2 bands).",
+        f"- Sizes: mean length {labels.length_m.mean():.0f} m vs the paper's "
+        f"{paper['mean_length_m']} m. The 4-sigma region",
+        "  includes half-bright edge pixels (about +10 m per side). Shortening every length by",
+        "  20 m matches the paper's mean but not its class split (more small, still more large),",
+        "  so lengths are kept as measured and the size classes are compared with that caveat.",
         "- Verified paths require a SAR object found by one global threshold, so verified labels",
         "  lean towards bergs that are bright in SAR. The paper's manual matching has the same",
         "  lean (it notes small bergs were hard to match), but not necessarily the same amount.",

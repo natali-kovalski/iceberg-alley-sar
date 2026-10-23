@@ -1,7 +1,10 @@
 """Færch 2023 benchmark scenes: `scenes.csv` checked against Table 1 of the paper's JATS XML.
 
 `scenes.csv` has two parts per row: the paper's Table 1 columns as transcribed (sensor ...
-enl), and the product we use for it (`product_id`, `source`). `check_scenes` compares both
+enl), and the product we use for it (`product_id`, `source`). `basis` says why a product is
+there: `table1`; `table1_note_format` (the GRDM, kept because Table 1's ENL fits it, not
+its "GRDH"); `fig1` (S2 tiles not in Table 1 but inside the paper's Fig. 1 S2 outline; their
+tile column copies Table 1's pattern, so the check flags them). `check_scenes` compares both
 parts with Table 1 as parsed from `faerch2023.xml`, so a typo in the CSV and a product that
 differs from what the paper names both show up as mismatches.
 """
@@ -132,7 +135,8 @@ def config_block(scenes: list[dict[str, str]]) -> str:
     for s in scenes:
         prod = parse_product(s["product_id"])
         lines.append(f"      - {{sensor: {s['sensor']}, product_id: {s['product_id']}, "
-                     f"source: {s['source']}, start: '{prod['start'].isoformat()}'}}")
+                     f"source: {s['source']}, basis: {s.get('basis', 'table1')}, "
+                     f"start: '{prod['start'].isoformat()}'}}")
     lines.append(CONFIG_END)
     return "\n".join(lines)
 
