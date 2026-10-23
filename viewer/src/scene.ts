@@ -169,6 +169,7 @@ export async function loadDetections(viewer: Viewer): Promise<{
   );
   const dataSource = await CzmlDataSource.load(base);
   for (const czml of rest) await dataSource.process(czml);
+  hollowCfarDots(dataSource);
   await viewer.dataSources.add(dataSource);
   viewer.clockTrackedDataSource = dataSource;
   viewer.timeline.zoomTo(viewer.clock.startTime, viewer.clock.stopTime);
@@ -275,42 +276,22 @@ export function applyLayers(dataSource: CzmlDataSource, layers: Layers): void {
   }
 }
 
-// A filled CFAR dot covers the target it marks. Over the SAR image the dots are drawn hollow, at
-// the same outer size (Cesium draws pixelSize + 2 * outlineWidth), so the berg shows inside and
-// "found by both" becomes an orange circle inside the THOR ring.
+// A filled CFAR dot covers the target it marks, so the CZML's dots are redrawn as hollow circles
+// of the same outer size (Cesium draws pixelSize + 2 * outlineWidth). The berg stays visible on
+// the SAR image, and "found by both" is an orange circle inside the THOR ring.
 const HOLLOW_OUTLINE_PX = 2;
 const HOLLOW_FILL = Color.BLACK.withAlpha(1 / 255); // near-transparent keeps it clickable
-interface DotStyle {
-  color: Color;
-  outlineColor: Color;
-  outlineWidth: number;
-  pixelSize: number;
-}
-const dotStyles = new WeakMap<Entity, DotStyle>();
-let dotsHollow = false;
 
-export function setHollowDots(dataSource: CzmlDataSource, hollow: boolean): void {
-  if (hollow === dotsHollow) return;
-  dotsHollow = hollow;
+function hollowCfarDots(dataSource: CzmlDataSource): void {
   const t = JulianDate.now();
   for (const e of dataSource.entities.values) {
     const p = e.point;
     if (!p || !e.id.startsWith("det/")) continue;
-    let s = dotStyles.get(e);
-    if (!s) {
-      s = {
-        color: p.color?.getValue(t),
-        outlineColor: p.outlineColor?.getValue(t),
-        outlineWidth: p.outlineWidth?.getValue(t) ?? 0,
-        pixelSize: p.pixelSize?.getValue(t) ?? 1,
-      };
-      dotStyles.set(e, s);
-    }
-    const outer = s.pixelSize + 2 * s.outlineWidth;
-    p.color = new ConstantProperty(hollow ? HOLLOW_FILL : s.color);
-    p.outlineColor = new ConstantProperty(hollow ? s.color : s.outlineColor);
-    p.outlineWidth = new ConstantProperty(hollow ? HOLLOW_OUTLINE_PX : s.outlineWidth);
-    p.pixelSize = new ConstantProperty(hollow ? Math.max(1, outer - 2 * HOLLOW_OUTLINE_PX) : s.pixelSize);
+    const outer = (p.pixelSize?.getValue(t) ?? 1) + 2 * (p.outlineWidth?.getValue(t) ?? 0);
+    p.outlineColor = new ConstantProperty(p.color?.getValue(t));
+    p.color = new ConstantProperty(HOLLOW_FILL);
+    p.outlineWidth = new ConstantProperty(HOLLOW_OUTLINE_PX);
+    p.pixelSize = new ConstantProperty(Math.max(1, outer - 2 * HOLLOW_OUTLINE_PX));
   }
 }
 

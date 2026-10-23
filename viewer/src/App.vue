@@ -12,7 +12,6 @@ import {
   loadDetections,
   sarImagery,
   sceneAt,
-  setHollowDots,
   type Layers,
   type SarUpdate,
   type Legend,
@@ -28,7 +27,7 @@ const compareScene = ref<SceneInfo>(); // scene whose THOR vs CFAR chart is open
 // The About dialog opens on a first visit only. Storage can be unavailable (private mode).
 const ABOUT_SEEN = "iceberg-alley-about-seen";
 const showAbout = ref(!storageGet(ABOUT_SEEN));
-// THOR is the detector; the CFAR baseline stays on so "found by both" (dot in ring) reads at a glance.
+// THOR is the detector; the CFAR baseline stays on so "found by both" (circle in ring) reads at a glance.
 const layers = reactive<Layers>({
   thor: true, cfar: true, nearIce: true, seaIce: true, footprints: true, unobserved: true, truth: true,
   sar: true,
@@ -39,11 +38,9 @@ let viewer: Viewer | undefined;
 let dataSource: CzmlDataSource | undefined;
 let updateSar: SarUpdate | undefined;
 
-// SAR image of the pass on screen, and hollow CFAR dots while it shows.
+// SAR image of the pass on screen.
 function syncSar(): void {
-  const scene = scenes.value.find((s) => s.id === currentId.value);
-  updateSar?.(scene, layers.sar);
-  if (dataSource) setHollowDots(dataSource, layers.sar && !!scene?.hasSar);
+  updateSar?.(scenes.value.find((s) => s.id === currentId.value), layers.sar);
 }
 
 onMounted(async () => {
