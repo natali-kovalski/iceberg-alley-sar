@@ -34,6 +34,9 @@ jobs:
           cache-dependency-path: viewer/package-lock.json
       - run: npm ci
       - run: npm run build          # base /iceberg-alley-sar/ (vite.config.ts)
+        env:
+          CESIUM_ION_TOKEN: ${{ secrets.CESIUM_ION_TOKEN }}
+          SAR_ION_ASSETS: ${{ vars.SAR_ION_ASSETS }}
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
