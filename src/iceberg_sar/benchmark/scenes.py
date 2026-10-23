@@ -1,7 +1,8 @@
 """Færch 2023 benchmark scenes: `scenes.csv` checked against Table 1 of the paper's JATS XML.
 
-`scenes.csv` has two parts per row: the paper's Table 1 columns as transcribed (sensor ...
-enl), and the product we use for it (`product_id`, `source`). `basis` says why a product is
+`scenes.csv` has two parts per row: what the paper's Table 1 says (`paper_*` columns, copied
+as printed, so the GRDH and GRDM rows both read "EW GRDH"), and the product we use for it
+(`product_id`, `product_format`, `source`). `basis` says why a product is
 there: `table1`; `table1_note_format` (the GRDM, kept because Table 1's ENL fits it, not
 its "GRDH"); `fig1` (S2 tiles not in Table 1 but inside the paper's Fig. 1 S2 outline; their
 tile column copies Table 1's pattern, so the check flags them). `check_scenes` compares both
@@ -20,8 +21,6 @@ from pathlib import Path
 from typing import Any
 
 TABLE_NS = "{http://docs.oasis-open.org/ns/oasis-exchange/table}"
-PAPER_COLUMNS = ("sensor", "format", "acquisition", "tile_orbit", "pixel_spacing_m", "bands",
-                 "enl")
 CONFIG_BEGIN = "    # >>> scenes: generated from scenes.csv by `bench-scenes --write-config`"
 CONFIG_END = "    # <<< scenes"
 
@@ -95,21 +94,24 @@ def check_scenes(scenes: list[dict[str, str]], table: list[dict[str, str]],
             continue
         tiles = [t.split("/") for t in paper["Tile(s)/orbit identifier"].split()]
         # 1. Transcription: the CSV's paper columns against Table 1.
-        tile, orbit = s["tile_orbit"].split("/")
+        tile, orbit = s["paper_tile_orbit"].split("/")
         transcribed = {
-            "format": (paper["Format"], s["format"]),
-            "acquisition": (_paper_time(paper["Acquisition date/time"]).isoformat(),
-                            s["acquisition"]),
-            "tile_orbit": (" ".join("/".join(t) for t in tiles), s["tile_orbit"]),
-            "pixel_spacing_m": (paper["Pixel spacing"].removesuffix(" m"), s["pixel_spacing_m"]),
-            "bands": (paper["Bands"], s["bands"]),
-            "enl": (_strip_note(paper["ENL"]).replace("n/a", ""), s["enl"]),
+            "paper_format": (paper["Format"], s["paper_format"]),
+            "paper_acquisition": (_paper_time(paper["Acquisition date/time"]).isoformat(),
+                                  s["paper_acquisition"]),
+            "paper_tile_orbit": (" ".join("/".join(t) for t in tiles), s["paper_tile_orbit"]),
+            "paper_pixel_spacing_m": (paper["Pixel spacing"].removesuffix(" m"),
+                                      s["paper_pixel_spacing_m"]),
+            "paper_bands": (paper["Bands"], s["paper_bands"]),
+            "paper_enl": (_strip_note(paper["ENL"]).replace("n/a", ""), s["paper_enl"]),
         }
         for field, (p, o) in transcribed.items():
-            ok = [tile, orbit] in tiles if field == "tile_orbit" else p == o
+            ok = [tile, orbit] in tiles if field == "paper_tile_orbit" else p == o
             checks.append(Check(pid, f"csv.{field}", p, o, ok))
-        # 2. Product: what the product name says against the paper's row.
+        # 2. Product: what the product name says, against the CSV and against the paper's row.
         prod = parse_product(pid)
+        checks.append(Check(pid, "csv.product_format", prod["format"], s["product_format"],
+                            s["product_format"] == prod["format"]))
         t = _paper_time(paper["Acquisition date/time"])
         if prod["format"].startswith("EW"):
             inside = prod["start"] <= t <= prod["stop"]

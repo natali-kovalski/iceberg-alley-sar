@@ -35,8 +35,10 @@ def test_parse_s1_and_s2() -> None:
 
 
 def _row(**kw: str) -> dict[str, str]:
-    base = {"sensor": "Sentinel-1", "format": "EW GRDH", "acquisition": "2019-07-04T10:27:30",
-            "tile_orbit": "–/027966", "pixel_spacing_m": "40", "bands": "HH, HV", "enl": "10.7",
+    base = {"sensor": "Sentinel-1", "paper_format": "EW GRDH",
+            "paper_acquisition": "2019-07-04T10:27:30", "paper_tile_orbit": "–/027966",
+            "paper_pixel_spacing_m": "40", "paper_bands": "HH, HV", "paper_enl": "10.7",
+            "product_format": "EW GRDH",
             "product_id": "S1A_EW_GRDH_1SDH_20190704T102730_20190704T102831_027966_032866_DEF7",
             "source": "cdse"}
     return base | kw
@@ -45,9 +47,9 @@ def _row(**kw: str) -> dict[str, str]:
 def test_check_agrees_and_flags() -> None:
     assert all(c.ok for c in check_scenes([_row()], TABLE))
     bad = {c.field for c in check_scenes(
-        [_row(enl="3.0", product_id="S1A_EW_GRDM_1SDH_20190704T102830_20190704T102931_"
+        [_row(paper_enl="3.0", product_format="EW GRDM", product_id="S1A_EW_GRDM_1SDH_20190704T102830_20190704T102931_"
               "027967_032866_AAAA")], TABLE) if not c.ok}
-    assert bad == {"csv.enl", "product.format", "product.time", "product.abs_orbit"}
+    assert bad == {"csv.paper_enl", "product.format", "product.time", "product.abs_orbit"}
 
 
 @pytest.mark.skipif(not XML.is_file(), reason="paper XML not present")
@@ -60,10 +62,10 @@ def test_table1_from_xml_and_committed_csv() -> None:
     scenes = {s["product_id"]: s for s in load_scenes(CSV)}
     bad_csv = {c.product for c in checks if c.field.startswith("csv.") and not c.ok}
     assert bad_csv == {p for p, s in scenes.items() if s["basis"] == "fig1"}
-    assert all(c.field == "csv.tile_orbit" for c in checks
+    assert all(c.field == "csv.paper_tile_orbit" for c in checks
                if c.field.startswith("csv.") and not c.ok)
     assert {c.field for c in checks if not c.ok} == {
-        "csv.tile_orbit", "product.abs_orbit", "product.rel_orbit", "product.format"}
+        "csv.paper_tile_orbit", "product.abs_orbit", "product.rel_orbit", "product.format"}
     assert [c.product for c in checks if c.field == "product.format" and not c.ok] == [
         "S1A_EW_GRDM_1SDH_20190704T102730_20190704T102831_027966_032866_4053"]
 
