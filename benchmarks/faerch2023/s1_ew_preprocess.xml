@@ -16,7 +16,11 @@
     height). Ellipsoid-Correction-GG has no pixel-spacing parameter, so it cannot give the
     paper's 40 m. nodataValueAtSea=false, or the operator blanks the ocean.
   - Calibration: sigma0 only (the CFARs run on linear sigma0 intensity).
-  - Thermal noise removal: SNAP defaults (negative values clipped to 0).
+  - Thermal noise removal: SNAP defaults. SNAP 14 clips negative values to ~3.7e-12, not 0:
+    23.7 % of HV and 0.75 % of HH open-water pixels sit at about -115 dB (checked 2026-10-26).
+    removeThermalNoise=false is ignored by SNAP 14, so the diagnostic variant without noise
+    removal (snap.remove_thermal_noise: false) drops this node from a copy of the graph
+    (preprocess.graph_variant).
   - Map projection: ${crs} from config (UTM 20N, the Sentinel-2 tiles' grid). The paper's
     final grid was a local polar stereographic projection, chosen for its C- vs L-band
     comparison.

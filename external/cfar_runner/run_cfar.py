@@ -6,7 +6,11 @@ imports the GPL-3.0 `cfar_filters` library. It talks to the main package through
   in : --image  2-band GeoTIFF [HH, HV], linear intensity, float32 (NaN = nodata)
        --mask   1-band GeoTIFF, nonzero = valid
   out: <out-dir>/<detector>_pfa<pfa>.tif  uint8 detections (1 = outlier), same grid as --image
+       <out-dir>/<detector>_pfa<pfa>.json  that PFA's runtime and counts, written when it finishes
        <out-dir>/<detector>_run.json       parameters, per-PFA runtime and counts, warnings
+
+With --max-objects, the PFAs run in ascending order and the sweep stops after the first PFA
+that gives more objects than that (the higher PFAs would only give more).
 
 Library behaviour this runner handles (benchmarks/cfar_api_notes.md):
 - `detector.run` expects dB; the input here is linear, so it is converted at the boundary.
@@ -32,6 +36,7 @@ from pathlib import Path
 
 import numpy as np
 import rasterio
+from scipy import ndimage
 
 t_import = time.perf_counter()
 import cfar_filters  # noqa: E402  (Numba compiles the window kernels at import)
@@ -107,6 +112,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--min-ring-fraction", type=float, default=0.5)
     p.add_argument("--masked-as-nan", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--allow-window-crop", action="store_true")
+    p.add_argument("--max-objects", type=int,
+                   help="Stop after the first PFA (ascending) with more objects than this.")
     p.add_argument("--out-dir", type=Path, required=True)
     return p.parse_args(argv)
 
@@ -149,7 +156,9 @@ def main(argv: list[str] | None = None) -> int:
     out_profile = dict(profile) | {"count": 1, "dtype": "uint8", "nodata": None, "compress": "lzw",
                              "predictor": 1}
     runs = []
-    for pfa in a.pfa:
+    stopped = False
+    four = ndimage.generate_binary_structure(2, 1)  # the library's small-object connectivity
+    for pfa in sorted(a.pfa) if a.max_objects is not None else a.pfa:
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             t0 = time.perf_counter()
@@ -169,10 +178,16 @@ def main(argv: list[str] | None = None) -> int:
             dst.write(outliers.astype(np.uint8), 1)
         msgs = sorted({f"{w.category.__name__}: {' '.join(str(w.message).split())}"
                        for w in caught})
+        n_objects = int(ndimage.label(outliers, structure=four)[1])
         runs.append({"pfa": pfa, "raster": path.name, "runtime_s": round(runtime, 2),
-                     "outlier_px": int(outliers.sum()), "warnings": msgs})
-        print(f"{a.detector} pfa={pfa:.0e}: {int(outliers.sum())} px in {runtime:.1f} s",
-              flush=True)
+                     "outlier_px": int(outliers.sum()), "objects": n_objects, "warnings": msgs})
+        # per-PFA sidecar, written as each PFA finishes: a long sweep resumes from these
+        path.with_suffix(".json").write_text(json.dumps(runs[-1], indent=2), encoding="utf-8")
+        print(f"{a.detector} pfa={pfa:.0e}: {int(outliers.sum())} px, {n_objects} objects "
+              f"in {runtime:.1f} s", flush=True)
+        if a.max_objects is not None and n_objects > a.max_objects:
+            stopped = True
+            break
 
     meta = {
         "detector": a.detector, "method": a.method, "wi_px": a.wi, "wo_px": a.wo,
@@ -181,6 +196,7 @@ def main(argv: list[str] | None = None) -> int:
         "minsize": a.minsize, "min_ring_fraction": a.min_ring_fraction,
         "masked_as_nan": a.masked_as_nan, "window_cropped": max(a.wi, a.wo) > STENCIL_LIMIT_PX,
         "image": str(a.image), "mask": str(a.mask),
+        "pfas_requested": a.pfa, "max_objects": a.max_objects, "stopped_early": stopped,
         "valid_px": int(valid.sum()), "run_mask_px": int(run_mask.sum()),
         "import_s": round(IMPORT_S, 2), "library_commit": library_commit(),
         "python": sys.version.split()[0],

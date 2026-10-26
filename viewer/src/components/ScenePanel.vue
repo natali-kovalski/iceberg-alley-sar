@@ -34,6 +34,10 @@ function splitTitle(s: SceneInfo): string | undefined {
     : "THOR pack-ice validation frame: labelled, never trained on";
   return `${what}. ${s.nTruth ?? 0} IIP analyst labels shown.`;
 }
+function compareTitle(s: SceneInfo): string {
+  const labels = s.nTruth !== undefined ? ` ${s.nTruth} scored IIP labels shown.` : "";
+  return `THOR vs CFAR compared on this pass: click for the recall chart.${labels}`;
+}
 const current = computed(() => props.scenes.find((x) => x.id === props.currentId));
 const currentHasIce = computed(() => (current.value ? hasIce(current.value) : props.scenes.some(hasIce)));
 </script>
@@ -61,7 +65,7 @@ const currentHasIce = computed(() => (current.value ? hasIce(current.value) : pr
     <div v-if="hasThor" class="key"><span class="ring" /> THOR detection, score ≥ {{ legend.thorScore ?? 0.35 }}</div>
     <div class="key"><span class="dot cfar" /> CA-CFAR <template v-if="hasThor">baseline </template>candidate</div>
     <div v-if="hasThor" class="key"><span class="ring both"><span class="dot cfar" /></span> found by both</div>
-    <div v-if="hasTruth" class="key"><span class="cross">✕</span> IIP analyst label, same pass (THOR training frames)</div>
+    <div v-if="hasTruth" class="key"><span class="cross">✕</span> IIP analyst label, same pass (THOR training and test frames)</div>
     <div class="sizes-title">Size = target extent, same classes for both</div>
     <div class="sizes">
       <div v-for="c in sizeClasses" :key="c.label" class="size">
@@ -85,7 +89,7 @@ const currentHasIce = computed(() => (current.value ? hasIce(current.value) : pr
         v-for="s in scenes"
         :key="s.id"
         :class="{ active: s.id === currentId, compare: s.compare, [`split-${s.split}`]: s.split }"
-        :title="s.compare ? 'THOR vs CFAR compared on this pass: click for the recall chart' : splitTitle(s)"
+        :title="s.compare ? compareTitle(s) : splitTitle(s)"
         @click="emit('jump', s)"
       >
         <span class="date">{{ s.date }}</span>
@@ -97,7 +101,7 @@ const currentHasIce = computed(() => (current.value ? hasIce(current.value) : pr
     <h2>Layers</h2>
     <label v-if="hasThor"><input v-model="layers.thor" type="checkbox" /> THOR detections (foundation model)</label>
     <label v-if="hasThor"><input v-model="layers.cfar" type="checkbox" /> CA-CFAR baseline</label>
-    <label v-if="hasTruth"><input v-model="layers.truth" type="checkbox" /> IIP labels on training frames</label>
+    <label v-if="hasTruth"><input v-model="layers.truth" type="checkbox" /> IIP analyst labels</label>
     <label :class="{ off: !currentHasIce }">
       <input v-model="layers.nearIce" type="checkbox" :disabled="!currentHasIce" /> Near-ice candidates (likely floes)
     </label>

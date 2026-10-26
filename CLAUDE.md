@@ -3,7 +3,7 @@
 ## What this project is
 Detect icebergs off the coast of Newfoundland & Labrador in Sentinel-1 SAR imagery with **THOR**, a SAR foundation model (frozen encoder + a small trained head), benchmarked against a classical **CA-CFAR** detector, and display the results on an interactive **CesiumJS** globe with a timeline.
 
-**Main story (since Milestone 5):** THOR is the detector, the CA-CFAR is the baseline. The classical SAR pipeline (HyP3 calibration, land mask, HV pack-ice mask) feeds both, and THOR depends on it. Headline: on four held-out April 2019 passes (512 same-pass IIP labels), THOR finds 0.84 vs. CFAR 0.74 at the same number of detections, and 11 vs. 4 of 14 large bergs. Don't use the old CFAR 78% as a headline: it counts near-ice detections and isn't comparable (the CFAR's comparable figure is 0.74). Keep the caveats with the headline: one month of one year, THOR learned from IIP analyst labels, precision unknown without AIS.
+**Main story (since Milestone 5):** THOR is the detector, the CA-CFAR is the baseline. The classical SAR pipeline (HyP3 calibration, land mask, HV pack-ice mask) feeds both, and THOR depends on it. Headline (since 2026-10-26): on four held-out April 2019 passes (512 same-pass IIP labels), THOR finds 0.85 vs. CFAR 0.80 at the same number of detections, and 11 vs. 10 of 14 large bergs; the gain is mostly medium bergs (0.88 vs 0.81). The old 0.84 vs 0.74 (11 vs 4 large) had the CFAR's ice-strip rule on in every scene; it now applies only with pack ice (`detections.length_rule: auto`), and that cutoff was set after seeing 04-29 (no labels used): say so with the headline. Don't use the old CFAR 78% as a headline: it counts near-ice detections and isn't comparable. Keep the caveats with the headline: one month of one year, THOR learned from IIP analyst labels, precision unknown without AIS.
 
 This is a portfolio project. It should show hands-on SAR and maritime-domain skills to remote sensing / ocean-tech employers in St. John's, NL. Clarity, reproducibility, and a polished demo matter more than state-of-the-art accuracy.
 
@@ -90,9 +90,9 @@ iceberg-alley-sar/
   (`benchmarks/ENVIRONMENT.md`). API quirks (dB input, NaN masking, 41 px stencil, K LUT index)
   in `benchmarks/cfar_api_notes.md`. `bench-smoke` runs all six detectors on 2019-04-29 at 40 m
   (`benchmarks/m0_smoke.md`). 40 m HH/HV ENLs are 6.0 / 1.8, so gamma/K run with per-band ENL (`benchmark.enl_mode`, decided 2026-10-22).
-- **Stage 2 / Milestone 1 (branch `Establishing-benchmark`, 2026-10-22/23): 1a–1d done (1d as Path B), 1e–1f not started.**
+- **Stage 2 / Milestone 1 (branch `Establishing-benchmark`, 2026-10-22/24): 1a–1d done (1d as Path A and B), 1e–1f not started.**
   Commands: `bench-scenes`, `bench-download`, `bench-preprocess [--s1 GRDH|GRDM]`,
-  `bench-landmask [--s1 ...]`, `bench-fig1`, `bench-labels [--force-s2]`.
+  `bench-landmask [--s1 ...]`, `bench-fig1`, `bench-labels [--source faerch|reconstructed] [--force-s2]`.
   - 1a: `scenes.csv` checked against Table 1 (`basis` column: table1 / table1_note_format / fig1).
     Open mismatches: S1 orbit (paper 028068, product 027966 / rel. 069), S2 rel. orbit (paper R068,
     product R111). S1 EW slice 10:27:30 (last of the pass): GRDH `_DEF7` (from ASF) and GRDM
@@ -114,7 +114,51 @@ iceberg-alley-sar/
     length 105 vs 84 m (4-sigma edge pixels, partly). Rules replacing the paper's manual check:
     contrast >= 2x the water, B11 <= 0.035. Weak step: drift. 53 verified paths vs 270, all slow or
     grounded bergs (mean drift 300 m); every coherent setting swept on GRDM verifies 50-60.
-    Open: wait for Færch's labels, match by hand, or score all-labels only.
+  - 1d Path A (2026-10-24, **the default**: `benchmark.faerch2023.labels_source: faerch`): Færch's
+    own labels by email (private, `data/` only, never commit; `benchmark/patha.py`,
+    `benchmarks/faerch2023/labels_faerch.md`). 492 S2 -> S1 drift lines in EPSG:5938, `method`
+    manual 284 / interpolate 208, plus 22 "unknown" SAR objects. Lengths are S2 pixels; the paper's
+    metres are EPSG:5938 (x1.07 at 58° N), which reproduces Table 2 exactly (181/175/136) and the
+    mean drift (3954 vs 3953 m). 269 manual paths are >= 50 m (paper: 270). Path B found 419 of the
+    492 in S2 but put 369 of them ~4.5 km off in S1. The zip is LZMA: Explorer can't open it.
+  - 1e (2026-10-24): `bench-sweep` (`sweep.run_faerch_sweep`), 6 detectors x 21 PFAs, ENL 10.7 for
+    both bands (Table 1, single), resumable per (detector, PFA) from the runner's per-PFA JSON;
+    stops a detector above 20,000 objects. Full scene: 1.7-5 min per detector per PFA, peak RAM
+    ~15.6 GB with other apps open (close them). Wishart / NIS pass the cap already at 1e-9.
+  - 1f: `bench-reference` -> `reference.yaml` (Tables 3 + 5, `checked_against_paper: false` until
+    I check it), `bench-score` -> `docs/faerch2023-reproduction.md` + `docs/img/faerch2023_f_vs_pfa.png`.
+    Scoring area `fig1` (S1 valid x Fig. 1 S2 x ALOS-2); greedy one-to-one matching; detections
+    within 250 m of unknown objects ignored. Hand-written discussion goes in
+    `benchmarks/faerch2023/reproduction_notes.md` (included in the report). Tables 3 and 5 give
+    different PFAs for gamma / K / log-normal but the same detections (Table 5 % x N = Table 3 TP).
+    `reference.yaml` checked by me (2026-10-26). Sweep 1 (with thermal noise removal, as the paper
+    describes): no detector within 0.05; best F gamma 0.43, K 0.53, iDPolRAD 0.32, NIS 0.23,
+    log-normal 0.15, Wishart none (21k objects at 1e-21). FPs cluster in dark calm water.
+  - Diagnosis (2026-10-26): SNAP 14 thermal noise removal breaks the paper's ENL. It clips
+    negatives to ~3.7e-12 (-115 dB), not 0: 23.7 % of HV, 0.75 % of HH. SNAP 14 ignores
+    removeThermalNoise=false, so `snap.remove_thermal_noise: false` drops the node from a copy of
+    the graph (`preprocess.graph_variant`); `--no-tnr` on bench-preprocess / bench-landmask, files
+    tagged `_noTNR`. Without TNR: ENL HH 10.74 / HV 11.45 (Table 1: 10.7); gamma 1e-19 TP/FP
+    156/8 (paper 238/32), log-normal 1e-5 251/121, F 0.58 (paper 0.62). GRDH gamma 1e-19: more FPs
+    than GRDM (575 vs 341), so the paper used GRDM. Spot checks in `data/benchmark/faerch2023/
+    sweep_noTNR`, `sweep_GRDH`. **Waiting for my go:** full sweep on the noTNR stack as the
+    reproduction run (own out_dir, config default -> noTNR), TNR sweep kept in the report as
+    "as described"; ask Laust his SNAP version and whether TNR was applied.
+- **Stage 2 / Milestone 2b, one frame (2026-10-23/26):** `bench-iw-sweep` + `bench-iw-compare`
+  (`benchmark/sweep.py`, `benchmark/iwcompare.py`, config `benchmark.iw_sweep`, report
+  `benchmarks/m2b_iw40.md`). 2019-04-29 at 40 m, 6 reference detectors + my CA-CFAR, 11 PFAs
+  (every 2 decades), stop above 5,000 objects (runner `--max-objects`), 5d scoring. Recall at 500
+  detections: gamma / iDPolRAD 0.87, my CA-CFAR without length rule 0.86, log-normal / K 0.85 /
+  0.84; NIS 0.94 but can't go below ~600 detections; Wishart stops at 92 (one ENL = HV's).
+  My CA-CFAR, 4 variants at 500: 10 m with rule 0.75, 10 m without 0.83, 40 m with 0.84, 40 m
+  without 0.86. The length rule was the main cost at 10 m (all 4 large + 21 medium bergs).
+  Not done: the other three April frames (2b proper), 2a, 2c.
+- **Length rule only in icy scenes (2026-10-26):** `detections.length_rule: auto`, on when the
+  scene's pack-ice mask covers >= `length_rule_min_ice_km2` (500; our scenes are <= 300 or
+  >= 1,200 km²). Decision in each detection summary JSON. 5d re-run: pooled 0.85 vs 0.80 (was
+  0.84 vs 0.74), tables in `data/outputs/thor/5d/`, old ones in `5d_rule_always/`. Docs updated;
+  viewer CZMLs for the open-water scenes (04-24, 04-29, 2025-05-14) need `detect` + `czml` +
+  `publish` to match. `detections.block_rows` 512 for RAM (same detections).
 - **Milestones 0–3: done.** Search, HyP3 RTC (10 m), land + pack-ice masks, CA-CFAR on HV with strip rejection and an HH co-pol check, GeoJSON detections, and the Vue + Cesium viewer.
 - **Scenes:** spring 2025 (2025-05-02, 05-08, 05-14) in the viewer, checked against NAIS charts. Spring 2019 (2019-04-15, 04-29) and 2020-06-10 for point-level validation.
 - **Validation (beyond the plan):** 78% recall (207/267) against same-pass IIP analyst labels on 2019-04-29, median offset 67 m (IIP positions are truncated to 0.1'; corrected to cell centres). Precision is not measurable without AIS. Large bergs (>120 m) are missed: their grown blobs exceed `max_structure_m` (the ice-strip rule). See `docs/validation-findings.md`.
@@ -132,6 +176,7 @@ iceberg-alley-sar/
   0.74 (04-29 alone: 0.89 vs 0.74); CenterNet equal; small bergs a tie. HyP3 rejects open-ocean
   frames (no DEM), so richer April frames couldn't be added (`data/thor/test_candidates.csv`).
   CFAR misses large bergs (4/14 vs THOR 11/14): grown blobs (340-470 m) exceed `max_structure_m`.
+  (Superseded 2026-10-26 by the length rule only in icy scenes: 0.85 vs 0.80, 11 vs 10 large.)
   THOR needs the CFAR's pack-ice mask (47-59% of its peaks on 04-15 fall in it). 2019-04-15 is
   unscored (aircraft truth, drift unresolved). THOR is a toggleable viewer layer.
   PFA sweep runs in one pass (`detect_raster_multi`); `component_table` stats now reduce over
@@ -596,6 +641,9 @@ Milestone numbering restarts at 0 for Stage 2. Stage 1 milestones stay as they a
 - ENL per band for gamma / K on our IW frames (`benchmark.enl_mode: per_band`, 2026-10-22):
   HyP3 HV water has a much lower ENL than HH (1.8 vs 6.0 at 40 m). Wishart keeps one ENL (min).
   For the Færch EW scene the paper used one ENL (10.7) for both; use `single` there.
+- The ice-strip length rule applies only in scenes with pack ice (`detections.length_rule: auto`,
+  >= 500 km² of pack-ice mask; 2026-10-26). In open water it only dropped large bergs. Until I've
+  read how the literature handles ice; a shape-based strip test is the candidate replacement.
 
 ### Stage 2 pitfalls
 - Per-channel PFA ≠ final PFA. Always log both.

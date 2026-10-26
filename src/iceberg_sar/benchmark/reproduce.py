@@ -31,6 +31,7 @@ from iceberg_sar.config import Config
 @dataclass(frozen=True)
 class ScenePaths:
     product: str
+    stem: str          # file prefix: the product, or `<product>_noTNR`
     raw_zip: Path
     snap: Path
     stack: Path
@@ -59,11 +60,13 @@ def scene_paths(cfg: Config, s1_format: str | None = None) -> ScenePaths:
     base = cfg.root / fc["dir"]
     res = f"{fc['pixel_m']:g}m"
     i = base / "interim"
+    # Diagnostic variant without thermal noise removal: own files, so the main stack stays
+    st = s1 if fc["snap"].get("remove_thermal_noise", True) else f"{s1}_noTNR"
     return ScenePaths(
-        product=s1, raw_zip=base / "raw" / f"{s1}.zip", snap=i / f"{s1}_snap_{res}.tif",
-        stack=i / f"{s1}_{res}_HHHV.tif", inc=i / f"{s1}_{res}_inc.tif",
-        swath=i / f"{s1}_{res}_swath.tif", land=i / f"{s1}_{res}_land.tif",
-        valid=i / f"{s1}_{res}_valid.tif", enl=i / f"{s1}_{res}_enl.json",
+        product=s1, stem=st, raw_zip=base / "raw" / f"{s1}.zip", snap=i / f"{st}_snap_{res}.tif",
+        stack=i / f"{st}_{res}_HHHV.tif", inc=i / f"{st}_{res}_inc.tif",
+        swath=i / f"{st}_{res}_swath.tif", land=i / f"{st}_{res}_land.tif",
+        valid=i / f"{st}_{res}_valid.tif", enl=i / f"{st}_{res}_enl.json",
         quicklooks=base / "quicklooks")
 
 
@@ -98,7 +101,7 @@ def db_quicklooks(p: ScenePaths, max_px: int) -> list[Path]:
     with rasterio.open(p.stack) as src:
         for i, pol in enumerate(("HH", "HV"), start=1):
             db = plots.to_db(src.read(i))
-            png = p.quicklooks / f"{p.product}_{pol}_db.png"
+            png = p.quicklooks / f"{p.stem}_{pol}_db.png"
             plots.detection_quicklook(db, gpd.GeoDataFrame(), png,
                                       f"{pol} sigma0 dB, {abs(src.transform.a):g} m",
                                       max_px, plots.db_stretch(db))
@@ -123,7 +126,7 @@ def build_land_mask(cfg: Config, s1_format: str | None = None, log: Any = print
         dst.write(valid.astype(np.uint8), 1)
     with rasterio.open(p.stack) as src:
         hh_db = plots.to_db(src.read(1))
-    png = mask_overlay(hh_db, land & swath, p.quicklooks / f"{p.product}_landmask.png",
+    png = mask_overlay(hh_db, land & swath, p.quicklooks / f"{p.stem}_landmask.png",
                        f"HH dB + OSM land, {buffer_m:g} m buffer (purple)",
                        plots.db_stretch(hh_db), int(fc["quicklook_max_px"]))
     # ENL on open water, as in 0c (median of 2 km boxes): compare with Table 1's 10.7.

@@ -206,6 +206,13 @@ def apply_coarse_mask(path: Path, mask: np.ndarray, factor: int, block_rows: int
     return n_masked
 
 
+def ice_area_km2(mask_path: Path) -> float:
+    """Pack-ice area (km²) in a scene's ice mask (1 = ice)."""
+    with rasterio.open(mask_path) as src:
+        n = int((src.read(1) == 1).sum())
+        return n * abs(src.transform.a * src.transform.e) / 1e6
+
+
 def distance_to_ice_km(mask_path: Path, xs: np.ndarray, ys: np.ndarray) -> np.ndarray:
     """Distance (km) from map points (mask CRS) to the nearest masked pack-ice cell.
 

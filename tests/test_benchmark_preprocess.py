@@ -91,3 +91,17 @@ def test_combine() -> None:
     assert (combine(e, "min"), combine(e, "mean"), combine(e, "HH")) == (2.0, 4.0, 6.0)
     with pytest.raises(ValueError):
         combine(e, "max")
+
+
+def test_graph_variant_drops_thermal_noise_node(tmp_path: Path) -> None:
+    import xml.etree.ElementTree as ET
+
+    from iceberg_sar.benchmark.preprocess import graph_variant
+
+    graph = Path(__file__).resolve().parents[1] / "benchmarks/faerch2023/s1_ew_preprocess.xml"
+    assert graph_variant({"remove_thermal_noise": True}, graph, tmp_path) == graph
+    root = ET.parse(graph_variant({"remove_thermal_noise": False}, graph, tmp_path)).getroot()
+    ops = {n.get("id"): n for n in root.findall("node")}
+    assert "ThermalNoiseRemoval" not in ops
+    calib_src = ops["Calibration"].find("sources/sourceProduct")
+    assert calib_src.get("refid") == "Remove-GRD-Border-Noise"

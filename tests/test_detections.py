@@ -166,3 +166,43 @@ def test_multi_threshold_needs_same_windows(scene: dict[str, Path]) -> None:
     with pytest.raises(ValueError):
         detect_raster_multi(scene, "HV", [CfarParams(3, 10, 1e-6, 4.0),
                                           CfarParams(3, 12, 1e-6, 4.0)], p)
+
+
+# --- length rule per scene (detections.length_rule) -----------------------------------------
+
+def _ice_mask(path: Path, ice_cells: int) -> Path:
+    """200 m mask grid (0.04 km² per cell) with `ice_cells` ice cells."""
+    a = np.zeros((100, 100), np.uint8)
+    a.flat[:ice_cells] = 1
+    with rasterio.open(path, "w", driver="GTiff", height=100, width=100, count=1,
+                       dtype="uint8", crs="EPSG:32621",
+                       transform=from_origin(600_000, 5_600_000, 200, 200)) as dst:
+        dst.write(a, 1)
+    return path
+
+
+@pytest.mark.parametrize(("mode", "ice_cells", "expected"),
+                         [("auto", 2500, False), ("auto", 5000, True), ("on", 0, True),
+                          ("off", 9000, False)])
+def test_length_rule_for_scene(tmp_path: Path, mode: str, ice_cells: int,
+                               expected: bool) -> None:
+    from types import SimpleNamespace
+
+    from iceberg_sar.detections import length_rule_for_scene
+
+    d = {"length_rule": mode, "length_rule_min_ice_km2": 150}
+    cfg = SimpleNamespace(section=lambda name: d)
+    rule = length_rule_for_scene(cfg, _ice_mask(tmp_path / "ice.tif", ice_cells))
+    assert rule["length_rule"] is expected
+    assert rule["ice_km2"] == pytest.approx(ice_cells * 0.04)   # 2500 cells = 100 km²
+
+
+def test_length_rule_auto_without_ice_mask_stays_on(tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    from iceberg_sar.detections import length_rule_for_scene
+
+    cfg = SimpleNamespace(section=lambda name: {"length_rule": "auto",
+                                                "length_rule_min_ice_km2": 500})
+    rule = length_rule_for_scene(cfg, tmp_path / "missing.tif")
+    assert rule["length_rule"] is True and rule["ice_km2"] is None

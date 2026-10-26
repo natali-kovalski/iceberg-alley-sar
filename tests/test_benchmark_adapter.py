@@ -158,3 +158,27 @@ def test_run_gamma_end_to_end(tmp_path: Path) -> None:
     assert (tmp_path / "out" / "gamma_pfa1e-09.geojson").is_file()
     meta = (tmp_path / "out" / "gamma_run.json").read_text(encoding="utf-8")
     assert '"wo_px": 13' in meta and '"window_cropped": false' in meta
+
+
+def test_max_objects_flag(tmp_path: Path) -> None:
+    s = adapter.DetectorSettings("gamma", 9, 13)
+    cmd = adapter.runner_command(BENCH, ROOT, s, tmp_path / "i.tif", tmp_path / "m.tif",
+                                 [1e-9], 4.0, tmp_path, max_objects=5000)
+    assert cmd[cmd.index("--max-objects") + 1] == "5000"
+    cmd = adapter.runner_command(BENCH, ROOT, s, tmp_path / "i.tif", tmp_path / "m.tif",
+                                 [1e-9], 4.0, tmp_path)
+    assert "--max-objects" not in cmd
+
+
+@needs_env
+def test_sweep_stops_after_the_object_cap(tmp_path: Path) -> None:
+    """PFAs run ascending: 1e-9 finds the one berg, 1e-2 adds speckle and exceeds the cap of
+    1 object, so 1e-1 never runs."""
+    raster, mask = _scene(tmp_path, enl=4.0, seed=3)
+    out = adapter.run("gamma", raster, mask, [1e-1, 1e-9, 1e-2], enl=4.0, cfg=CFG,
+                      out_dir=tmp_path / "out", scene_id=SCENE, max_objects=1)
+    assert list(out) == [1e-9, 1e-2]          # sorted; 1e-2 exceeds the cap, 1e-1 is skipped
+    assert len(out[1e-9]) == 1 and len(out[1e-2]) > 1
+    meta = (tmp_path / "out" / "gamma_run.json").read_text(encoding="utf-8")
+    assert '"stopped_early": true' in meta and '"max_objects": 1' in meta
+    assert not (tmp_path / "out" / "gamma_pfa1e-01.tif").exists()

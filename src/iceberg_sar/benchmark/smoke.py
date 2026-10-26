@@ -23,11 +23,16 @@ from iceberg_sar.benchmark.preprocess import multilook_stack
 from iceberg_sar.config import Config
 
 
-def prepare(cfg: Config, force: bool = False) -> dict[str, Any]:
-    """Multilooked stack, mask and ENL sidecar for the smoke scene (cached on disk)."""
+def prepare(cfg: Config, force: bool = False, sc: dict[str, Any] | None = None,
+            scene: str | None = None, work_root: Path | None = None) -> dict[str, Any]:
+    """Multilooked stack, mask and ENL sidecar for one IW frame (cached on disk).
+
+    Defaults to the smoke scene. `sc` is a config block with the multilook and ENL settings
+    (`benchmark.smoke` by default); the stack goes to `work_root / scene`.
+    """
     bench = cfg.section("benchmark")
-    sc = bench["smoke"]
-    scene = sc["scene"]
+    sc = sc if sc is not None else bench["smoke"]
+    scene = scene or sc["scene"]
     interim = cfg.path("interim") / scene
     paths = {pol: interim / f"{scene}_{pol}_masked.tif" for pol in ("HH", "HV")}
     for p in paths.values():
@@ -36,7 +41,7 @@ def prepare(cfg: Config, force: bool = False) -> dict[str, Any]:
     with rasterio.open(paths["HH"]) as src:
         pixel_m = abs(src.transform.a)
     res_m = round(pixel_m * int(sc["multilook"]))
-    work = cfg.root / bench["out_dir"] / "m0" / scene
+    work = (work_root or cfg.root / bench["out_dir"] / "m0") / scene
     raster = work / f"{scene}_{res_m}m_HHHV.tif"
     mask = work / f"{scene}_{res_m}m_valid.tif"
     if force or not (raster.is_file() and mask.is_file()):

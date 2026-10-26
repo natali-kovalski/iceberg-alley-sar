@@ -85,7 +85,7 @@ def pfa_tag(pfa: float) -> str:
 def runner_command(
     bench: dict[str, Any], root: Path, s: DetectorSettings, raster: Path, mask: Path,
     pfas: Sequence[float], enl: float, out_dir: Path,
-    enl_bands: dict[str, float] | None = None,
+    enl_bands: dict[str, float] | None = None, max_objects: int | None = None,
 ) -> list[str]:
     cmd = [str(root / bench["cfar_env_python"]), str(root / bench["cfar_runner"]),
            "--image", str(raster), "--mask", str(mask), "--detector", s.name,
@@ -100,6 +100,8 @@ def runner_command(
         cmd.append("--allow-window-crop")
     if enl_bands is not None and s.name in PER_BAND_ENL:
         cmd += ["--enl-hh", f"{enl_bands['HH']:.6g}", "--enl-hv", f"{enl_bands['HV']:.6g}"]
+    if max_objects is not None:
+        cmd += ["--max-objects", str(int(max_objects))]
     return cmd
 
 
@@ -187,25 +189,31 @@ def run(
     scene_id: str,
     inc_path: Path | None = None,
     ice_mask: Path | None = None,
+    max_objects: int | None = None,
 ) -> dict[float, gpd.GeoDataFrame]:
     """Run `detector` at each total PFA; returns (and writes) one GeoDataFrame per PFA.
 
     `raster`: 2-band GeoTIFF [HH, HV], linear intensity. `mask`: nonzero = valid.
     `enl` is the single ENL (library behaviour, and always Wishart's). With `enl_bands`
     ({"HH": .., "HV": ..}), gamma and K run each band with its own ENL instead.
+    With `max_objects`, the PFAs run in ascending order and stop after the first one with more
+    objects than that; the result then holds only the PFAs that ran.
     Writes `<detector>_pfa<pfa>.tif` / `.geojson` and `<detector>_run.json` to `out_dir`.
     """
     bench = cfg.section("benchmark")
     s = detector_settings(detector, pixel_size_m(raster), bench)
     out_dir.mkdir(parents=True, exist_ok=True)
-    cmd = runner_command(bench, cfg.root, s, raster, mask, pfas, enl, out_dir, enl_bands)
+    if max_objects is not None:
+        pfas = sorted(pfas)
+    cmd = runner_command(bench, cfg.root, s, raster, mask, pfas, enl, out_dir, enl_bands,
+                         max_objects)
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
         raise RuntimeError(f"cfar runner failed for {detector} (exit {proc.returncode}):\n"
                            f"{proc.stderr.strip()[-3000:]}")
     meta = json.loads((out_dir / f"{detector}_run.json").read_text(encoding="utf-8"))
     results: dict[float, gpd.GeoDataFrame] = {}
-    for p, r in zip(pfas, meta["runs"], strict=True):
+    for p, r in zip(pfas[:len(meta["runs"])], meta["runs"], strict=True):
         gdf = objects_from_raster(
             out_dir / r["raster"], raster, detector=detector, pfa=float(p),
             merge=bench["merge"], connectivity=int(bench["object_connectivity"]),

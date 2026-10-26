@@ -33,8 +33,9 @@ const WRITEUP = `${REPO}/blob/main/docs/thor-vs-cfar.md`;
       <h3>The result</h3>
       <p>
         On four April 2019 passes that neither detector was tuned on, with 512 icebergs marked by
-        Ice Patrol analysts, THOR found <b>84%</b> and the CFAR <b>74%</b>, with the same number of
-        detections each. For large bergs it was <b>11 of 14</b> against 4. On the globe, cyan
+        Ice Patrol analysts, THOR found <b>85%</b> and the CFAR <b>80%</b>, with the same number of
+        detections each. THOR's gain is mostly in medium-sized bergs; for large bergs it was
+        <b>11 of 14</b> against 10. On the globe, cyan
         rings are THOR and orange circles the CFAR baseline. Click a pass marked "THOR vs CFAR" for
         its chart.
       </p>

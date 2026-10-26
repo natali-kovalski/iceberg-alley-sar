@@ -110,3 +110,50 @@ def test_normalized_intensity_flattens_incidence_trend() -> None:
     valid[:5] = False
     n = normalized_intensity(stack.astype(np.float32), inc, valid, 0.5)
     assert n[100, 150] > 20 and np.median(n[valid]) < 1.1 and (n[~valid] == 0).all()
+
+
+def _faerch_shapefile(tmp_path):  # type: ignore[no-untyped-def]
+    """Two drift lines in EPSG:5938 near 58.5 N, like Færch's file (sizes in S2 pixels)."""
+    from shapely.geometry import LineString
+
+    pts = gpd.GeoSeries(gpd.points_from_xy([-60.5, -60.4], [58.5, 58.6]), crs=4326).to_crs(5938)
+    lines = [LineString([(p.x, p.y), (p.x + 1000, p.y - 2000)]) for p in pts]
+    gdf = gpd.GeoDataFrame({"method": ["manual", "interpolate"], "id": ["S2_7", "S2_12"],
+                            "area": [40.0, 0.0], "width": [5.0, np.nan], "length": [10.0, 5.5],
+                            "shape": [0.5, np.nan]}, geometry=lines, crs=5938)
+    path = tmp_path / "drift.shp"
+    gdf.to_file(path)
+    return path, pts
+
+
+def test_faerch_labels_s1_end_status_and_paper_metres(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from iceberg_sar.benchmark.patha import faerch_labels
+
+    path, pts = _faerch_shapefile(tmp_path)
+    lab = faerch_labels(path, "EPSG:32620", 10.0, ["manual"], 250, 1789)
+    assert lab.label_id.tolist() == [7, 12]
+    assert lab.status.tolist() == ["verified", "interpolated"]
+    assert lab.radius_m.tolist() == [250, 1789]
+    # label = S1 end of the line, S2 position = start
+    s2 = pts.to_crs(32620)
+    assert np.allclose(lab.s2_x, s2.x, atol=0.01) and np.allclose(lab.s2_y, s2.y, atol=0.01)
+    s1 = gpd.GeoSeries(gpd.points_from_xy(pts.x + 1000, pts.y - 2000), crs=5938).to_crs(32620)
+    assert np.allclose(lab.geometry.x, s1.x, atol=0.01)
+    # EPSG:5938 metres are ~7 % longer than true ones at 58.5 N
+    k = lab.length_m_paper / lab.length_m
+    assert np.allclose(lab.length_m, [100.0, 55.0]) and ((k > 1.06) & (k < 1.08)).all()
+    assert np.allclose(lab.drift_m_paper, np.hypot(1000, 2000))
+    assert (lab.drift_m < lab.drift_m_paper).all()
+    # classes use paper metres: 100 m -> ~107 m (medium), 55 m -> ~59 m (still small)
+    assert lab.size_class.tolist() == ["medium", "small"]
+    assert np.isclose(lab.area_m2.iloc[0], 4000.0) and np.isnan(lab.width_m.iloc[1])
+
+
+def test_faerch_unknown_drops_empty_rows(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from iceberg_sar.benchmark.patha import faerch_unknown
+
+    pts = gpd.GeoSeries(gpd.points_from_xy([-60.5], [58.5]), crs=4326).to_crs(5938)
+    gdf = gpd.GeoDataFrame({"id": [np.nan, np.nan]}, geometry=[pts.iloc[0], None], crs=5938)
+    gdf.to_file(tmp_path / "u.shp")
+    unk, n_empty = faerch_unknown(tmp_path / "u.shp", "EPSG:32620")
+    assert len(unk) == 1 and n_empty == 1 and unk.crs.to_epsg() == 32620

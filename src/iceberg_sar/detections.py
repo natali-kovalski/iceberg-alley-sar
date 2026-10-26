@@ -372,10 +372,38 @@ def save_overlay(
     return png_path
 
 
+NO_STRUCTURE_LIMIT = np.iinfo(np.int32).max
+
+
+def length_rule_for_scene(cfg: Config, ice_mask: Path) -> dict[str, object]:
+    """Whether the ice-strip length rule (`max_structure_m`) applies to a scene.
+
+    `detections.length_rule`: on / off, or auto = on when the scene's pack-ice mask covers at
+    least `length_rule_min_ice_km2`. Strips break off pack ice; in open water the rule only
+    drops large bergs (5d, Stage 2 / 2b). Auto without an ice mask keeps the rule on.
+    """
+    d = cfg.section("detections")
+    mode = str(d.get("length_rule", "on")).lower()
+    if mode not in ("on", "off", "auto"):
+        raise ValueError(f"detections.length_rule must be on, off or auto, not {mode!r}")
+    ice_km2 = None
+    if ice_mask.is_file():
+        from iceberg_sar.seaice import ice_area_km2
+
+        ice_km2 = round(ice_area_km2(ice_mask), 1)
+    if mode == "auto":
+        min_km2 = float(d["length_rule_min_ice_km2"])
+        on = ice_km2 is None or ice_km2 >= min_km2
+    else:
+        on = mode == "on"
+    return {"length_rule": on, "length_rule_mode": mode, "ice_km2": ice_km2}
+
+
 def _product_setup(
     product_dir: Path, cfg: Config, band: str | None,
-) -> tuple[dict[str, Path], str, float, CfarParams, DetectionParams]:
-    """Masked rasters, CFAR band, pixel size, CFAR and detection parameters from the config."""
+) -> tuple[dict[str, Path], str, float, CfarParams, DetectionParams, dict[str, object]]:
+    """Masked rasters, CFAR band, pixel size, CFAR and detection parameters from the config,
+    and the scene's length-rule decision (`length_rule_for_scene`, already applied)."""
     name = product_dir.name
     interim = cfg.path("interim") / name
     masked = {
@@ -385,7 +413,7 @@ def _product_setup(
     }
     if not masked:
         raise FileNotFoundError(f"No masked rasters in {interim}; run `preprocess` first")
-    c, d = cfg.section("cfar"), cfg.section("detections")
+    c = cfg.section("cfar")
     if c.get("variant", "CA") != "CA":
         raise NotImplementedError(f"CFAR variant {c['variant']} (only CA so far)")
     fallback = {"HV": "VH", "VH": "HV", "HH": "VV", "VV": "HH"}
@@ -393,14 +421,24 @@ def _product_setup(
     band = want if want in masked else fallback[want]
     if band not in masked:
         raise ValueError(f"CFAR band {want} (or {band}) not in {sorted(masked)}")
+    pixel_m, cfar, params = params_for_raster(cfg, masked[band])
+    rule = length_rule_for_scene(cfg, interim / f"{name}_seaice_mask.tif")
+    if not rule["length_rule"]:
+        params = replace(params, max_structure_px=NO_STRUCTURE_LIMIT)
+    return masked, band, pixel_m, cfar, params, rule
 
-    with rasterio.open(masked[band]) as src:
+
+def params_for_raster(cfg: Config, cfar_path: Path) -> tuple[float, CfarParams, DetectionParams]:
+    """Pixel size, CFAR and detection parameters for a masked CFAR-band raster (metres from the
+    config converted at its pixel size; `enl: auto` estimated on it)."""
+    c, d = cfg.section("cfar"), cfg.section("detections")
+    with rasterio.open(cfar_path) as src:
         pixel_m = abs(src.transform.a)
 
     def px(metres: float) -> int:
         return metres_to_px(float(metres), pixel_m)
 
-    enl = resolve_enl(c.get("enl", "auto"), masked[band], px(c.get("enl_cell_m", 500)))
+    enl = resolve_enl(c.get("enl", "auto"), cfar_path, px(c.get("enl_cell_m", 500)))
     cfar = CfarParams(
         guard_px=px(c["guard_m"]), background_px=px(c["background_m"]),
         pfa=float(c["pfa"]), enl=enl,
@@ -417,7 +455,7 @@ def _product_setup(
         merge_by_structure=bool(d.get("merge_by_structure", True)),
         block_rows=int(d.get("block_rows", 1024)),
     )
-    return masked, band, pixel_m, cfar, params
+    return pixel_m, cfar, params
 
 
 def detect_product(product_dir: Path, cfg: Config, band: str | None = None) -> dict[str, Path]:
@@ -432,7 +470,7 @@ def detect_product(product_dir: Path, cfg: Config, band: str | None = None) -> d
     product_dir = Path(product_dir)
     name = product_dir.name
     interim = cfg.path("interim") / name
-    masked, band, pixel_m, cfar, params = _product_setup(product_dir, cfg, band)
+    masked, band, pixel_m, cfar, params, rule = _product_setup(product_dir, cfg, band)
     table, transform, crs = detect_raster(masked, band, cfar, params)
     inc = find_rtc_bands(product_dir).get("inc") if product_dir.is_dir() else None
     ice_mask = interim / f"{name}_seaice_mask.tif"
@@ -466,6 +504,7 @@ def detect_product(product_dir: Path, cfg: Config, band: str | None = None) -> d
         "alpha": round(cfar.alpha, 3),
         "alpha_db": round(float(to_db(cfar.alpha)), 2),
         "n_detections": len(gdf),
+        **rule,
         "area_px_quantiles": (gdf["area_px"].quantile([0.1, 0.5, 0.9]).tolist()
                               if len(gdf) else []),
     }
@@ -487,7 +526,7 @@ def detect_product_sweep(
     product_dir = Path(product_dir)
     name = product_dir.name
     interim = cfg.path("interim") / name
-    masked, band, pixel_m, base, params = _product_setup(product_dir, cfg, band)
+    masked, band, pixel_m, base, params, rule = _product_setup(product_dir, cfg, band)
     cfars = [replace(base, pfa=float(pfa)) for pfa in pfas]
     tables, transform, crs = detect_raster_multi(masked, band, cfars, params)
     inc = find_rtc_bands(product_dir).get("inc") if product_dir.is_dir() else None
@@ -510,7 +549,8 @@ def detect_product_sweep(
         summary = {"product": name, "timestamp": scene_timestamp(name), "cfar_band": band,
                    "pixel_m": pixel_m, "guard_px": c.guard_px, "background_px": c.background_px,
                    "pfa": c.pfa, "enl": round(c.enl, 3), "alpha": round(c.alpha, 3),
-                   "alpha_db": round(float(to_db(c.alpha)), 2), "n_detections": len(gdf)}
+                   "alpha_db": round(float(to_db(c.alpha)), 2), "n_detections": len(gdf),
+                   **rule}
         (d / f"{name}_{band}_detections.json").write_text(json.dumps(summary, indent=2),
                                                            encoding="utf-8")
         out[c.pfa] = geojson

@@ -317,6 +317,26 @@ def test_training_frame_split_and_truth(cfg: Config) -> None:
     assert "n_truth" not in by_id[f"scene/{second}"]
 
 
+def test_test_frame_truth(cfg: Config) -> None:
+    """5d test frame: the scored labels passed in become `truth/` crosses, not snapped."""
+    import pandas as pd
+
+    first, second = SCENES
+    labels = pd.DataFrame({
+        "season": 2025, "number": [7], "time": "2025-05-02 09:47:00", "lat": [50.1],
+        "lon": [-53.2], "method": "SAT-HIGH", "size": "LG", "shape": "TAB", "source": "SNL1",
+        "snapped": False,
+    })
+    packets = build_czml(find_scenes(cfg, "HV"), ViewerParams(), test_truth={second: labels})
+    truth = [p for p in packets if p["id"].startswith("truth/")]
+    assert len(truth) == 1 and truth[0]["parent"] == f"scene/{second}"
+    assert truth[0]["position"]["cartographicDegrees"][:2] == [-53.2, 50.1]
+    assert "0.1' cell centre" in truth[0]["description"]
+    by_id = {p["id"]: p["properties"] for p in packets if p["id"].startswith("scene/")}
+    assert by_id[f"scene/{second}"]["n_truth"] == 1
+    assert "n_truth" not in by_id[f"scene/{first}"]
+
+
 def test_export_leaves_out_excluded_scenes(cfg: Config) -> None:
     first, second = SCENES
     cfg.raw["viewer"] = {"exclude": [first]}

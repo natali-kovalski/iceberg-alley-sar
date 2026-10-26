@@ -154,9 +154,15 @@ def _write(out_dir: Path, targets: gpd.GeoDataFrame, labels: gpd.GeoDataFrame,
     return paths
 
 
-def _quicklooks(sp: Any, labels: gpd.GeoDataFrame, sar: gpd.GeoDataFrame, qdir: Path,
-                max_px: int) -> dict[str, Path]:
-    """Full scene with labels, and a zoom on the densest 20 km with drift paths."""
+def _quicklooks(sp: Any, labels: gpd.GeoDataFrame, sar: gpd.GeoDataFrame | None, qdir: Path,
+                max_px: int, stem: str = "labels_reconstructed",
+                caption: str = f"{MARK}: Sentinel-2 4-sigma, moved to the S1 pass. HH dB, 40 m",
+                zoom_title: str = f"{MARK}: drift S2 (dot) -> S1 (ring), 20 km zoom",
+                extra: gpd.GeoDataFrame | None = None) -> dict[str, Path]:
+    """Full scene with labels, and a zoom on the densest 20 km with drift paths.
+
+    `sar`: bright SAR objects (zoom only); `extra`: unknown SAR objects (both plots).
+    """
     import matplotlib
 
     matplotlib.use("Agg")
@@ -180,11 +186,14 @@ def _quicklooks(sp: Any, labels: gpd.GeoDataFrame, sar: gpd.GeoDataFrame, qdir: 
     for st, m in (("interpolated", ~ver), ("verified", ver)):
         ax.scatter(lc[m] / step, lr[m] / step, s=30, facecolors="none", edgecolors=colours[st],
                    linewidths=0.8, label=f"{st} ({m.sum()})")
-    ax.text(15, 15, f"{MARK}: Sentinel-2 4-sigma, moved to the S1 pass. HH dB, 40 m",
-            color="yellow", fontsize=18, va="top")
+    if extra is not None and len(extra):
+        er, ec = rc(extra.geometry.x, extra.geometry.y)
+        ax.scatter(ec / step, er / step, s=60, c="#ff375f", marker="x", linewidths=1.2,
+                   label=f"unknown SAR objects ({len(extra)})")
+    ax.text(15, 15, caption, color="yellow", fontsize=18, va="top")
     ax.legend(loc="lower left", fontsize=14)
     ax.set_axis_off()
-    out["full"] = qdir / "labels_reconstructed_full.png"
+    out["full"] = qdir / f"{stem}_full.png"
     qdir.mkdir(parents=True, exist_ok=True)
     fig.savefig(out["full"], facecolor="black")
     plt.close(fig)
@@ -195,8 +204,13 @@ def _quicklooks(sp: Any, labels: gpd.GeoDataFrame, sar: gpd.GeoDataFrame, qdir: 
     fig, ax = plt.subplots(figsize=(10, 10))
     ax.imshow(db[r0:r0 + size, c0:c0 + size], cmap="gray", vmin=stretch[0], vmax=stretch[1],
               extent=(c0, c0 + size, r0 + size, r0))
-    srr, scc = rc(sar.geometry.x, sar.geometry.y)
-    ax.scatter(scc, srr, s=8, c="#64d2ff", marker="+", linewidths=0.6, label="SAR bright objects")
+    if sar is not None:
+        srr, scc = rc(sar.geometry.x, sar.geometry.y)
+        ax.scatter(scc, srr, s=8, c="#64d2ff", marker="+", linewidths=0.6,
+                   label="SAR bright objects")
+    if extra is not None and len(extra):
+        ax.scatter(ec, er, s=60, c="#ff375f", marker="x", linewidths=1.2,
+                   label="unknown SAR objects")
     for st, m in (("interpolated", ~ver), ("verified", ver)):
         ax.plot(np.vstack([sc[m], lc[m]]), np.vstack([sr[m], lr[m]]), color=colours[st], lw=0.6)
         ax.scatter(lc[m], lr[m], s=40, facecolors="none", edgecolors=colours[st], linewidths=1,
@@ -204,11 +218,11 @@ def _quicklooks(sp: Any, labels: gpd.GeoDataFrame, sar: gpd.GeoDataFrame, qdir: 
         ax.scatter(sc[m], sr[m], s=6, c=colours[st], label=f"{st}: S2 position")
     ax.set_xlim(c0, c0 + size)
     ax.set_ylim(r0 + size, r0)
-    ax.set_title(f"{MARK}: drift S2 (dot) -> S1 (ring), 20 km zoom")
+    ax.set_title(zoom_title)
     ax.legend(loc="lower left", fontsize=8)
     ax.set_xticks([])
     ax.set_yticks([])
-    out["zoom"] = qdir / "labels_reconstructed_zoom.png"
+    out["zoom"] = qdir / f"{stem}_zoom.png"
     fig.savefig(out["zoom"], dpi=110, bbox_inches="tight")
     plt.close(fig)
     return out

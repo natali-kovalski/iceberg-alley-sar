@@ -69,7 +69,7 @@ export interface SceneInfo {
   // THOR training frame (5b): "train" = the head was fitted on it, "val" = pack-ice set, never
   // trained on. Undefined for every other pass.
   split?: string;
-  nTruth?: number; // IIP analyst labels shown on a training frame
+  nTruth?: number; // IIP analyst labels shown on a training or 5d test frame
   hasSar?: boolean; // at least one frame has SAR imagery on ion
 }
 

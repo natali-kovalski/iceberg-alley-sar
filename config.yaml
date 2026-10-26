@@ -97,9 +97,15 @@ detections:
   max_extent_m: 1280        # anything taller is not a berg or ship
   grow_db: 4                # region-grow level (dB over background, 3x3 smoothed) around each target
   max_structure_m: 300      # longer grown structures are sea-ice strips (tuned on 2025-05-08 at 20 m)
+  # The length rule above, only in scenes with pack ice (2026-10-26): auto = on when the scene's
+  # HV pack-ice mask covers >= length_rule_min_ice_km2. In open water it only drops large bergs
+  # (04-29 at 10 m: recall at 500 detections 0.75 with it, 0.83 without). on / off force it.
+  # Our scenes: <= 300 km² (open water) or >= 1200 km² (2025-05-08, where it was tuned: 2100).
+  length_rule: auto
+  length_rule_min_ice_km2: 500
   copol_min_contrast_db: 6  # HH peak over HH background; drops HV-only speckle (10 m HV noise ~0 dB, bergs 3-20 dB). null = off
   merge_by_structure: true  # CFAR cores in one grown blob = one target (ships split into 2 cores ~50 m apart)
-  block_rows: 1024          # rows per processing block (memory vs. overhead)
+  block_rows: 512           # rows per processing block (memory vs. overhead; same detections at any size)
 
 ground_truth:
   # NAIS (IIP + Canadian Ice Service) daily Iceberg Analysis: icebergs per 1-degree square.
@@ -306,6 +312,7 @@ benchmark:
   # per_band: gamma / K use each band's own ENL (HyP3 HV water ENL << HH). single: the
   # library's one ENL for both (smoke.enl_combine). Wishart always takes the single value.
   enl_mode: per_band
+  repro_tolerance_f1: 0.05  # Milestone 1f: |my F - paper F| at each detector's optimum PFA
   # Window diameters in metres -> nearest odd pixel count per raster (360 / 520 m = 9 / 13 px at 40 m)
   detectors:
     gamma:    {inner_m: 360, outer_m: 520}
@@ -325,6 +332,36 @@ benchmark:
     enl_box: auto           # auto = the median-ENL box among fully valid boxes; or [W, S, E, N] in EPSG:4326
     enl_combine: min        # the single ENL (Wishart, or all in enl_mode single): min, mean, HH or HV
     quicklook_max_px: 2400
+  iw_sweep:                 # Milestone 2b, one frame first: reference detectors + my CA-CFAR at 40 m vs IIP labels
+    scenes: [S1A_IW_20190429T094108_DHP_RTC10_G_gpuned_671B]   # same-pass IIP labels (5d: 267 compared)
+    out_dir: data/benchmark/iw40
+    multilook: 4            # 10 m -> 40 m: the paper's windows (9 / 13 px) fit the library's 41 px stencil
+    multilook_min_valid: 1.0
+    enl_box_m: 2000
+    enl_box: auto
+    enl_combine: min
+    # Total PFA, every 2 decades (the paper's 21 levels halved). Curves are compared at matched
+    # detection counts, so sparser points only cost interpolation.
+    pfas: [1.0e-21, 1.0e-19, 1.0e-17, 1.0e-15, 1.0e-13, 1.0e-11, 1.0e-9, 1.0e-7, 1.0e-5, 1.0e-3, 1.0e-1]
+    # PFAs run in ascending order; a detector stops after the first PFA with more objects than
+    # this (~20x the labels; 5d's 10 m CFAR curve ends at 1513). Reference detectors count raw
+    # outlier components, the CA-CFAR its final objects.
+    max_objects: 5000
+    detectors: [gamma, lognorm, k, wishart, nis, idpolrad]
+    # My CA-CFAR with and/or without max_structure_m (tags cacfar / cacfar-nolength). Without it
+    # is the like-for-like run: the reference detectors have no such rule.
+    cacfar_length_rules: [false, true]
+    # My CA-CFAR also at native 10 m without the length rule (tag cacfar-nolength-10m), at 5d's
+    # PFAs (thor.compare.cfar_pfas) so it pairs with 5d's with-rule curve. [] = skip.
+    cacfar_10m_pfas: [1.0e-12, 1.0e-10, 1.0e-8, 1.0e-7, 1.0e-6, 1.0e-5, 1.0e-4, 1.0e-3]
+    # Rows per block at 10 m (detections.block_rows is 1024). A 10 m row is 28,591 px, so 1024-row
+    # blocks need a few GB; smaller blocks give the same detections (halo) with less peak RAM.
+    cacfar_10m_block_rows: 256
+    # Scoring as in 5d (thor.compare): same labels, open-water filter (viewer.near_ice_km), radius
+    # validation.max_dist_m. Recall is read off each curve at these detection counts.
+    matched_counts: [250, 500, 1000]
+    breakdown_count: 500    # size breakdown at each detector's operating point nearest this count
+    report: benchmarks/m2b_iw40.md
   faerch2023:               # Stage 2 / Milestone 1: reproduce Færch 2023 on the Sentinel-1 EW scene
     paper_xml: benchmarks/faerch2023/faerch2023.xml
     scenes_csv: benchmarks/faerch2023/scenes.csv
@@ -354,11 +391,52 @@ benchmark:
       cache: 6G             # gpt -c; must stay below -Xmx10G in gpt.vmoptions (16 GB RAM)
       threads: 8
       resampling: NEAREST_NEIGHBOUR   # paper: nearest neighbour, "to avoid averaging pixel intensities"
+      # Paper: thermal noise removal on. false = diagnostic variant, files tagged `_noTNR`
+      # (`--no-tnr` on bench-preprocess / bench-landmask); the pipeline default stays true.
+      remove_thermal_noise: true
     land:
       buffer_m: 500         # paper sec. 3.1
       # Fallback when osmdata.openstreetmap.de is unreachable: land built from the coastline ways
       # of this Geofabrik extract (same OSM data the land polygons are made from).
       osm_pbf: data/land/newfoundland-and-labrador-261020.osm.pbf
+    sweep:                  # 1e: every reference detector x 21 PFAs on the 40 m EW stack (`bench-sweep`)
+      out_dir: data/benchmark/faerch2023/sweep
+      # Paper sec. 3.3: "21 different PFA levels varying from 1e-21 to 1e-1" (one per decade)
+      pfa_min_exp: -21
+      pfa_max_exp: -1
+      detectors: [gamma, lognorm, k, wishart, nis, idpolrad]
+      # One ENL for both bands, as the paper (Table 1: 10.7, read from scenes.csv `paper_enl`).
+      # Measured on GRDM: HH 9.5 / HV 0.98. `table1` or a number.
+      enl: table1
+      # PFAs run in ascending order; a detector stops after the first PFA with more objects than
+      # this in the whole scene. The AOI is ~1/5 of the scene, so the last PFA scored has >~4000
+      # objects in it vs 492 labels (F < 0.2); the paper's optimum has 24-74 false positives.
+      max_objects: 20000
+    score:                  # 1f: match detections to labels, recall / precision / F per (detector, PFA)
+      # Scoring area: S1 valid (swath, no land buffer) x the S2 and ALOS-2 outlines of Fig. 1
+      # (`fig1`), or the Path B AOI that also drops clouds and S2 nodata (`reconstructed`).
+      aoi: fig1
+      aoi_sensitivity: reconstructed   # also scored, reported as one row (FP depend on the area)
+      # Detections within this of an "unknown SAR object" (Path A) are ignored: neither TP nor FP
+      # (paper: bright objects under clouds, bergs drifting in, one ship were removed).
+      unknown_ignore_m: 250
+      reference: benchmarks/faerch2023/reference.yaml
+      fig6_csv: benchmarks/faerch2023/reference_fig6.csv   # digitized by hand; overlay only if present
+      figure: docs/img/faerch2023_f_vs_pfa.png
+      report: docs/faerch2023-reproduction.md
+      table_csv: data/benchmark/faerch2023/score/scores.csv
+    labels_source: faerch   # labels for 1e/1f: faerch (Path A) | reconstructed (Path B); --source overrides
+    labels_faerch:          # 1d Path A: the paper's validation set, from Laust Færch (email, 2026-10-24). Private: never commit
+      dir: data/benchmark/faerch2023/labels_faerch/data-for-natalia   # unzipped as sent (LZMA zip: Explorer can't open it)
+      drift_paths: matching-sentinel2-sentinel1-interpolated.shp   # lines S2 -> S1 position, EPSG:5938
+      unknown_objects: sentinel1-unknown-objects.shp               # bright SAR objects without an optical match
+      verified_methods: [manual]    # `method` of verified drift paths; "interpolate" = expected drift paths
+      s2_pixel_m: 10                # `length` / `width` / `area` are in Sentinel-2 pixels
+      radius_verified_m: 250        # paper sec. 3.4
+      radius_interpolated_m: 1789
+      compare_m: 50                 # report only: rebuilt (Path B) S2 target <-> Færch S2 position
+      out_dir: data/benchmark/faerch2023/labels
+      report: benchmarks/faerch2023/labels_faerch.md
     labels:                 # 1d Path B: labels rebuilt from Sentinel-2 -> RECONSTRUCTED LABELS
       dir: data/benchmark/faerch2023/labels
       report: benchmarks/faerch2023/labels_rebuilt.md

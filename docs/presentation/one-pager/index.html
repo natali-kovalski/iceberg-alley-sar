@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Iceberg Alley SAR</title>
+<!-- One-page project summary (US Letter). Print with:
+     msedge --headless --print-to-pdf="Iceberg Alley SAR.pdf" --no-pdf-header-footer index.html
+     Numbers: docs/thor-vs-cfar.md, current result (2026-10-26). -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400..700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+:root {
+  --paper: #FAFBFA;      /* sheet */
+  --desk: #E3E9EB;       /* behind the sheet on screen */
+  --panel: #F2F4F4;      /* body panel */
+  --ink: #0E2233;        /* deep ocean navy: headings */
+  --body: #3E4E5E;       /* running text */
+  --muted: #5F6E7C;      /* captions */
+  --accent: #B04E1C;     /* labels, numbers */
+  --rule: #D3DCDF;
+  --tint: #EDF2F3;       /* stat row */
+  --display: 'Source Serif 4', Georgia, serif;
+  --text: 'IBM Plex Sans', Arial, sans-serif;
+  --mono: 'IBM Plex Mono', 'Courier New', monospace;
+  color-scheme: light;
+}
+@page { size: letter; margin: 0.3in 0.45in 0.3in; }
+* { box-sizing: border-box; }
+html, body { background: var(--desk); color: var(--body); }
+body { margin: 0; font-family: var(--text); font-size: 7.4pt; line-height: 1.34; padding: 24px 16px; }
+.sheet {
+  width: 8.5in; min-height: 11in; margin-inline: auto; background: var(--paper);
+  padding: 0.3in 0.45in 0.3in; display: flex; flex-direction: column; gap: 0.07in;
+  box-shadow: 0 2px 18px rgba(14, 34, 51, 0.14);
+}
+h1, h2, p, ul, figure { margin: 0; }
+b { color: var(--ink); font-weight: 600; }
+.label { font-size: 7pt; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+
+header { display: flex; justify-content: space-between; align-items: flex-end; gap: 0.3in;
+         border-bottom: 1.5px solid var(--ink); padding-bottom: 0.1in; }
+.title { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+h1 { font-family: var(--display); font-size: 27pt; font-weight: 650; line-height: 1.05; color: var(--ink); letter-spacing: -0.01em; }
+.lede { font-family: var(--display); font-size: 10pt; line-height: 1.38; max-width: 4.9in; }
+.who { text-align: right; font-size: 7.4pt; line-height: 1.6; color: var(--muted); white-space: nowrap; }
+.who b { font-size: 8.4pt; }
+.who a { color: var(--accent); text-decoration: none; font-family: var(--mono); }
+
+.hero { position: relative; }
+.hero img { display: block; width: 100%; aspect-ratio: 1310 / 225; object-fit: cover; border-radius: 3px; }
+.cta { position: absolute; right: 0.14in; top: 50%; transform: translateY(-50%);
+       background: rgba(10, 26, 40, 0.88); color: #E8EEF1; border-radius: 3px; padding: 0.08in 0.13in;
+       display: flex; flex-direction: column; gap: 2px; }
+.cta .label { color: #E8EEF1; display: flex; align-items: center; gap: 5px; }
+.cta .label::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #F0913A; }
+.cta .url { font-family: var(--mono); font-size: 9.6pt; color: #fff; }
+.cta .how { font-size: 7pt; color: #C9D4DA; }
+figcaption { font-size: 7.1pt; line-height: 1.4; color: var(--muted); }
+figcaption b { color: var(--body); }
+
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--tint); border-radius: 3px; }
+.stat { padding: 0.06in 0.13in; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.stat + .stat { border-left: 1px solid var(--rule); }
+.num { font-family: var(--display); font-size: 18pt; font-weight: 650; line-height: 1.1; color: var(--ink); font-variant-numeric: tabular-nums; }
+.num small { font-size: 10.5pt; font-weight: 500; color: var(--accent); }
+.stat p { font-size: 7.1pt; line-height: 1.28; }
+
+.cols { display: grid; grid-template-columns: 1fr 1.08fr; gap: 0.2in; background: var(--panel);
+        padding: 0.08in 0.12in; border-radius: 3px; flex: 1; }
+.col { display: flex; flex-direction: column; gap: 0.055in; min-width: 0; }
+section { display: flex; flex-direction: column; gap: 2px; }
+h2 { font-family: var(--display); font-size: 10pt; font-weight: 650; color: var(--ink); line-height: 1.2; }
+ul.dots { padding-left: 1.05em; display: flex; flex-direction: column; gap: 2px; }
+ul.dots li::marker { color: var(--accent); }
+.chart { background: #fff; border: 1px solid var(--rule); border-radius: 3px; padding: 4px; display: flex; justify-content: center; }
+.chart img { display: block; height: 1.7in; width: auto; }
+.tools { font-family: var(--mono); font-size: 7pt; line-height: 1.5; color: var(--ink); }
+
+footer { border-top: 1px solid var(--rule); padding-top: 0.05in; font-size: 6.4pt; line-height: 1.4; color: var(--muted); }
+
+@media print {
+  html, body { background: var(--paper); }
+  body { padding: 0; }
+  .sheet { width: 100%; min-height: 0; padding: 0; box-shadow: none; }
+  .cols { flex: none; }
+  section, figure, .stats { break-inside: avoid; }
+}
+@media screen and (max-width: 8.9in) {
+  .sheet { width: 100%; min-height: 0; padding: 24px 16px; gap: 16px; }
+  header { flex-direction: column; align-items: flex-start; }
+  .who { text-align: left; white-space: normal; }
+  .cta { position: static; transform: none; margin-top: 6px; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .stat:nth-child(3) { border-left: none; }
+  .stat:nth-child(n+3) { border-top: 1px solid var(--rule); }
+  .cols { grid-template-columns: 1fr; }
+  .chart img { height: auto; width: 100%; max-width: 420px; }
+}
+</style>
+</head>
+<body>
+<article class="sheet">
+  <header>
+    <div class="title">
+      <p class="label">Project portfolio · Remote sensing + machine learning</p>
+      <h1>Iceberg Alley SAR</h1>
+      <p class="lede">Finding icebergs off Newfoundland in Sentinel&#8209;1 radar with THOR, a SAR foundation model, benchmarked against a classical CA&#8209;CFAR detector.</p>
+    </div>
+    <div class="who">
+      <b>Natali Kovalski</b><br>
+      October 2026<br>
+      Code: <a href="https://github.com/natali-kovalski/iceberg-alley-sar">github.com/natali-kovalski/iceberg-alley-sar</a>
+    </div>
+  </header>
+
+  <figure>
+    <div class="hero">
+      <img src="hero.png" alt="Live viewer over northeast Newfoundland: THOR rings and CFAR dots on 8 May 2025">
+      <div class="cta">
+        <span class="label">Live 3D viewer</span>
+        <span class="url">natali-kovalski.github.io/iceberg-alley-sar</span>
+        <span class="how">Step through the scenes · toggle THOR and CFAR · click any detection</span>
+      </div>
+    </div>
+    <figcaption><b>The live viewer</b>, 8 May 2025: THOR detections (cyan rings), CA-CFAR baseline (orange dots), pack ice (blue), likely floes in grey.</figcaption>
+  </figure>
+
+  <div class="stats">
+    <div class="stat"><span class="num">85<small>%</small></span><p>of analyst-labelled icebergs found by THOR on four held-out frames (435 of 512)</p></div>
+    <div class="stat"><span class="num">80<small>%</small></span><p>found by the CA-CFAR baseline with the same number of detections</p></div>
+    <div class="stat"><span class="num">0.88 <small>vs 0.81</small></span><p>recall on medium bergs (61–120&nbsp;m, 425 labels), where most of the gain is</p></div>
+    <div class="stat"><span class="num">18<small>% fewer</small></span><p>detections for THOR to reach the CFAR's 80% recall (≈790 vs 961)</p></div>
+  </div>
+
+  <div class="cols">
+    <div class="col">
+      <section>
+        <h2>Summary</h2>
+        <p>I added the <b>THOR foundation model</b> (frozen encoder plus a small trained head) as a second iceberg detector next to my CA-CFAR baseline. On four held-out Sentinel&#8209;1 frames from April 2019 (512 analyst-labelled bergs), THOR found <b>85%</b> of the labelled bergs and the CFAR found <b>80%</b>, with both detectors allowed the same number of detections. The gain is mostly in medium-sized bergs; for large bergs (&gt;120&nbsp;m) it was <b>11 of 14</b> against 10.</p>
+      </section>
+      <section>
+        <h2>Setup</h2>
+        <p>The <b>baseline</b> is a cell-averaging CFAR on HV intensity (Sentinel&#8209;1 IW, HyP3 RTC at 10&nbsp;m), with land and pack-ice masks and an HH co-pol check. Its rule against thin sea-ice strips runs only in scenes with pack ice.</p>
+        <p>The setup follows Forgaard et al., <i>Efficient iceberg detection in Sentinel&#8209;1 imagery using the THOR foundation model</i> (IGARSS 2026). The article worked with VV/VH polarization; I used <b>HH/HV</b>, and the model accepted it well. I used the <b>tiny model</b> (FM4CS, Apache 2.0), which the article reported as performing well, with 8×8 patches.</p>
+      </section>
+      <section>
+        <h2>Data and labels</h2>
+        <p>Training used <b>17 Sentinel&#8209;1 IW HH/HV frames</b> from May–June 2019 and April–May 2020. Each frame has same-pass IIP satellite-analyst labels, so no drift correction was needed. That gave <b>702 chips</b> of 512×512 px with <b>432 visible labelled bergs</b>. The chips were sampled around bergs, open water, the swath edge and the pack-ice edge.</p>
+        <ul class="dots">
+          <li><b>Label cleaning.</b> IIP positions are truncated to 0.1 arc-minute. Moving them to the cell centre halved the position error (median 135&nbsp;m to 67&nbsp;m). I then snapped each label to the nearest bright HH peak within 200&nbsp;m.</li>
+          <li><b>Ignored regions.</b> Labels on masked pixels and CFAR detections with no label are excluded from the loss. They are not treated as water.</li>
+          <li><b>Leakage.</b> Bergs drift only 10–20&nbsp;km a day, so the same berg appears on nearby dates. All of 25 March to 6 May 2019 was held out as the test window, and head selection used year folds (train 2019, validate 2020, and the reverse).</li>
+          <li><b>Pack-ice set.</b> The Feb–Mar 2019 frames are mostly close pack ice. They were never trained on and are kept as a separate stress set.</li>
+        </ul>
+      </section>
+      <section>
+        <p class="label">Tools</p>
+        <p class="tools">PyTorch · TerraTorch · Python · NumPy · SciPy · rasterio · GeoPandas · HyP3 · Vue 3 · CesiumJS</p>
+      </section>
+    </div>
+
+    <div class="col">
+      <figure>
+        <div class="chart"><img src="recall_pooled.png" alt="Recall vs. detections, pooled over four held-out frames: THOR above the CA-CFAR"></div>
+        <figcaption>Recall vs. detections, 4 held-out frames, 512 bergs: THOR linear (blue) and CenterNet (green) vs. the CA-CFAR over its false-alarm rates (orange).</figcaption>
+      </figure>
+      <section>
+        <h2>Results on the held-out test frames</h2>
+        <p>The test used four April 2019 frames with same-pass analyst labels. THOR was not tuned on them. Without AIS, precision can't be measured, so I compared <b>recall at a matched number of detections</b>. The CFAR's count at PFA 1e&#8209;6 was fixed, and THOR got the same number of top-scoring peaks. Both detectors used the same masks, labels and 500&nbsp;m one-to-one matching.</p>
+        <ul class="dots">
+          <li><b>THOR is ahead on every frame</b>, by 2 to 7 points. Pooled, it reaches the CFAR's recall with about 18% fewer detections. The CFAR flattens at 0.89 even at PFA 1e&#8209;3 (about 4,900 detections); THOR reaches that with about 1,300.</li>
+          <li><b>Large bergs (&gt;120&nbsp;m):</b> THOR 11 of 14, CFAR 10. The CFAR's length rule against sea-ice strips used to throw them away (grown blobs of 340–470&nbsp;m), leaving it 4 of 14 and 74% overall. It now runs only in scenes with pack ice; the four it still misses are on those frames.</li>
+          <li><b>Medium bergs (61–120&nbsp;m)</b> carry most of the gain: 0.81 to 0.88 on 425 labels.</li>
+          <li><b>Small bergs (15–60&nbsp;m)</b> are a tie at 0.71. They are near the ~20&nbsp;m true resolution, and one THOR token is 80&nbsp;m.</li>
+        </ul>
+      </section>
+      <section>
+        <h2>Limitations</h2>
+        <p>The pooled gap (5 points) is about 2.5 times the binomial noise at n&nbsp;=&nbsp;512. The pack-ice cutoff for the CFAR's strip rule was set after seeing one test frame (no labels used). The evidence is one month of one year, the frames share some bergs, and near range (&lt;35° incidence) is untested.</p>
+        <ul class="dots">
+          <li><b>Pack ice.</b> On its own, THOR fires on pack ice: 34–82% of its peaks on icy frames fall inside the CFAR's ice mask, and on the pack-ice stress set its F1 is only 0.2–0.35. It depends on the CFAR pipeline's HV ice mask.</li>
+          <li><b>Precision is unknown</b> for both detectors. At the matched count, the CFAR has 553 unlabelled detections and THOR has 526. Without AIS, ships and missed bergs can't be told apart.</li>
+        </ul>
+      </section>
+    </div>
+  </div>
+
+  <footer>Data: modified Copernicus Sentinel data (2019–2026) · International Ice Patrol (NSIDC G00807) · North American Ice Service · THOR: FM4CS (Apache 2.0), Forgaard et al., IGARSS 2026 · © OpenStreetMap contributors</footer>
+</article>
+</body>
+</html>

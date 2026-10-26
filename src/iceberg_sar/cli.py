@@ -9,7 +9,7 @@ from typing import Annotated
 import typer
 
 from iceberg_sar import __version__
-from iceberg_sar.config import DEFAULT_CONFIG, load_config
+from iceberg_sar.config import DEFAULT_CONFIG, Config, load_config
 
 app = typer.Typer(
     help="Iceberg Alley SAR: detect icebergs in Sentinel-1 imagery.",
@@ -756,6 +756,70 @@ def bench_smoke(
     typer.echo(f"ok  {run_smoke(cfg, cfg.root / report, force)}")
 
 
+@app.command("bench-iw-sweep")
+def bench_iw_sweep(
+    force: Annotated[bool, typer.Option(help="Redo finished detectors.")] = False,
+    only: Annotated[list[str] | None, typer.Option(
+        help="Run only these detectors (repeat), e.g. --only gamma --only cacfar-nolength.")
+    ] = None,
+    config: ConfigOption = DEFAULT_CONFIG,
+) -> None:
+    """Stage 2 / 2b: PFA sweep of the reference detectors and my CA-CFAR on the
+    `benchmark.iw_sweep` frames at 40 m. Resumable: finished detectors are skipped."""
+    from iceberg_sar.benchmark.sweep import run_sweep
+
+    cfg = load_config(config)
+    for d in run_sweep(cfg, force, only, log=lambda m: typer.echo(m)):
+        typer.echo(f"ok  {d}")
+
+
+@app.command("bench-sweep")
+def bench_sweep(
+    force: Annotated[bool, typer.Option(help="Rerun finished PFAs.")] = False,
+    only: Annotated[list[str] | None, typer.Option(
+        help="Run only these detectors (repeat), e.g. --only gamma --only nis.")] = None,
+    config: ConfigOption = DEFAULT_CONFIG,
+) -> None:
+    """Stage 2 / 1e: every reference detector x 21 PFAs on the Færch 2023 EW scene (40 m).
+    Resumable per detector and PFA; run it overnight."""
+    from iceberg_sar.benchmark.sweep import run_faerch_sweep
+
+    typer.echo(f"ok  {run_faerch_sweep(load_config(config), force, only, log=typer.echo)}")
+
+
+@app.command("bench-reference")
+def bench_reference(config: ConfigOption = DEFAULT_CONFIG) -> None:
+    """Stage 2 / 1f: parse Tables 3 and 5 of the paper XML into reference.yaml (check by hand)."""
+    from iceberg_sar.benchmark.score import write_reference
+
+    typer.echo(f"ok  {write_reference(load_config(config))}")
+
+
+@app.command("bench-score")
+def bench_score(
+    source: Annotated[str | None, typer.Option(
+        help="Labels: faerch (Path A) or reconstructed (Path B). "
+             "Default: benchmark.faerch2023.labels_source.")] = None,
+    config: ConfigOption = DEFAULT_CONFIG,
+) -> None:
+    """Stage 2 / 1f: score the `bench-sweep` detections, F vs PFA figure, reproduction report."""
+    from iceberg_sar.benchmark.score import run_score
+
+    for key, path in run_score(load_config(config), source, log=typer.echo).items():
+        typer.echo(f"ok  {key}: {path}")
+
+
+@app.command("bench-iw-compare")
+def bench_iw_compare(config: ConfigOption = DEFAULT_CONFIG) -> None:
+    """Stage 2 / 2b: score the `bench-iw-sweep` detections against same-pass IIP labels (5d
+    protocol): recall at matched detection counts, size breakdown, figure, report."""
+    from iceberg_sar.benchmark.iwcompare import run_iw_compare
+
+    cfg = load_config(config)
+    for key, path in run_iw_compare(cfg, log=lambda m: typer.echo(m)).items():
+        typer.echo(f"ok  {key}: {path}")
+
+
 @app.command("bench-scenes")
 def bench_scenes(
     write_config: Annotated[bool, typer.Option(
@@ -796,17 +860,28 @@ def bench_download(config: ConfigOption = DEFAULT_CONFIG) -> None:
     typer.echo(f"ok  {png}")
 
 
+def _tnr_config(config: Path, tnr: bool) -> Config:
+    """Config with `--no-tnr` applied (thermal noise removal off -> the `_noTNR` file variant)."""
+    cfg = load_config(config)
+    if not tnr:
+        cfg.section("benchmark")["faerch2023"]["snap"]["remove_thermal_noise"] = False
+    return cfg
+
+
 @app.command("bench-preprocess")
 def bench_preprocess(
     force: Annotated[bool, typer.Option(help="Re-run SNAP and the split.")] = False,
     s1: Annotated[str | None, typer.Option(
         help="Sentinel-1 product: GRDH or GRDM (default: benchmark.faerch2023.s1_format).")] = None,
+    tnr: Annotated[bool, typer.Option(
+        "--tnr/--no-tnr", help="Thermal noise removal (default: config snap.remove_thermal_noise); "
+        "--no-tnr writes a separate `_noTNR` variant.")] = True,
     config: ConfigOption = DEFAULT_CONFIG,
 ) -> None:
     """Stage 2 / 1b: SNAP GPT on the Sentinel-1 EW scene -> 40 m linear sigma0 HH/HV."""
     from iceberg_sar.benchmark.reproduce import preprocess_scene
 
-    info = preprocess_scene(load_config(config), force, s1, log=typer.echo)
+    info = preprocess_scene(_tnr_config(config, tnr), force, s1, log=typer.echo)
     typer.echo(f"grid {info['shape']} px, spacing {info['pixel_m']} m")
     if "hv_zero_in_swath" in info:
         typer.echo(f"HV clipped to 0 by thermal noise removal: {info['hv_zero_in_swath']:.2%}")
@@ -818,12 +893,15 @@ def bench_preprocess(
 def bench_landmask(
     s1: Annotated[str | None, typer.Option(
         help="Sentinel-1 product: GRDH or GRDM (default: benchmark.faerch2023.s1_format).")] = None,
+    tnr: Annotated[bool, typer.Option(
+        "--tnr/--no-tnr", help="Thermal noise removal (default: config snap.remove_thermal_noise); "
+        "--no-tnr writes a separate `_noTNR` variant.")] = True,
     config: ConfigOption = DEFAULT_CONFIG,
 ) -> None:
     """Stage 2 / 1c: OSM land polygons + buffer on the scene grid, and the open-water ENL."""
     from iceberg_sar.benchmark.reproduce import build_land_mask
 
-    res = build_land_mask(load_config(config), s1, log=typer.echo)
+    res = build_land_mask(_tnr_config(config, tnr), s1, log=typer.echo)
     typer.echo(f"land (in swath) {res['land_px_in_swath']} px, valid {res['valid_px']} px")
     typer.echo(f"ok  {res['overlay']}")
 
@@ -845,13 +923,26 @@ def bench_fig1(config: ConfigOption = DEFAULT_CONFIG) -> None:
 
 @app.command("bench-labels")
 def bench_labels(
-    force_s2: Annotated[bool, typer.Option(help="Redo the Sentinel-2 detection (cached).")] = False,
+    source: Annotated[str | None, typer.Option(
+        help="faerch (Path A, the paper's labels) or reconstructed (Path B). "
+             "Default: benchmark.faerch2023.labels_source.")] = None,
+    force_s2: Annotated[bool, typer.Option(
+        help="Path B: redo the Sentinel-2 detection (cached).")] = False,
     config: ConfigOption = DEFAULT_CONFIG,
 ) -> None:
-    """Stage 2 / 1d Path B: rebuild labels from Sentinel-2 (RECONSTRUCTED LABELS)."""
-    from iceberg_sar.benchmark.pathb import run_pathb
+    """Stage 2 / 1d: load Færch's labels (Path A) or rebuild them from Sentinel-2 (Path B)."""
+    cfg = load_config(config)
+    source = source or cfg.section("benchmark")["faerch2023"]["labels_source"]
+    if source == "faerch":
+        from iceberg_sar.benchmark.patha import run_patha
 
-    res = run_pathb(load_config(config), force_s2, log=typer.echo)
+        res = run_patha(cfg, log=typer.echo)
+    elif source == "reconstructed":
+        from iceberg_sar.benchmark.pathb import run_pathb
+
+        res = run_pathb(cfg, force_s2, log=typer.echo)
+    else:
+        raise typer.BadParameter(f"--source must be faerch or reconstructed, not {source!r}")
     for f in [*res["files"].values(), *res["pngs"].values(), res["report"]]:
         typer.echo(f"ok  {f}")
 

@@ -49,7 +49,9 @@ not only working in easy offshore water.
 **Large bergs are missed (0 of 4 over 120 m).** Each has a detection 1-4 km away but none on
 the berg. Likely causes are the 300 m structure filter (tuned to reject sea-ice strips) and the
 CFAR guard window being smaller than a large berg, which puts part of the berg into its own
-background estimate. Not yet fixed.
+background estimate. *Update 2026-10-26: the structure filter was the cause. It now applies only
+in scenes with pack ice (`detections.length_rule: auto`); on this pass the CFAR then finds all 4
+large bergs and 0.83 of the labels in open water (see [thor-vs-cfar.md](thor-vs-cfar.md)).*
 
 **Precision cannot be measured with this source.** 324 detections have no IIP label. They are
 strong targets (median contrast 16.9 dB vs. 18.7 dB for matched ones), similar in size, mostly

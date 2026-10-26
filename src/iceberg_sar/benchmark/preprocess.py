@@ -28,13 +28,37 @@ def gpt_command(snap: dict[str, Any], graph: Path, src: Path, out: Path, crs: st
             f"-PpixelSpacing={pixel_m:g}", f"-Presampling={snap['resampling']}"]
 
 
+def graph_variant(snap: dict[str, Any], graph: Path, out_dir: Path) -> Path:
+    """The graph to run: as is, or (snap.remove_thermal_noise false) a copy without the
+    ThermalNoiseRemoval node, its consumers rewired to its source. SNAP 14 ignores
+    removeThermalNoise=false, so the node has to go."""
+    if snap.get("remove_thermal_noise", True):
+        return graph
+    import xml.etree.ElementTree as ET
+
+    tree = ET.parse(graph)
+    root = tree.getroot()
+    tnr = next(n for n in root.findall("node") if n.findtext("operator") == "ThermalNoiseRemoval")
+    src_ref = tnr.find("sources/sourceProduct")
+    assert src_ref is not None
+    for node in root.findall("node"):
+        for ref in node.findall("sources/*"):
+            if ref.get("refid") == tnr.get("id"):
+                ref.set("refid", src_ref.get("refid", ""))
+    root.remove(tnr)
+    out = out_dir / f"{graph.stem}_noTNR.xml"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    tree.write(out, encoding="utf-8")
+    return out
+
+
 def run_snap(snap: dict[str, Any], graph: Path, src: Path, out: Path, crs: str,
              pixel_m: float, log: Any = print) -> Path:
     """Run the SNAP graph (skipped if `out` exists). SNAP's own log goes to <out>.gpt.log."""
     if out.is_file():
         return out
     out.parent.mkdir(parents=True, exist_ok=True)
-    cmd = gpt_command(snap, graph, src, out, crs, pixel_m)
+    cmd = gpt_command(snap, graph_variant(snap, graph, out.parent), src, out, crs, pixel_m)
     log(" ".join(cmd))
     t0 = time.perf_counter()
     log_path = out.with_suffix(".gpt.log")

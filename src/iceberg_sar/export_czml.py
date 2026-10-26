@@ -18,7 +18,8 @@ into a `pass/` entity with the AOI share they observe, and the AOI outside them 
 
 THOR training frames (Milestone 5b) carry their split (`train`, or `val` for the pack-ice set
 that was never trained on) and their same-pass IIP analyst labels as `truth/` crosses, at the
-HH peak they were snapped to: the positions the THOR head was trained on.
+HH peak they were snapped to: the positions the THOR head was trained on. The held-out 5d test
+frames with same-pass truth show the labels `thor-compare` scored, at their 0.1' cell centres.
 """
 
 from __future__ import annotations
@@ -298,6 +299,25 @@ def read_truth(labels: Path, raster: Path) -> pd.DataFrame:
     return df.assign(lon=np.asarray(lon), lat=np.asarray(lat))
 
 
+def read_compare_truth(cfg: Config, name: str) -> pd.DataFrame:
+    """Same-pass IIP labels of a 5d test frame, as `thor-compare` scores them.
+
+    Cell-centre positions on valid SAR pixels (same-pass truth gets no drift), not snapped.
+    """
+    from iceberg_sar.detections import scene_timestamp
+    from iceberg_sar.pointval import load_truth, point_val_params, sar_valid_at
+
+    sar_time = pd.Timestamp(scene_timestamp(name)).tz_localize(None)
+    truth, _ = load_truth(cfg, name, sar_time, "iip-satellite")
+    masked = cfg.path("interim") / name / f"{name}_HV_masked.tif"
+    with rasterio.open(masked) as src:
+        g = truth.to_crs(src.crs).geometry
+    xy = np.column_stack([g.x.to_numpy(), g.y.to_numpy()]) if len(g) else np.empty((0, 2))
+    truth = truth[sar_valid_at(masked, xy, point_val_params(cfg).valid_block_px)]
+    return pd.DataFrame(truth.drop(columns="geometry")).reset_index(drop=True).assign(
+        time=lambda d: d["time"].astype(str), snapped=False)
+
+
 def _truth_description(props: dict[str, Any], scene_id: str) -> str:
     g = props.get
     snap = (f"to the HH peak, {_num(g('snap_m'), '.0f')} m" if g("snapped")
@@ -400,8 +420,9 @@ def find_scenes(cfg: Config, band: str, start: date | None = None,
 
 
 def build_czml(scenes: list[Scene], p: ViewerParams, static: gpd.GeoDataFrame | None = None,
-               sp: StaticParams | None = None, aoi: gpd.GeoDataFrame | None = None
-               ) -> list[dict[str, Any]]:
+               sp: StaticParams | None = None, aoi: gpd.GeoDataFrame | None = None,
+               test_truth: dict[str, pd.DataFrame] | None = None) -> list[dict[str, Any]]:
+    """`test_truth`: scene name -> labels of a 5d test frame (`read_compare_truth`)."""
     if not scenes:
         raise ValueError("No scenes with detections; run `detect` first")
     intervals = scene_intervals([s.start for s in scenes], p.last_interval_days)
@@ -456,7 +477,7 @@ def build_czml(scenes: list[Scene], p: ViewerParams, static: gpd.GeoDataFrame | 
             ice = gpd.read_file(scene.seaice)
             ice_km2 = float(ice["area_km2"].sum()) if "area_km2" in ice else 0.0
         truth = (read_truth(scene.labels, scene.raster) if scene.labels and scene.raster
-                 else None)
+                 else (test_truth or {}).get(scene.name))
         packets.append({
             "id": f"scene/{scene.name}",
             "name": scene.name,
@@ -550,7 +571,11 @@ def export_czml(cfg: Config, band: str = "HV", start: date | None = None,
     chips_dir = cfg.root / thor["dir"] / "chips" if "dir" in thor else None
     scenes = [s for s in find_scenes(cfg, band, start, end, p.thor_model, chips_dir)
               if s.name not in p.exclude]
-    packets = build_czml(scenes, p, static, sp, aoi)
+    # 5d test frames: aircraft truth (hours after the pass) needs a drift fit, so same-pass only.
+    test = cfg.raw.get("thor", {}).get("compare", {}).get("scenes", {})
+    test_truth = {s.name: read_compare_truth(cfg, s.name) for s in scenes
+                  if test.get(s.name) == "iip-satellite"}
+    packets = build_czml(scenes, p, static, sp, aoi, test_truth)
     out = cfg.path("czml")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(packets, separators=(",", ":")), encoding="utf-8")
