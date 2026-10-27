@@ -90,7 +90,8 @@ iceberg-alley-sar/
   (`benchmarks/ENVIRONMENT.md`). API quirks (dB input, NaN masking, 41 px stencil, K LUT index)
   in `benchmarks/cfar_api_notes.md`. `bench-smoke` runs all six detectors on 2019-04-29 at 40 m
   (`benchmarks/m0_smoke.md`). 40 m HH/HV ENLs are 6.0 / 1.8, so gamma/K run with per-band ENL (`benchmark.enl_mode`, decided 2026-10-22).
-- **Stage 2 / Milestone 1 (branch `Establishing-benchmark`, 2026-10-22/24): 1a–1d done (1d as Path A and B), 1e–1f not started.**
+- **Stage 2 / Milestone 1 (branch `Establishing-benchmark`, 2026-10-22/27): done.** 1d as Path A (+ B);
+  1e/1f on the stack without thermal noise removal: 5 of 6 detectors within 0.05 of the paper's F.
   Commands: `bench-scenes`, `bench-download`, `bench-preprocess [--s1 GRDH|GRDM]`,
   `bench-landmask [--s1 ...]`, `bench-fig1`, `bench-labels [--source faerch|reconstructed] [--force-s2]`.
   - 1a: `scenes.csv` checked against Table 1 (`basis` column: table1 / table1_note_format / fig1).
@@ -141,9 +142,16 @@ iceberg-alley-sar/
     tagged `_noTNR`. Without TNR: ENL HH 10.74 / HV 11.45 (Table 1: 10.7); gamma 1e-19 TP/FP
     156/8 (paper 238/32), log-normal 1e-5 251/121, F 0.58 (paper 0.62). GRDH gamma 1e-19: more FPs
     than GRDM (575 vs 341), so the paper used GRDM. Spot checks in `data/benchmark/faerch2023/
-    sweep_noTNR`, `sweep_GRDH`. **Waiting for my go:** full sweep on the noTNR stack as the
-    reproduction run (own out_dir, config default -> noTNR), TNR sweep kept in the report as
-    "as described"; ask Laust his SNAP version and whether TNR was applied.
+    sweep_noTNR`, `sweep_GRDH`. **Decided 2026-10-26:** the noTNR stack is the reproduction run
+    (`snap.remove_thermal_noise: false` is the config default; sweep in `sweep_noTNR`, via
+    `sweep.sweep_dir`). The TNR sweep (`sweep/`) stays in the report as "as described" (grey).
+  - Result (2026-10-27, `docs/faerch2023-reproduction.md`, discussion in
+    `benchmarks/faerch2023/reproduction_notes.md`): best F vs paper: gamma 0.636 / 0.625, Wishart
+    0.653 / 0.659, NIS 0.650 / 0.658, log-normal 0.602 / 0.619, K 0.594 / 0.613, iDPolRAD 0.448 /
+    0.509 (outside: global gen.-gamma fit). Gamma / Wishart peak 13-15 decades of PFA higher than
+    the paper (same F; they take the ENL as given). noTNR sweep: 7 h 15 min, 117 of 126 runs
+    scored (rest over the cap). Open for Laust: SNAP version / TNR, ENL for gamma and Wishart,
+    radius of the 15 small manual labels, Table 3 vs 5 PFAs.
 - **Stage 2 / Milestone 2b, one frame (2026-10-23/26):** `bench-iw-sweep` + `bench-iw-compare`
   (`benchmark/sweep.py`, `benchmark/iwcompare.py`, config `benchmark.iw_sweep`, report
   `benchmarks/m2b_iw40.md`). 2019-04-29 at 40 m, 6 reference detectors + my CA-CFAR, 11 PFAs

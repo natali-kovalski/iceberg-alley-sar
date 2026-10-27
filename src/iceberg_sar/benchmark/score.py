@@ -19,6 +19,7 @@ optimum is derived from Table 3 (2 TP / (2 TP + FP + FN)), which the paper does 
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import xml.etree.ElementTree as ET
@@ -34,6 +35,7 @@ from scipy.spatial import cKDTree
 
 from iceberg_sar.benchmark.labels import SIZE_CLASSES
 from iceberg_sar.benchmark.scenes import TABLE_NS, _text
+from iceberg_sar.benchmark.sweep import sweep_dir
 from iceberg_sar.config import Config
 
 # Column headers of Tables 3 and 5 -> detector names in config / the runner
@@ -244,14 +246,14 @@ def score_sweep(cfg: Config, labels: pd.DataFrame, unknown: np.ndarray, aoi: Any
                 log: Callable[[str], None] = print) -> pd.DataFrame:
     """One row per (detector, PFA) of the sweep; over-cap PFAs get NaN scores."""
     fc = cfg.section("benchmark")["faerch2023"]
-    s = fc["sweep"]
-    runtime = pd.read_csv(cfg.root / s["out_dir"] / "sweep_runtime.csv")
+    out_dir = sweep_dir(cfg)
+    runtime = pd.read_csv(out_dir / "sweep_runtime.csv")
     rows = []
     for r in runtime.itertuples():
         row = {"detector": r.detector, "pfa": r.pfa, "pfa_per_channel": r.pfa_per_channel,
                "objects_raw": r.objects_raw, "over_cap": bool(r.over_cap)}
         if not r.over_cap:
-            path = cfg.root / s["out_dir"] / r.detector / str(r.geojson)
+            path = out_dir / r.detector / str(r.geojson)
             xy, n_unk = detections_xy(path, fc["crs"], aoi, unknown,
                                       float(fc["score"]["unknown_ignore_m"]))
             row |= {"ignored_unknown": n_unk, **score_points(xy, labels)}
@@ -273,11 +275,14 @@ def optimum(scores: pd.DataFrame, col: str = "f") -> pd.DataFrame:
 LIGHT_BLUE = "#2a78d6"   # dataviz categorical slot 1 (validated); one hue per panel
 ORANGE = "#eb6834"       # slot 2: digitized Fig. 6, if present
 INK = "#1f1f1e"
+GREY = "#9a9a96"         # the other stack variant (context, not a series of its own)
 
 
 def f_figure(scores: pd.DataFrame, ref: dict[str, Any], fig6: pd.DataFrame | None,
-             detectors: list[str], out: Path, note: str) -> Path:
-    """Small multiples: F vs PFA per detector, all-labels and verified-only, paper optimum."""
+             detectors: list[str], out: Path, note: str,
+             alt: pd.DataFrame | None = None, alt_label: str = "") -> Path:
+    """Small multiples: F vs PFA per detector, all-labels and verified-only, paper optimum;
+    `alt`: the other stack variant's all-labels F, drawn in grey."""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -289,6 +294,9 @@ def f_figure(scores: pd.DataFrame, ref: dict[str, Any], fig6: pd.DataFrame | Non
         x = np.log10(d.pfa)
         ax.plot(x, d.f, color=LIGHT_BLUE, lw=2, marker="o", ms=4, label="mine, all labels")
         ax.plot(x, d.f_v, color=LIGHT_BLUE, lw=2, ls=(0, (4, 3)), label="mine, verified only")
+        if alt is not None:
+            a = alt[alt.detector == det].sort_values("pfa")
+            ax.plot(np.log10(a.pfa), a.f, color=GREY, lw=1.5, label=alt_label)
         if fig6 is not None:
             g = fig6[fig6.detector == det].sort_values("pfa")
             ax.plot(np.log10(g.pfa), g.f, color=ORANGE, lw=2, label="paper Fig. 6 (digitized)")
@@ -321,7 +329,7 @@ def f_figure(scores: pd.DataFrame, ref: dict[str, Any], fig6: pd.DataFrame | Non
 
 
 def compare_table(scores: pd.DataFrame, ref: dict[str, Any], tol: float,
-                  sens: pd.DataFrame | None) -> pd.DataFrame:
+                  sens: pd.DataFrame | None, alt: pd.DataFrame | None = None) -> pd.DataFrame:
     best = optimum(scores)
     rows = []
     for det, t in ref["table3"].items():
@@ -337,6 +345,10 @@ def compare_table(scores: pd.DataFrame, ref: dict[str, Any], tol: float,
                "f_v_best": optimum(scores, "f_v").loc[det].f_v}
         if sens is not None and det in optimum(sens).index:
             row["f_sens"] = optimum(sens).loc[det].f
+        if alt is not None:
+            a = optimum(alt)
+            row["f_alt"] = a.loc[det].f if det in a.index else np.nan
+            row["pfa_alt"] = a.loc[det].pfa if det in a.index else np.nan
         rows.append(row)
     return pd.DataFrame(rows)
 
@@ -363,7 +375,8 @@ def _e(p: float) -> str:
 
 
 def report(cfg: Config, source: str, ref: dict[str, Any], cmp: pd.DataFrame, sizes: pd.DataFrame,
-           scores: pd.DataFrame, n_labels: int, n_outside: int, fig: Path, fig6: bool) -> str:
+           scores: pd.DataFrame, n_labels: int, n_outside: int, fig: Path, fig6: bool,
+           csvs: dict[str, Path]) -> str:
     fc = cfg.section("benchmark")["faerch2023"]
     sc = fc["score"]
     tol = float(cfg.section("benchmark")["repro_tolerance_f1"])
@@ -372,6 +385,9 @@ def report(cfg: Config, source: str, ref: dict[str, Any], cmp: pd.DataFrame, siz
     from iceberg_sar.benchmark.sweep import FaerchSweepParams
 
     sp = FaerchSweepParams.from_config(cfg)
+    scene = scene_paths(cfg)
+    enl = json.loads(scene.enl.read_text(encoding="utf-8"))["enl"] if scene.enl.is_file() else {}
+    tnr = fc["snap"].get("remove_thermal_noise", True)
     lines = ["# Færch 2023 reproduction (Stage 2, Milestone 1)", ""]
     if not ref.get("checked_against_paper"):
         lines += ["> **`reference.yaml` is not yet checked against the paper by hand.** The paper",
@@ -388,7 +404,12 @@ def report(cfg: Config, source: str, ref: dict[str, Any], cmp: pd.DataFrame, siz
         f"{cfg.section('benchmark')['merge']} merge for gamma / log-normal / K, windows "
         "360 / 520 m "
         "(9 / 13 px), iDPolRAD 3 / 57 px cropped to the library's 41 px, objects 2-500 px.",
-        f"- ENL {sp.enl:g} for both bands (Table 1). Measured on this product: HH 9.5, HV 0.98.",
+        "- Thermal noise removal: " + ("on, as the paper describes." if tnr else
+            "**off** (decided 2026-10-26). SNAP 14's noise removal clips negatives to -115 dB "
+            "and gives HV an ENL of ~1, which breaks the paper's ENL; the run with it is the "
+            "grey curve and the last table column."),
+        f"- ENL {sp.enl:g} for both bands (Table 1). Measured on this stack (median 2 km "
+        f"open-water box): HH {enl.get('HH', float('nan')):g}, HV {enl.get('HV', float('nan')):g}.",
         f"- PFA: {len(sp.pfas)} levels, {_e(sp.pfas[0])} .. {_e(sp.pfas[-1])} total; a detector "
         f"stops after the first PFA with > {sp.max_objects} objects in the scene (dotted line).",
         f"- Labels: {'Færch (Path A)' if source == 'faerch' else 'reconstructed (Path B)'}, "
@@ -408,8 +429,10 @@ def report(cfg: Config, source: str, ref: dict[str, Any], cmp: pd.DataFrame, siz
         "| Detector | Paper PFA | My PFA | Paper TP / FP / FN | Mine TP / FP / FN | Paper F |"
         " My F |"
         " Diff | Within | Verified-only F (at my PFA / best) |"
-        + (" F, AOI `" + str(sc["aoi_sensitivity"]) + "` |" if "f_sens" in cmp else ""),
-        "|---|---|---|---|---|---|---|---|---|---|" + ("---|" if "f_sens" in cmp else ""),
+        + (" F, AOI `" + str(sc["aoi_sensitivity"]) + "` |" if "f_sens" in cmp else "")
+        + (f" F {'with' if not tnr else 'without'} TNR (PFA) |" if "f_alt" in cmp else ""),
+        "|---|---|---|---|---|---|---|---|---|---|" + ("---|" if "f_sens" in cmp else "")
+        + ("---|" if "f_alt" in cmp else ""),
     ]
     for r in cmp.itertuples():
         lines.append(
@@ -417,7 +440,9 @@ def report(cfg: Config, source: str, ref: dict[str, Any], cmp: pd.DataFrame, siz
             f"{r.paper_TP} / {r.paper_FP} / {r.paper_FN} | {r.TP} / {r.FP} / {r.FN} | "
             f"{r.paper_f:.3f} | {r.f:.3f} | {r.diff:+.3f} | {'yes' if r.within else '**no**'} | "
             f"{r.f_v:.3f} / {r.f_v_best:.3f} ({_e(r.pfa_v)}) |"
-            + (f" {r.f_sens:.3f} |" if "f_sens" in cmp else ""))
+            + (f" {r.f_sens:.3f} |" if "f_sens" in cmp else "")
+            + ((f" {r.f_alt:.3f} ({_e(r.pfa_alt)}) |" if np.isfinite(r.f_alt) else " none |")
+               if "f_alt" in cmp else ""))
     fig_rel = Path(os.path.relpath(fig, (cfg.root / sc["report"]).parent)).as_posix()
     lines += ["", f"![F vs PFA]({fig_rel})", ""]
     if not fig6:
@@ -432,13 +457,15 @@ def report(cfg: Config, source: str, ref: dict[str, Any], cmp: pd.DataFrame, siz
     for r in sizes.itertuples():
         lines.append(f"| {DISPLAY[r.detector]} | {r.size} | {r.paper_pct:.1f} "
                      f"({_e(r.paper_pfa)}) | "
-                     f"{r.pct_at_paper_pfa:.1f} | {r.pct_at_my_opt:.1f} |")
+                     + (f"{r.pct_at_paper_pfa:.1f}" if np.isfinite(r.pct_at_paper_pfa)
+                        else "over cap") + f" | {r.pct_at_my_opt:.1f} |")
     notes = cfg.root / "benchmarks" / "faerch2023" / "reproduction_notes.md"
     lines += ["", "## Discussion", ""]
     lines += [notes.read_text(encoding="utf-8").strip() if notes.is_file()
               else f"(not written yet: `{rel(notes)}` is included here)"]
-    lines += ["", "## Files", "", f"- per-run scores: `{sc['table_csv']}` (local)",
-              f"- runtime per detector and PFA: `{fc['sweep']['out_dir']}/sweep_runtime.csv`",
+    lines += ["", "## Files", ""]
+    lines += [f"- per-run scores, {k}: `{rel(v)}` (local)" for k, v in csvs.items()]
+    lines += [f"- runtime per detector and PFA: `{rel(sp.out_dir / 'sweep_runtime.csv')}`",
               f"- reference values: `{sc['reference']}`", ""]
     return "\n".join(lines)
 
@@ -458,27 +485,52 @@ def run_score(cfg: Config, source: str | None = None, log: Callable[[str], None]
     log(f"{len(labels)} labels ({source}), {int((~in_aoi).sum())} outside the `{sc['aoi']}` "
         f"area; {len(unknown)} unknown objects")
     scores = score_sweep(cfg, labels, unknown, aoi, log)
+    other = _other_variant(cfg)
+    alt = None
+    if (sweep_dir(other) / "sweep_runtime.csv").is_file():
+        log(f"also scoring the {_variant(other)} sweep")
+        alt = score_sweep(other, labels, unknown, aoi, log)
     sens = None
     if sc.get("aoi_sensitivity"):
         sens = score_sweep(cfg, labels, unknown, scoring_aoi(cfg, sc["aoi_sensitivity"]), log)
-    out_csv = cfg.root / sc["table_csv"]
-    out_csv.parent.mkdir(parents=True, exist_ok=True)
-    scores.to_csv(out_csv, index=False)
+    base = cfg.root / sc["table_csv"]
+    base.parent.mkdir(parents=True, exist_ok=True)
+    csvs = {_variant(cfg): base.with_name(f"{base.stem}_{_variant(cfg)}.csv")}
+    scores.to_csv(csvs[_variant(cfg)], index=False)
+    if alt is not None:
+        csvs[_variant(other)] = base.with_name(f"{base.stem}_{_variant(other)}.csv")
+        alt.to_csv(csvs[_variant(other)], index=False)
 
     tol = float(cfg.section("benchmark")["repro_tolerance_f1"])
-    cmp = compare_table(scores, ref, tol, sens)
+    cmp = compare_table(scores, ref, tol, sens, alt)
     sizes = size_table(scores, ref)
     fig6_path = cfg.root / sc["fig6_csv"]
     fig6 = pd.read_csv(fig6_path) if fig6_path.is_file() else None
     dets = [d for d in fc["sweep"]["detectors"] if d in set(scores.detector)]
     note = ("Færch labels (Path A)" if source == "faerch" else "RECONSTRUCTED LABELS (Path B)") + \
-        f"; scoring area `{sc['aoi']}`; dotted line: object cap reached"
-    fig = f_figure(scores, ref, fig6, dets, cfg.root / sc["figure"], note)
+        f"; {_variant(cfg)} stack; scoring area `{sc['aoi']}`; dotted line: object cap reached"
+    fig = f_figure(scores, ref, fig6, dets, cfg.root / sc["figure"], note, alt,
+                   f"{_variant(other)} stack, all labels")
     rep = cfg.root / sc["report"]
     rep.write_text(report(cfg, source, ref, cmp, sizes, scores, len(labels),
-                          int((~in_aoi).sum()), fig, fig6 is not None), encoding="utf-8")
+                          int((~in_aoi).sum()), fig, fig6 is not None, csvs), encoding="utf-8")
     for r in cmp.itertuples():
         log(f"{r.detector:9s} F {r.f:.3f} at {_e(r.pfa)} vs paper {r.paper_f:.3f} at "
             f"{_e(r.paper_pfa)} ({r.diff:+.3f})")
-    return {"scores": out_csv, "figure": fig, "report": rep}
+    return {**{f"scores {k}": v for k, v in csvs.items()}, "figure": fig, "report": rep}
+
+
+def _variant(cfg: Config) -> str:
+    tnr = cfg.section("benchmark")["faerch2023"]["snap"].get("remove_thermal_noise", True)
+    return "TNR" if tnr else "noTNR"
+
+
+def _other_variant(cfg: Config) -> Config:
+    """A copy of `cfg` for the other stack variant (thermal noise removal on <-> off)."""
+    import copy
+
+    other = Config(root=cfg.root, raw=copy.deepcopy(cfg.raw))
+    snap = other.section("benchmark")["faerch2023"]["snap"]
+    snap["remove_thermal_noise"] = not snap.get("remove_thermal_noise", True)
+    return other
 

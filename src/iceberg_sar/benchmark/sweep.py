@@ -303,9 +303,16 @@ class FaerchSweepParams:
         if unknown:
             raise ValueError(f"faerch2023.sweep.detectors: unknown {sorted(unknown)}")
         enl = table1_enl(cfg) if s["enl"] == "table1" else float(s["enl"])
-        return cls(out_dir=cfg.root / s["out_dir"],
+        return cls(out_dir=sweep_dir(cfg),
                    pfas=[float(f"1e{e}") for e in range(lo, hi + 1)],
                    detectors=list(s["detectors"]), enl=enl, max_objects=int(s["max_objects"]))
+
+
+def sweep_dir(cfg: Config) -> Path:
+    """`sweep.out_dir`, plus `_noTNR` for the stack without thermal noise removal."""
+    fc = cfg.section("benchmark")["faerch2023"]
+    tnr = fc["snap"].get("remove_thermal_noise", True)
+    return cfg.root / (fc["sweep"]["out_dir"] + ("" if tnr else "_noTNR"))
 
 
 def table1_enl(cfg: Config) -> float:

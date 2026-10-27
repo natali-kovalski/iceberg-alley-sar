@@ -391,9 +391,11 @@ benchmark:
       cache: 6G             # gpt -c; must stay below -Xmx10G in gpt.vmoptions (16 GB RAM)
       threads: 8
       resampling: NEAREST_NEIGHBOUR   # paper: nearest neighbour, "to avoid averaging pixel intensities"
-      # Paper: thermal noise removal on. false = diagnostic variant, files tagged `_noTNR`
-      # (`--no-tnr` on bench-preprocess / bench-landmask); the pipeline default stays true.
-      remove_thermal_noise: true
+      # Paper: thermal noise removal on. With SNAP 14 it breaks the paper's ENL (HV ENL 0.98,
+      # 23.7 % of HV clipped to -115 dB); without it ENL is HH 10.74 / HV 11.45 vs Table 1's 10.7.
+      # false (decided 2026-10-26): files tagged `_noTNR`, sweep in `<sweep.out_dir>_noTNR`.
+      # `--tnr` on bench-preprocess / bench-landmask switches back to the as-described variant.
+      remove_thermal_noise: false
     land:
       buffer_m: 500         # paper sec. 3.1
       # Fallback when osmdata.openstreetmap.de is unreachable: land built from the coastline ways
