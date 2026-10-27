@@ -23,7 +23,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-from scipy import ndimage, stats
+from scipy import ndimage, special
 
 
 @dataclass(frozen=True)
@@ -52,8 +52,15 @@ class CfarParams:
 
 
 def threshold_factor(pfa: float, enl: float, n_background: int) -> float:
-    """CA-CFAR multiplier on the background mean for gamma(L) clutter and N ring pixels."""
-    return float(stats.f.isf(pfa, 2 * enl, 2 * enl * n_background))
+    """CA-CFAR multiplier on the background mean for gamma(L) clutter and N ring pixels.
+
+    `stats.f.isf` works through 1 - pfa and returns inf below ~1e-16 (the Færch sweep goes
+    to 1e-21), so invert the F survival function directly: P(F > x) = I_w(d2/2, d1/2) with
+    w = d2 / (d2 + d1 x), the regularized incomplete beta function.
+    """
+    d1, d2 = 2 * enl, 2 * enl * n_background
+    w = special.betaincinv(d2 / 2, d1 / 2, pfa)
+    return float(d2 * (1 - w) / (d1 * w))
 
 
 def _box_sum(a: np.ndarray, half: int) -> np.ndarray:

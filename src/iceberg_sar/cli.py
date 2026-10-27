@@ -777,11 +777,12 @@ def bench_iw_sweep(
 def bench_sweep(
     force: Annotated[bool, typer.Option(help="Rerun finished PFAs.")] = False,
     only: Annotated[list[str] | None, typer.Option(
-        help="Run only these detectors (repeat), e.g. --only gamma --only nis.")] = None,
+        help="Run only these detectors (repeat), e.g. --only gamma --only cacfar.")] = None,
     config: ConfigOption = DEFAULT_CONFIG,
 ) -> None:
-    """Stage 2 / 1e: every reference detector x 21 PFAs on the Færch 2023 EW scene (40 m).
-    Resumable per detector and PFA; run it overnight."""
+    """Stage 2 / 1e: every reference detector x 21 PFAs on the Færch 2023 EW scene (40 m),
+    then (2a) my CA-CFAR with and without the length rule (cacfar, cacfar-nolength; one pass
+    each). Resumable per detector and PFA; run it overnight."""
     from iceberg_sar.benchmark.sweep import run_faerch_sweep
 
     typer.echo(f"ok  {run_faerch_sweep(load_config(config), force, only, log=typer.echo)}")

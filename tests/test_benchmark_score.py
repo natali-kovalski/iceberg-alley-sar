@@ -65,3 +65,18 @@ def test_parse_reference_tables() -> None:
 def test_optimum_lowest_pfa_on_ties() -> None:
     df = pd.DataFrame({"detector": ["a"] * 3, "pfa": [1e-3, 1e-9, 1e-5], "f": [0.5, 0.6, 0.6]})
     assert score.optimum(df).loc["a"].pfa == pytest.approx(1e-9)
+
+
+def test_compare_and_size_tables_add_my_cacfar_without_paper_values() -> None:
+    ref = score.parse_reference(ROOT / "benchmarks/faerch2023/faerch2023.xml")
+    rows = []
+    for det in ["gamma", "cacfar"]:
+        for pfa, f in [(1e-9, 0.5), (1e-5, 0.6)]:
+            rows.append({"detector": det, "pfa": pfa, "f": f, "f_v": f, "TP": 10, "FP": 5,
+                         "FN": 3, "recall_small": 0.1, "recall_medium": 0.5,
+                         "recall_large": 0.9})
+    cmp = score.compare_table(pd.DataFrame(rows), ref, 0.05, None)
+    mine = cmp.set_index("detector").loc["cacfar"]
+    assert mine.pfa == pytest.approx(1e-5) and np.isnan(mine.paper_f) and mine.within is None
+    sizes = score.size_table(pd.DataFrame(rows), ref)
+    assert sizes[sizes.detector == "cacfar"].pct_at_my_opt.tolist() == pytest.approx([10, 50, 90])

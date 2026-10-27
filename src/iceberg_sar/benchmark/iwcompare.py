@@ -68,7 +68,8 @@ class IwCompareParams:
                    near_ice_km=float(cfg.raw.get("viewer", {}).get("near_ice_km", 5)),
                    radius_m=point_val_params(cfg).max_dist_m,
                    report=cfg.root / s["report"],
-                   ref_5d=cfg.root / cfg.section("thor")["compare"]["out_dir"])
+                   ref_5d=cfg.root / (s.get("ref_5d_dir")
+                                       or cfg.section("thor")["compare"]["out_dir"]))
 
 
 def scene_truth(cfg: Config, scene: str) -> tuple[gpd.GeoDataFrame, np.ndarray, Any]:

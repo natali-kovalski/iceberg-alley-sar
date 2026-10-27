@@ -32,8 +32,11 @@ import rasterio
 from iceberg_sar.benchmark import adapter
 from iceberg_sar.benchmark.pfa import detector_channel_pfa
 from iceberg_sar.benchmark.smoke import prepare
+from iceberg_sar.cfar import CfarParams
 from iceberg_sar.config import Config
 from iceberg_sar.detections import (
+    NO_STRUCTURE_LIMIT,
+    DetectionParams,
     detect_raster,
     detect_raster_multi,
     params_for_raster,
@@ -408,7 +411,8 @@ def sweep_detector(cfg: Config, name: str, p: FaerchSweepParams, force: bool,
 
 def run_faerch_sweep(cfg: Config, force: bool = False, only: list[str] | None = None,
                      log: Callable[[str], None] = print) -> Path:
-    """1e: every detector of `faerch2023.sweep`; returns `sweep_runtime.csv`."""
+    """1e: every detector of `faerch2023.sweep`, then (2a) my CA-CFAR variants; returns
+    `sweep_runtime.csv`. `only` takes detector names and CA-CFAR tags."""
     import datetime as dt
 
     p = FaerchSweepParams.from_config(cfg)
@@ -422,17 +426,116 @@ def run_faerch_sweep(cfg: Config, force: bool = False, only: list[str] | None = 
             f.write(line + "\n")
 
     names = [n for n in p.detectors if not only or n in only]
-    tlog(f"sweep: {names}, {len(p.pfas)} PFAs {p.pfas[0]:.0e}..{p.pfas[-1]:.0e}, ENL {p.enl:g}, "
-         f"cap {p.max_objects} objects")
+    cacfar = {t: r for t, r in faerch_cacfar_tags(cfg).items() if not only or t in only}
+    tlog(f"sweep: {names + list(cacfar)}, {len(p.pfas)} PFAs {p.pfas[0]:.0e}..{p.pfas[-1]:.0e}, "
+         f"ENL {p.enl:g} (reference detectors), cap {p.max_objects} objects")
     rows: list[dict[str, Any]] = []
     for name in names:
         t0 = time.perf_counter()
         rows += sweep_detector(cfg, name, p, force, tlog)
         tlog(f"{name}: wall time {(time.perf_counter() - t0) / 60:.1f} min")
-    f = p.out_dir / "sweep_runtime.csv"
+    for rule in cacfar.values():
+        rows += sweep_cacfar_faerch(cfg, p, rule, force, tlog)
+    return merge_runtime_rows(p.out_dir / "sweep_runtime.csv", rows)
+
+
+def merge_runtime_rows(f: Path, rows: list[dict[str, Any]]) -> Path:
+    """Write `rows` to `sweep_runtime.csv`, keeping the rows of detectors not in them."""
     new = pd.DataFrame(rows)
-    if f.is_file() and not new.empty:   # keep the rows of detectors not in this run
+    if f.is_file() and not new.empty:
         old = pd.read_csv(f)
         new = pd.concat([old[~old["detector"].isin(new["detector"])], new], ignore_index=True)
     new.to_csv(f, index=False)
     return f
+
+
+# --- Milestone 2a: my CA-CFAR on the Færch 2023 EW scene, same protocol as 1e
+#
+# Under `sweep_dir/<tag>/` (tag cacfar / cacfar-nolength): `<tag>_pfa<pfa>.geojson` per PFA up to
+# the first one over `max_objects` (that one has no GeoJSON, as in 1e) and `<tag>_run.json`.
+# Rows go into the same `sweep_runtime.csv`, so `bench-score` scores them with the rest.
+# Input: the stack as masked single bands next to it (`<stem>_40m_HH_masked.tif`, NaN outside
+# the valid mask), the format `detections.detect_raster` reads.
+
+
+def faerch_cacfar_tags(cfg: Config) -> dict[str, bool]:
+    """CA-CFAR variant tag -> length rule on, from `faerch2023.sweep.cacfar_length_rules`."""
+    rules = cfg.section("benchmark")["faerch2023"]["sweep"].get("cacfar_length_rules") or []
+    return {cacfar_tag(bool(r)): bool(r) for r in rules}
+
+
+def faerch_cacfar_settings(cfg: Config, hv: Path, length_rule: bool
+                           ) -> tuple[float, CfarParams, DetectionParams]:
+    """`params_for_raster` with the paper's windows (diameters -> odd px -> half-widths) and
+    the length rule forced on or off."""
+    s = cfg.section("benchmark")["faerch2023"]["sweep"]["cacfar_windows"]
+    pixel_m, base, params = params_for_raster(cfg, hv)
+    wi, wo = adapter.odd_px(s["inner_m"], pixel_m), adapter.odd_px(s["outer_m"], pixel_m)
+    base = replace(base, guard_px=(wi - 1) // 2, background_px=(wo - 1) // 2)
+    if not length_rule:
+        params = replace(params, max_structure_px=NO_STRUCTURE_LIMIT)
+    return pixel_m, base, params
+
+
+def cap_runs(counts: list[int], max_objects: int) -> int:
+    """How many of the ascending PFAs to keep: up to and including the first over the cap."""
+    for i, n in enumerate(counts):
+        if n > max_objects:
+            return i + 1
+    return len(counts)
+
+
+def sweep_cacfar_faerch(cfg: Config, p: FaerchSweepParams, length_rule: bool, force: bool,
+                        log: Callable[[str], None]) -> list[dict[str, Any]]:
+    """My CA-CFAR over every PFA of the sweep in one pass; returns `sweep_runtime.csv` rows."""
+    from iceberg_sar.benchmark.reproduce import scene_paths
+
+    tag = cacfar_tag(length_rule)
+    sp = scene_paths(cfg)
+    out_dir = p.out_dir / tag
+    run_json = out_dir / f"{tag}_run.json"
+    pixel_m = adapter.pixel_size_m(sp.stack)
+    stem = f"{sp.stem}_{pixel_m:g}m"
+    paths = {pol: sp.stack.parent / f"{stem}_{pol}_masked.tif" for pol in BANDS}
+    if force or not all(f.is_file() for f in paths.values()):
+        split_bands(sp.stack, sp.valid, paths)
+    pixel_m, base, params = faerch_cacfar_settings(cfg, paths["HV"], length_rule)
+    settings = {"guard_px": base.guard_px, "background_px": base.background_px,
+                "enl": round(base.enl, 3), "length_rule": length_rule,
+                "pfas_requested": p.pfas, "max_objects": p.max_objects}
+    if run_json.is_file() and not force:
+        meta = json.loads(run_json.read_text(encoding="utf-8"))
+        if {k: meta.get(k) for k in settings} == settings:
+            log(f"{tag}: done, skipped")
+            return meta["rows"]
+    t0 = time.perf_counter()
+    cfars = [replace(base, pfa=pfa) for pfa in p.pfas]
+    tables, transform, crs = detect_raster_multi(paths, "HV", cfars, params)
+    runtime = round(time.perf_counter() - t0, 2)
+    keep = cap_runs([len(t) for t in tables], p.max_objects)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    rows = []
+    for c, t in zip(cfars[:keep], tables[:keep], strict=True):
+        over = len(t) > p.max_objects
+        geo = out_dir / f"{tag}_pfa{adapter.pfa_tag(c.pfa)}.geojson"
+        if not over:
+            gdf = to_geodataframe(t, transform, crs, sp.product, sp.inc)
+            write_geojson(gdf.assign(detector=tag, pfa=c.pfa, pfa_per_channel=c.pfa), geo)
+        rows.append({"detector": tag, "pfa": c.pfa, "pfa_per_channel": c.pfa,   # one test, HV
+                     "outlier_px": np.nan, "objects_raw": len(t),
+                     "runtime_s": round(runtime / len(cfars), 2), "over_cap": over,
+                     "geojson": geo.name if not over else ""})
+    meta = {"detector": tag, "band": "HV", "pixel_m": pixel_m, **settings,
+            "alpha_db": {f"{c.pfa:.0e}": round(10 * np.log10(c.alpha), 2) for c in cfars},
+            "max_structure_px": None if not length_rule else params.max_structure_px,
+            "copol_min_contrast_db": params.copol_min_contrast_db,
+            "runtime_s_all_pfas": runtime, "stopped_early": keep < len(cfars), "rows": rows}
+    run_json.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    stop = f", over the cap from {_e(cfars[keep - 1].pfa)}" if rows[-1]["over_cap"] else ""
+    log(f"{tag}: {len(rows)} PFAs{stop}, ENL {base.enl:.2f}, guard/background "
+        f"{base.guard_px}/{base.background_px} px, {runtime / 60:.1f} min")
+    return rows
+
+
+def _e(p: float) -> str:
+    return f"{p:.0e}".replace("e-0", "e-")

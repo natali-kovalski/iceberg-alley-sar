@@ -54,3 +54,15 @@ def test_estimate_enl_recovers_gamma_looks() -> None:
     blocks = rng.gamma(5.0, 1 / 5.0, size=(400, 25 * 25))
     cv = blocks.std(axis=1) / blocks.mean(axis=1)
     assert estimate_enl(cv) == pytest.approx(5.0, rel=0.15)
+
+
+def test_threshold_factor_finite_and_exact_at_tiny_pfa() -> None:
+    from scipy import special
+
+    # Færch sweep range: scipy's F isf returns inf below ~1e-16
+    for pfa in (1e-21, 1e-16, 1e-6):
+        a = threshold_factor(pfa, 13.4, 88)
+        d1, d2 = 2 * 13.4, 2 * 13.4 * 88
+        assert np.isfinite(a)
+        assert special.betainc(d2 / 2, d1 / 2, d2 / (d2 + d1 * a)) == pytest.approx(pfa, rel=1e-6)
+    assert threshold_factor(1e-21, 13.4, 88) > threshold_factor(1e-16, 13.4, 88)

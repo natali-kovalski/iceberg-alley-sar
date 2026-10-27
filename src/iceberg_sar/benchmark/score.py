@@ -41,7 +41,9 @@ from iceberg_sar.config import Config
 # Column headers of Tables 3 and 5 -> detector names in config / the runner
 PAPER_NAMES = {"Gamma": "gamma", "iDPolRAD": "idpolrad", "K": "k", "Log-normal": "lognorm",
                "NIS": "nis", "Wishart": "wishart"}
-DISPLAY = {v: k for k, v in PAPER_NAMES.items()}
+# 2a: my CA-CFAR (`sweep.cacfar_tag`), scored with the rest; no paper value to compare with
+MINE = {"cacfar": "My CA-CFAR", "cacfar-nolength": "My CA-CFAR, no length rule"}
+DISPLAY = {v: k for k, v in PAPER_NAMES.items()} | MINE
 _PFA = re.compile(r"1\s*×\s*10\s*[-−–]\s*(\d+)")
 
 
@@ -288,7 +290,10 @@ def f_figure(scores: pd.DataFrame, ref: dict[str, Any], fig6: pd.DataFrame | Non
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    fig, axes = plt.subplots(2, 3, figsize=(12, 7), sharex=True, sharey=True)
+    ncols = max(3, -(-len(detectors) // 2))
+    fig, axes = plt.subplots(2, ncols, figsize=(4 * ncols, 7), sharex=True, sharey=True)
+    for ax in axes.flat[len(detectors):]:
+        ax.set_visible(False)
     for ax, det in zip(axes.flat, detectors, strict=False):
         d = scores[scores.detector == det].sort_values("pfa")
         x = np.log10(d.pfa)
@@ -308,6 +313,9 @@ def f_figure(scores: pd.DataFrame, ref: dict[str, Any], fig6: pd.DataFrame | Non
         if len(cap):
             ax.axvline(np.log10(cap.pfa.min()), color="#9a9a96", lw=1, ls=":")
         ax.set_title(DISPLAY.get(det, det), fontsize=11, color=INK)
+        if det in MINE:
+            ax.text(0.03, 0.03, "no paper value", transform=ax.transAxes, fontsize=8,
+                    color="#5f5e5a")
         ax.grid(True, color="#e6e6e3", lw=0.8)
         ax.set_ylim(0, 1)
         ax.set_xlim(-21.5, -0.5)
@@ -330,7 +338,9 @@ def f_figure(scores: pd.DataFrame, ref: dict[str, Any], fig6: pd.DataFrame | Non
 
 # Paper Fig. 6 look (seaborn "darkgrid"): legend order, colours and markers read off the figure
 FIG6_STYLE = {"lognorm": ("#3e6fa8", "1"), "gamma": ("#5ec8ec", "2"), "k": ("#2e9a3c", "3"),
-              "idpolrad": ("#dcc23a", "4"), "nis": ("#ec6470", "+"), "wishart": ("#a3336f", "x")}
+              "idpolrad": ("#dcc23a", "4"), "nis": ("#ec6470", "+"), "wishart": ("#a3336f", "x"),
+              # 2a, not in the paper: black, so they read as the extra series
+              "cacfar": ("#1f1f1e", "o"), "cacfar-nolength": ("#1f1f1e", "s")}
 
 
 def fig6_style_figure(scores: pd.DataFrame, detectors: list[str], out: Path, subtitle: str,
@@ -342,12 +352,14 @@ def fig6_style_figure(scores: pd.DataFrame, detectors: list[str], out: Path, sub
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=(7.5, 6.5))
+    fig, ax = plt.subplots(figsize=(10, 6.5))
     ax.set_facecolor("#eaeaf2")
     for det in [d for d in FIG6_STYLE if d in detectors]:
         d = scores[(scores.detector == det) & np.isfinite(scores.f)].sort_values("pfa")
         color, marker = FIG6_STYLE[det]
-        ax.plot(d.pfa, d.f, color=color, marker=marker, ms=9, mew=1.5, lw=2,
+        mine = det in MINE
+        ax.plot(d.pfa, d.f, color=color, marker=marker, ms=6 if mine else 9, mew=1.5, lw=2,
+                ls="--" if det == "cacfar-nolength" else "-", mfc="none" if mine else color,
                 label=DISPLAY[det].replace("iDPolRAD", "iDPolRad"))
     ax.set_xscale("log")
     ax.set_xlim(10 ** -22.5, 10 ** -0.4)
@@ -365,8 +377,9 @@ def fig6_style_figure(scores: pd.DataFrame, detectors: list[str], out: Path, sub
     ax.set_xlabel("PFA", fontsize=14)
     ax.set_ylabel("F-Score", fontsize=14, rotation=45, labelpad=18)
     ax.set_title(subtitle, fontsize=14)
-    # upper left: the paper's upper-right spot is where our curves peak
-    ax.legend(loc="upper left", fontsize=12, facecolor="#eaeaf2", edgecolor="#cccccc")
+    # outside the axes: with 8 curves, every corner inside covers one of them
+    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), fontsize=12, facecolor="#eaeaf2",
+              edgecolor="#cccccc")
     fig.suptitle("F Score (Accuracy)", fontsize=18)
     fig.text(0.5, 0.01, note, ha="center", fontsize=8, color="#5f5e5a")
     fig.tight_layout(rect=(0, 0.03, 1, 1))
@@ -398,6 +411,21 @@ def compare_table(scores: pd.DataFrame, ref: dict[str, Any], tol: float,
             row["f_alt"] = a.loc[det].f if det in a.index else np.nan
             row["pfa_alt"] = a.loc[det].pfa if det in a.index else np.nan
         rows.append(row)
+    for det in [d for d in MINE if d in best.index]:
+        b = best.loc[det]
+        row = {"detector": det, "paper_pfa": np.nan, "pfa": b.pfa, "paper_TP": None,
+               "TP": int(b.TP), "paper_FP": None, "FP": int(b.FP), "paper_FN": None,
+               "FN": int(b.FN), "paper_f": np.nan, "f": b.f, "diff": np.nan, "within": None,
+               "f_v": b.f_v, "pfa_v": optimum(scores, "f_v").loc[det].pfa,
+               "f_v_best": optimum(scores, "f_v").loc[det].f_v}
+        if sens is not None:
+            s_best = optimum(sens)
+            row["f_sens"] = s_best.loc[det].f if det in s_best.index else np.nan
+        if alt is not None:
+            a = optimum(alt)
+            row["f_alt"] = a.loc[det].f if det in a.index else np.nan
+            row["pfa_alt"] = a.loc[det].pfa if det in a.index else np.nan
+        rows.append(row)
     return pd.DataFrame(rows)
 
 
@@ -414,6 +442,11 @@ def size_table(scores: pd.DataFrame, ref: dict[str, Any]) -> pd.DataFrame:
                          "paper_pfa": t["pfa"],
                          "pct_at_paper_pfa": np.nan if at5 is None
                          else 100 * at5[f"recall_{name}"],
+                         "pct_at_my_opt": 100 * best.loc[det][f"recall_{name}"]})
+    for det in [d for d in MINE if d in best.index]:
+        for name, _, _ in SIZE_CLASSES:
+            rows.append({"detector": det, "size": name, "paper_pct": np.nan,
+                         "paper_pfa": np.nan, "pct_at_paper_pfa": np.nan,
                          "pct_at_my_opt": 100 * best.loc[det][f"recall_{name}"]})
     return pd.DataFrame(rows)
 
@@ -452,6 +485,7 @@ def report(cfg: Config, source: str, ref: dict[str, Any], cmp: pd.DataFrame, siz
         f"{cfg.section('benchmark')['merge']} merge for gamma / log-normal / K, windows "
         "360 / 520 m "
         "(9 / 13 px), iDPolRAD 3 / 57 px cropped to the library's 41 px, objects 2-500 px.",
+        *_mine_setup(sp.out_dir, cfg),
         "- Thermal noise removal: " + ("on, as the paper describes." if tnr else
             "**off** (decided 2026-10-26). SNAP 14's noise removal clips negatives to -115 dB "
             "and gives HV an ENL of ~1, which breaks the paper's ENL; the run with it is the "
@@ -483,9 +517,17 @@ def report(cfg: Config, source: str, ref: dict[str, Any], cmp: pd.DataFrame, siz
         + ("---|" if "f_alt" in cmp else ""),
     ]
     for r in cmp.itertuples():
+        if r.detector in MINE:   # 2a: no paper value, no diff or tolerance
+            lines.append(
+                f"| {DISPLAY[r.detector]} | – | {_e(r.pfa)} | – | {r.TP} / {r.FP} / {r.FN} | – | "
+                f"{r.f:.3f} | – | – | {r.f_v:.3f} / {r.f_v_best:.3f} ({_e(r.pfa_v)}) |"
+                + (f" {r.f_sens:.3f} |" if "f_sens" in cmp else "")
+                + ((f" {r.f_alt:.3f} ({_e(r.pfa_alt)}) |" if np.isfinite(r.f_alt)
+                    else " not run |") if "f_alt" in cmp else ""))
+            continue
         lines.append(
             f"| {DISPLAY[r.detector]} | {_e(r.paper_pfa)} | {_e(r.pfa)} | "
-            f"{r.paper_TP} / {r.paper_FP} / {r.paper_FN} | {r.TP} / {r.FP} / {r.FN} | "
+            f"{r.paper_TP:.0f} / {r.paper_FP:.0f} / {r.paper_FN:.0f} | {r.TP} / {r.FP} / {r.FN} | "
             f"{r.paper_f:.3f} | {r.f:.3f} | {r.diff:+.3f} | {'yes' if r.within else '**no**'} | "
             f"{r.f_v:.3f} / {r.f_v_best:.3f} ({_e(r.pfa_v)}) |"
             + (f" {r.f_sens:.3f} |" if "f_sens" in cmp else "")
@@ -507,6 +549,9 @@ def report(cfg: Config, source: str, ref: dict[str, Any], cmp: pd.DataFrame, siz
               "| Detector | Size | Paper % (PFA) | Mine at that PFA | Mine at my optimum |",
               "|---|---|---|---|---|"]
     for r in sizes.itertuples():
+        if r.detector in MINE:
+            lines.append(f"| {DISPLAY[r.detector]} | {r.size} | – | – | {r.pct_at_my_opt:.1f} |")
+            continue
         lines.append(f"| {DISPLAY[r.detector]} | {r.size} | {r.paper_pct:.1f} "
                      f"({_e(r.paper_pfa)}) | "
                      + (f"{r.pct_at_paper_pfa:.1f}" if np.isfinite(r.pct_at_paper_pfa)
@@ -520,6 +565,24 @@ def report(cfg: Config, source: str, ref: dict[str, Any], cmp: pd.DataFrame, siz
     lines += [f"- runtime per detector and PFA: `{rel(sp.out_dir / 'sweep_runtime.csv')}`",
               f"- reference values: `{sc['reference']}`", ""]
     return "\n".join(lines)
+
+
+def _mine_setup(out_dir: Path, cfg: Config) -> list[str]:
+    """Report bullet for my CA-CFAR (2a), from its run sidecar; [] if it hasn't run."""
+    f = out_dir / "cacfar" / "cacfar_run.json"
+    if not f.is_file():
+        return []
+    m = json.loads(f.read_text(encoding="utf-8"))
+    d = cfg.section("detections")
+    return [
+        "- My CA-CFAR (2a; `cacfar`, `cacfar-nolength`): Stage 1's detector as it is, on the "
+        f"same stack and mask. HV only (one test, so per-channel PFA = total PFA), the paper's "
+        f"windows ({2 * m['guard_px'] + 1} / {2 * m['background_px'] + 1} px), ENL "
+        f"{m['enl']:g} measured on the HV band (`cfar.enl: auto`), HH co-pol check "
+        f"{m['copol_min_contrast_db']:g} dB, objects >= {d['min_area_px']} px merged by grown "
+        f"structure, none within {d['edge_buffer_m']} m of the mask. Length rule "
+        f"({d['max_structure_m']} m) on / off. The object cap counts its final objects.",
+    ]
 
 
 def run_score(cfg: Config, source: str | None = None, log: Callable[[str], None] = print
@@ -558,7 +621,7 @@ def run_score(cfg: Config, source: str | None = None, log: Callable[[str], None]
     sizes = size_table(scores, ref)
     fig6_path = cfg.root / sc["fig6_csv"]
     fig6 = pd.read_csv(fig6_path) if fig6_path.is_file() else None
-    dets = [d for d in fc["sweep"]["detectors"] if d in set(scores.detector)]
+    dets = [d for d in [*fc["sweep"]["detectors"], *MINE] if d in set(scores.detector)]
     note = ("Færch labels (Path A)" if source == "faerch" else "RECONSTRUCTED LABELS (Path B)") + \
         f"; {_variant(cfg)} stack; scoring area `{sc['aoi']}`; dotted line: object cap reached"
     fig = f_figure(scores, ref, fig6, dets, cfg.root / sc["figure"], note, alt,
@@ -572,8 +635,8 @@ def run_score(cfg: Config, source: str | None = None, log: Callable[[str], None]
                           int((~in_aoi).sum()), fig, fig6 is not None, csvs, fig_s),
                    encoding="utf-8")
     for r in cmp.itertuples():
-        log(f"{r.detector:9s} F {r.f:.3f} at {_e(r.pfa)} vs paper {r.paper_f:.3f} at "
-            f"{_e(r.paper_pfa)} ({r.diff:+.3f})")
+        log(f"{r.detector:9s} F {r.f:.3f} at {_e(r.pfa)}" + ("" if r.detector in MINE else
+            f" vs paper {r.paper_f:.3f} at {_e(r.paper_pfa)} ({r.diff:+.3f})"))
     return {**{f"scores {k}": v for k, v in csvs.items()}, "figure": fig,
             "figure (Fig. 6 style)": fig_s, "report": rep}
 

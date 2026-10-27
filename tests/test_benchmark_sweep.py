@@ -102,3 +102,26 @@ def test_pfa_status_resumes_and_stops_at_cap(tmp_path: Path) -> None:
     done(1e-5, 500)   # over the cap: nothing above it runs
     finished, todo = sweep.pfa_status(tmp_path, "g", pfas, max_objects=100)
     assert sorted(finished) == [1e-7, 1e-5] and todo == [1e-9]
+
+
+def test_cap_runs_keeps_the_first_pfa_over_the_cap() -> None:
+    assert sweep.cap_runs([10, 50, 200, 900], max_objects=100) == 3
+    assert sweep.cap_runs([10, 50], max_objects=100) == 2
+
+
+def test_faerch_cacfar_settings_paper_windows_and_length_rule(tmp_path: Path) -> None:
+    from iceberg_sar.detections import NO_STRUCTURE_LIMIT
+
+    rng = np.random.default_rng(0)
+    hv = tmp_path / "hv.tif"
+    with rasterio.open(hv, "w", driver="GTiff", width=120, height=120, count=1,
+                       dtype="float32", crs="EPSG:32620",
+                       transform=from_origin(500_000, 6_700_000, 40, 40)) as dst:
+        dst.write(rng.gamma(10.0, 0.1, (120, 120)).astype(np.float32), 1)
+    pixel_m, cfar, params = sweep.faerch_cacfar_settings(CFG, hv, length_rule=True)
+    assert pixel_m == 40 and (cfar.guard_px, cfar.background_px) == (4, 6)   # 9 / 13 px
+    assert params.max_structure_px == 8                                      # 300 m at 40 m
+    assert 7 < cfar.enl < 13                                                 # gamma(L=10) speckle
+    _, _, off = sweep.faerch_cacfar_settings(CFG, hv, length_rule=False)
+    assert off.max_structure_px == NO_STRUCTURE_LIMIT
+    assert sweep.faerch_cacfar_tags(CFG) == {"cacfar": True, "cacfar-nolength": False}

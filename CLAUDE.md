@@ -152,6 +152,18 @@ iceberg-alley-sar/
     the paper (same F; they take the ENL as given). noTNR sweep: 7 h 15 min, 117 of 126 runs
     scored (rest over the cap). Open for Laust: SNAP version / TNR, ENL for gamma and Wishart,
     radius of the 15 small manual labels, Table 3 vs 5 PFAs.
+- **Stage 2 / Milestone 2a (2026-10-27): done.** `bench-sweep` also runs my CA-CFAR on the noTNR
+  stack (`sweep.sweep_cacfar_faerch`, tags `cacfar` / `cacfar-nolength`, all 21 PFAs in one pass,
+  2 min each; config `faerch2023.sweep.cacfar_length_rules` / `cacfar_windows`: the paper's 9 / 13
+  px, ENL auto = 13.4). `bench-score` adds both as rows / panels / curves (`score.MINE`). Best F
+  0.567 (1e-5, rule on) / 0.587 (1e-1, off) vs gamma 0.636; precision 0.85-0.97, recall <= 0.45.
+  Cause (one-off ablation, `score/cacfar_ablation*.csv`): the 6 dB HH co-pol check is a fixed
+  second threshold that caps recall; without it 0.609 at 1e-7 (rest ~ HV-only vs HH AND HV).
+  TNR stack too (`sweep/cacfar*`): 0.494 / 0.468 vs gamma 0.428, NIS 0.233, K 0.533 (measured
+  ENL 1.05 adapts; fixed-ENL detectors collapse). Discussion in `reproduction_notes.md`; summary in `docs/cfar-choice-and-thermal-noise.md`. Bug fixed: `cfar.threshold_factor` (scipy F isf) was inf
+  below PFA ~1e-16; now via `betaincinv` (unchanged >= 1e-12). 2b's 40 m CA-CFAR runs redone
+  (matched-count recall unchanged); 2b's 10 m "with length rule" rows now read
+  `iw_sweep.ref_5d_dir: data/outputs/thor/5d_rule_always` (5d itself is `auto` since 10-26).
 - **Stage 2 / Milestone 2b, one frame (2026-10-23/26):** `bench-iw-sweep` + `bench-iw-compare`
   (`benchmark/sweep.py`, `benchmark/iwcompare.py`, config `benchmark.iw_sweep`, report
   `benchmarks/m2b_iw40.md`). 2019-04-29 at 40 m, 6 reference detectors + my CA-CFAR, 11 PFAs

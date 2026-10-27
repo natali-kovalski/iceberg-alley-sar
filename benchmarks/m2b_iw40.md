@@ -25,8 +25,8 @@ Same scoring as 5d (`thor-compare`), so the 40 m curves sit next to 5d's 10 m on
 | Wishart |  |  |  | 13-92 | 11 |
 | NIS |  |  | 0.96 | 597-9957 | 10 |
 | iDPolRAD (window cropped to 41 px) | 0.62 | 0.87 | 0.92 | 134-5943 | 10 |
-| my CA-CFAR, HV, no length rule | 0.64 | 0.86 | 0.92 | 0-1757 | 11 |
-| my CA-CFAR, HV, with length rule | 0.63 | 0.84 | 0.84 | 0-1631 | 11 |
+| my CA-CFAR, HV, no length rule | 0.64 | 0.86 | 0.92 | 69-1757 | 11 |
+| my CA-CFAR, HV, with length rule | 0.63 | 0.84 | 0.84 | 65-1631 | 11 |
 | my CA-CFAR 10 m, no length rule | 0.58 | 0.83 | 0.92 | 173-1568 | 5d |
 | my CA-CFAR 10 m, with length rule (5d) | 0.53 | 0.75 | 0.82 | 151-1513 | 5d |
 | THOR linear 10 m (5d) | 0.66 | 0.90 | 0.95 | 0-3561 | 5d |
@@ -99,8 +99,8 @@ standard error (~0.02 at recall 0.87). Read small gaps as ties.
   is real, but it finds little. Its statistic takes one ENL, the HV value (1.82), so HH is
   thresholded for much rougher speckle than it has.
 - **Nominal PFA is not a common scale.** At 1e-9 the detectors give 31 (Wishart) to 1087 (NIS)
-  open-water detections. My CA-CFAR gives none below 1e-15 (F threshold, ENL 1.88), and only
-  1757 at 1e-1. Matched detection counts are the only fair comparison.
+  open-water detections. My CA-CFAR gives 69 at 1e-21 (ENL 1.88) and only 1757 at 1e-1.
+  (Before 2026-10-27 it gave none below 1e-15: scipy's F inverse returned inf there; fixed in 2a.) Matched detection counts are the only fair comparison.
 - **40 m doesn't cost small bergs here.** Only 31 of the 267 labels are small (15-60 m). The
   40 m detectors find 15-22 of them (NIS 29), against 20 for the 10 m CA-CFAR and 22 for THOR.
 - **Runtime** (11 PFAs, 40 m frame): iDPolRAD 75 min, K 17, log-normal 16, NIS 7,

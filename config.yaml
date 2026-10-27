@@ -361,6 +361,9 @@ benchmark:
     # validation.max_dist_m. Recall is read off each curve at these detection counts.
     matched_counts: [250, 500, 1000]
     breakdown_count: 500    # size breakdown at each detector's operating point nearest this count
+    # 5d tables for the 10 m reference rows. 5d now runs the length rule only in icy scenes (off
+    # on 04-29); the "10 m, with length rule" rows are the run with it always on. Unset = thor.compare.out_dir.
+    ref_5d_dir: data/outputs/thor/5d_rule_always
     report: benchmarks/m2b_iw40.md
   faerch2023:               # Stage 2 / Milestone 1: reproduce Færch 2023 on the Sentinel-1 EW scene
     paper_xml: benchmarks/faerch2023/faerch2023.xml
@@ -414,6 +417,12 @@ benchmark:
       # this in the whole scene. The AOI is ~1/5 of the scene, so the last PFA scored has >~4000
       # objects in it vs 492 labels (F < 0.2); the paper's optimum has 24-74 false positives.
       max_objects: 20000
+      # 2a: my CA-CFAR as it is (HV test, co-pol check, `detections` rules, `cfar.enl` measured
+      # on the scene) with the length rule on and off (tags cacfar / cacfar-nolength). All PFAs
+      # in one pass; the cap counts final objects. Windows: the paper's (diameters, 9 / 13 px at
+      # 40 m), not `cfar.guard_m` / `background_m`, so window size isn't a variable.
+      cacfar_length_rules: [true, false]
+      cacfar_windows: {inner_m: 360, outer_m: 520}
     score:                  # 1f: match detections to labels, recall / precision / F per (detector, PFA)
       # Scoring area: S1 valid (swath, no land buffer) x the S2 and ALOS-2 outlines of Fig. 1
       # (`fig1`), or the Path B AOI that also drops clouds and S2 nodata (`reconstructed`).
