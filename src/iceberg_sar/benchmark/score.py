@@ -328,6 +328,54 @@ def f_figure(scores: pd.DataFrame, ref: dict[str, Any], fig6: pd.DataFrame | Non
     return out
 
 
+# Paper Fig. 6 look (seaborn "darkgrid"): legend order, colours and markers read off the figure
+FIG6_STYLE = {"lognorm": ("#3e6fa8", "1"), "gamma": ("#5ec8ec", "2"), "k": ("#2e9a3c", "3"),
+              "idpolrad": ("#dcc23a", "4"), "nis": ("#ec6470", "+"), "wishart": ("#a3336f", "x")}
+
+
+def fig6_style_figure(scores: pd.DataFrame, detectors: list[str], out: Path, subtitle: str,
+                      note: str) -> Path:
+    """All detectors' all-labels F vs PFA on one panel, styled like the paper's Fig. 6.
+    Over-cap PFAs (no score) are left out, so a curve can end before 1e-1."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(7.5, 6.5))
+    ax.set_facecolor("#eaeaf2")
+    for det in [d for d in FIG6_STYLE if d in detectors]:
+        d = scores[(scores.detector == det) & np.isfinite(scores.f)].sort_values("pfa")
+        color, marker = FIG6_STYLE[det]
+        ax.plot(d.pfa, d.f, color=color, marker=marker, ms=9, mew=1.5, lw=2,
+                label=DISPLAY[det].replace("iDPolRAD", "iDPolRad"))
+    ax.set_xscale("log")
+    ax.set_xlim(10 ** -22.5, 10 ** -0.4)
+    ax.set_xticks([10.0 ** e for e in range(-22, 0, 4)])
+    ax.minorticks_off()
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_yticks(np.arange(0, 1.01, 0.2))
+    ax.tick_params(length=0, labelsize=12, colors="#262626")
+    for lab in ax.get_xticklabels() + ax.get_yticklabels():
+        lab.set_rotation(45)
+    ax.grid(True, color="white", lw=1.2)
+    ax.set_axisbelow(True)
+    for s in ax.spines.values():
+        s.set_visible(False)
+    ax.set_xlabel("PFA", fontsize=14)
+    ax.set_ylabel("F-Score", fontsize=14, rotation=45, labelpad=18)
+    ax.set_title(subtitle, fontsize=14)
+    # upper left: the paper's upper-right spot is where our curves peak
+    ax.legend(loc="upper left", fontsize=12, facecolor="#eaeaf2", edgecolor="#cccccc")
+    fig.suptitle("F Score (Accuracy)", fontsize=18)
+    fig.text(0.5, 0.01, note, ha="center", fontsize=8, color="#5f5e5a")
+    fig.tight_layout(rect=(0, 0.03, 1, 1))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out, dpi=130, facecolor="white")
+    plt.close(fig)
+    return out
+
+
 def compare_table(scores: pd.DataFrame, ref: dict[str, Any], tol: float,
                   sens: pd.DataFrame | None, alt: pd.DataFrame | None = None) -> pd.DataFrame:
     best = optimum(scores)
@@ -376,7 +424,7 @@ def _e(p: float) -> str:
 
 def report(cfg: Config, source: str, ref: dict[str, Any], cmp: pd.DataFrame, sizes: pd.DataFrame,
            scores: pd.DataFrame, n_labels: int, n_outside: int, fig: Path, fig6: bool,
-           csvs: dict[str, Path]) -> str:
+           csvs: dict[str, Path], fig_s: Path | None = None) -> str:
     fc = cfg.section("benchmark")["faerch2023"]
     sc = fc["score"]
     tol = float(cfg.section("benchmark")["repro_tolerance_f1"])
@@ -448,6 +496,10 @@ def report(cfg: Config, source: str, ref: dict[str, Any], cmp: pd.DataFrame, siz
     if not fig6:
         lines += [f"No `{sc['fig6_csv']}`, so the paper's Fig. 6 curves are not overlaid; the star",
                   "is Table 3's optimum.", ""]
+    if fig_s is not None:
+        s_rel = Path(os.path.relpath(fig_s, (cfg.root / sc["report"]).parent)).as_posix()
+        lines += ["All detectors on one panel, all labels, styled like the paper's Fig. 6 for a",
+                  "side-by-side read:", "", f"![F vs PFA, Fig. 6 style]({s_rel})", ""]
     lines += ["## Detected share by size at the optimum (Table 5)", "",
               "Table 5 uses its own optimum PFA, which differs from Table 3 for "
               + ", ".join(n.split(":")[0] for n in ref["pfa_mismatch_table3_vs_table5"]) + ".",
@@ -511,13 +563,19 @@ def run_score(cfg: Config, source: str | None = None, log: Callable[[str], None]
         f"; {_variant(cfg)} stack; scoring area `{sc['aoi']}`; dotted line: object cap reached"
     fig = f_figure(scores, ref, fig6, dets, cfg.root / sc["figure"], note, alt,
                    f"{_variant(other)} stack, all labels")
+    fig_s = fig6_style_figure(
+        scores, dets, cfg.root / sc["figure_fig6_style"],
+        f"Sentinel-1 ({'with' if _variant(cfg) == 'TNR' else 'no'} thermal noise removal)",
+        note.split("; dotted")[0] + "; all labels; over-cap PFAs left out")
     rep = cfg.root / sc["report"]
     rep.write_text(report(cfg, source, ref, cmp, sizes, scores, len(labels),
-                          int((~in_aoi).sum()), fig, fig6 is not None, csvs), encoding="utf-8")
+                          int((~in_aoi).sum()), fig, fig6 is not None, csvs, fig_s),
+                   encoding="utf-8")
     for r in cmp.itertuples():
         log(f"{r.detector:9s} F {r.f:.3f} at {_e(r.pfa)} vs paper {r.paper_f:.3f} at "
             f"{_e(r.paper_pfa)} ({r.diff:+.3f})")
-    return {**{f"scores {k}": v for k, v in csvs.items()}, "figure": fig, "report": rep}
+    return {**{f"scores {k}": v for k, v in csvs.items()}, "figure": fig,
+            "figure (Fig. 6 style)": fig_s, "report": rep}
 
 
 def _variant(cfg: Config) -> str:

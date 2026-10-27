@@ -425,6 +425,7 @@ benchmark:
       reference: benchmarks/faerch2023/reference.yaml
       fig6_csv: benchmarks/faerch2023/reference_fig6.csv   # digitized by hand; overlay only if present
       figure: docs/img/faerch2023_f_vs_pfa.png
+      figure_fig6_style: docs/img/faerch2023_f_vs_pfa_fig6style.png   # all detectors, one panel
       report: docs/faerch2023-reproduction.md
       table_csv: data/benchmark/faerch2023/score/scores.csv
     labels_source: faerch   # labels for 1e/1f: faerch (Path A) | reconstructed (Path B); --source overrides

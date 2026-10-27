@@ -31,6 +31,11 @@ all-labels F.
 No `benchmarks/faerch2023/reference_fig6.csv`, so the paper's Fig. 6 curves are not overlaid; the star
 is Table 3's optimum.
 
+All detectors on one panel, all labels, styled like the paper's Fig. 6 for a
+side-by-side read:
+
+![F vs PFA, Fig. 6 style](img/faerch2023_f_vs_pfa_fig6style.png)
+
 ## Detected share by size at the optimum (Table 5)
 
 Table 5 uses its own optimum PFA, which differs from Table 3 for Gamma, K, Log-normal.
