@@ -613,15 +613,17 @@ Milestone numbering restarts at 0 for Stage 2. Stage 1 milestones stay as they a
 ### Milestone 2: Validate my CA-CFAR
 
 #### 2a: CA-CFAR on the Færch scene
-- Run my CA-CFAR on the 40 m EW scene under the Milestone 1 protocol: same land mask,
-  same windows (converted to pixels), same labels, same scorer.
-- Map my threshold to a PFA scale so it can sweep the same 21 levels. If my detector
-  isn't parameterized by PFA, sweep its own threshold and plot F1 vs detection count
-  for all detectors instead (both views go in the note).
+- Run my CA-CFAR on the 40 m EW scene **without thermal noise removal** (the noTNR stack, the
+  Milestone 1 reproduction run) under the Milestone 1 protocol: same land mask, same windows
+  (converted to pixels), same labels, same scorer, same scoring area.
+- My CA-CFAR is parameterized by PFA (HV only, one test, so per-channel PFA = total PFA): sweep
+  the same 21 levels (1e-21 to 1e-1), resumable, same object cap as 1e.
 - Run two variants: as it is (HV only, with the length rule) and without the
   length rule.
-- Add both as extra curves to the 1f figure.
-- **Done when:** the 1f figure and table include my CA-CFAR as two extra rows.
+- Every Milestone 1 output gets my CA-CFAR as well: the F-at-optimum table (no paper value, so
+  no diff / tolerance), the Table 5 size breakdown, the per-detector F vs PFA panels and the
+  Fig. 6-style one-panel chart. `bench-score` produces them, so the report regenerates as before.
+- **Done when:** every 1f table and figure includes my CA-CFAR as two extra rows / curves.
 
 #### 2b: Reference detectors on my IW frames
 - Run the gamma and NIS detectors (via the adapter) on all four April 2019 IW frames,
