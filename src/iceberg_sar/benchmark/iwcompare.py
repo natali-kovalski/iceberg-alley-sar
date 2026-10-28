@@ -8,7 +8,8 @@ Same protocol as 5d (`thor/compare.py`), so the 40 m curves sit next to the 10 m
 
 Precision isn't measurable without AIS, so detectors are compared by recall at matched numbers
 of detections, read off each PFA curve by interpolation in log(detections).
-The 10 m CA-CFAR (with the length rule) and THOR curves come from the 5d tables as reference.
+The 10 m CA-CFAR (with the length rule, from the old 5d run with the rule always on) and THOR
+curves come from the 5d tables as reference.
 """
 
 from __future__ import annotations
@@ -36,14 +37,16 @@ REF_10M_OPS = {"cfar": "cacfar-10m", "thor-linear matched-count": "thor-linear-1
 LABELS = {
     "cacfar-nolength": "my CA-CFAR, HV, no length rule",
     "cacfar": "my CA-CFAR, HV, with length rule",
+    "cacfar-nolength-ownwin": "my CA-CFAR, HV, no length rule, own windows",
+    "cacfar-ownwin": "my CA-CFAR, HV, with length rule, own windows",
     "gamma": "gamma (HH AND HV)",
     "lognorm": "log-normal (HH AND HV)",
     "k": "K (HH AND HV)",
     "wishart": "Wishart",
     "nis": "NIS",
     "idpolrad": "iDPolRAD (window cropped to 41 px)",
-    "cacfar-10m": "my CA-CFAR 10 m, with length rule (5d)",
-    CACFAR_10M: "my CA-CFAR 10 m, no length rule",
+    "cacfar-10m": "my CA-CFAR 10 m, with length rule (old 5d)",
+    CACFAR_10M: "my CA-CFAR 10 m, no length rule (= current 5d)",
     "thor-linear-10m": "THOR linear 10 m (5d)",
 }
 NOTES_MARKER = "<!-- hand-written notes below; kept when bench-iw-compare re-runs -->"
@@ -204,8 +207,11 @@ def run_iw_compare(cfg: Config, log: Callable[[str], None] = print) -> dict[str,
                            size_breakdown_10m(p.ref_5d, scene)], ignore_index=True)
         sizes.to_csv(work / "size_breakdown.csv", index=False)
         enl = json.loads(next(work.glob(f"{scene}_*m_enl.json")).read_text(encoding="utf-8"))
-        tag0 = next(iter(sp.cacfar_tags))   # ENL and windows are the same for every variant
-        cac = json.loads((work / tag0 / f"{tag0}_run.json").read_text(encoding="utf-8"))
+        cac = {}   # window set -> run.json of its first variant (ENL and windows per set)
+        for tag, v in sp.cacfar_tags.items():
+            if v.windows not in cac:
+                cac[v.windows] = json.loads((work / tag / f"{tag}_run.json")
+                                            .read_text(encoding="utf-8"))
         png = recall_figure(full, sp, len(t_xy), p, scene, work / "recall_vs_detections.png")
         log(f"{scene}: {len(t_xy)} labels; figure {png}")
         out[scene] = png
@@ -257,16 +263,18 @@ def recall_figure(sweep: pd.DataFrame, sp: SweepParams, n_truth: int, p: IwCompa
             ax.plot(g["detections"], g["recall"], color="#9a9890", lw=1.5, ls=ls,
                     marker=marker, ms=4, zorder=2, label=LABELS[tag],
                     markerfacecolor=SURFACE if tag == CACFAR_10M else "#9a9890")
-        # CA-CFAR variants share the orange (one detector); the length rule is dashed + hollow
-        mine_styles = {t: ("-", mine) if not rule else ("--", SURFACE)
-                       for t, rule in sp.cacfar_tags.items()}
-        for tag, color, marker in ([(t, mine, "s") for t in sp.cacfar_tags] + [(det, ref_c, "o")]):
+        # CA-CFAR variants share the orange (one detector); the length rule is dashed + hollow.
+        # Only the paper-window variants: the like-for-like ones (own windows: tables only).
+        paper = {t: v for t, v in sp.cacfar_tags.items() if v.windows == "paper"}
+        mine_styles = {t: ("-", mine) if not v.length_rule else ("--", SURFACE)
+                       for t, v in paper.items()}
+        for tag, color, marker in ([(t, mine, "s") for t in paper] + [(det, ref_c, "o")]):
             g = sweep[sweep["detector"] == tag].sort_values("detections")
             ls, face = mine_styles.get(tag, ("-", color))
             ax.plot(g["detections"], g["recall"], color=color, lw=2, ls=ls, marker=marker, ms=6,
                     markerfacecolor=face, markeredgecolor=color if face == SURFACE else SURFACE,
                     markeredgewidth=1.2 if face == SURFACE else 1, zorder=3,
-                    label=LABELS[tag] + " (40 m)" if tag in sp.cacfar_tags
+                    label=LABELS[tag] + " (40 m, paper windows)" if tag in paper
                     else "reference detector (40 m)")
             if tag == det:
                 last = (-np.inf, -np.inf)   # skip labels that would sit on the previous one
@@ -328,11 +336,15 @@ def _header(p: IwCompareParams) -> str:
         "pack ice, nodata, as in 5d.",
         "- Reference detectors: the library through `external/cfar_runner`, paper windows "
         "(360 / 520 m), HH AND HV merge, per-band ENL for gamma / K, objects of 2-500 px.",
-        "- My CA-CFAR: HV, its own windows (`cfar.guard_m` / `background_m`), co-pol check, "
-        "ENL estimated on the 40 m HV. Run "
-        + " and ".join(f"**{'with' if r else 'without'} the length rule**"
-                       for r in sp.cacfar_tags.values())
-        + " (the reference detectors have no such rule).",
+        "- My CA-CFAR: HV, co-pol check, ENL estimated on the 40 m HV. Variants: "
+        + ", ".join(f"**{'with' if v.length_rule else 'without'} the length rule, "
+                    f"{'paper' if v.windows == 'paper' else 'own'} windows**"
+                    for v in sp.cacfar_tags.values())
+        + ". Paper windows = the reference detectors' "
+        f"({sp.cacfar_windows['inner_m']:g} / {sp.cacfar_windows['outer_m']:g} m), so "
+        "paper windows without the length rule is the like-for-like run (the reference "
+        "detectors have no such rule). Own windows = `cfar.guard_m` / `background_m`, as at "
+        "10 m. Unlabelled CA-CFAR rows below use the paper windows.",
         f"- Total PFA: {', '.join(f'{x:.0e}' for x in sp.pfas)}; a detector stops after the "
         f"first PFA with more than {sp.max_objects} objects.",
         f"- Truth: same-pass IIP labels where the SAR is valid. Detections within "
@@ -348,15 +360,17 @@ def _fmt(v: float) -> str:
 
 
 def _scene_section(scene: str, sweep: pd.DataFrame, matched: pd.DataFrame, sizes: pd.DataFrame,
-                   enl: dict[str, Any], cac: dict[str, Any], p: IwCompareParams, png: Path,
-                   root: Path) -> str:
+                   enl: dict[str, Any], cac: dict[str, dict[str, Any]], p: IwCompareParams,
+                   png: Path, root: Path) -> str:
     counts = p.matched_counts
+    c0 = next(iter(cac.values()))
+    windows = ", ".join(f"{w} {c['guard_px']} / {c['background_px']}" for w, c in cac.items())
     lines = [
         f"## {scene}",
         "",
         f"- Labels compared: {int(sweep['truth'].iloc[0])}. ENL at 40 m (open-water box): "
-        f"HH {enl['enl']['HH']}, HV {enl['enl']['HV']}. My CA-CFAR: ENL {cac['enl']}, "
-        f"guard / background {cac['guard_px']} / {cac['background_px']} px half-width.",
+        f"HH {enl['enl']['HH']}, HV {enl['enl']['HV']}. My CA-CFAR: ENL {c0['enl']}, "
+        f"guard / background half-widths (px): {windows}.",
         "",
         "### Recall at matched detection counts",
         "",
@@ -370,8 +384,10 @@ def _scene_section(scene: str, sweep: pd.DataFrame, matched: pd.DataFrame, sizes
                      + f" | {r['detections_min']}-{r['detections_max']} | "
                      + (f"{r['pfas_run']}" if not r["detector"].endswith("-10m") else "5d")
                      + " |")
-    lines += ["", "Blank: the curve doesn't reach that count. 10 m rows: 5d's CA-CFAR PFA "
-              "sweep (with the length rule) and THOR's score sweep.", "",
+    lines += ["", "Blank: the curve doesn't reach that count. 10 m rows (own windows): the "
+              "CA-CFAR without the length rule is this sweep's `cacfar-nolength-10m`, the same "
+              "curve as current 5d on this scene; with the rule, the old 5d run with the rule "
+              "always on (`ref_5d_dir`); THOR, 5d's score sweep.", "",
               f"### Recall by IIP size, near {p.breakdown_count} detections", ""]
     groups = [g for g in ("small 15-60 m", "medium 61-120 m", "large >120 m",
                           "other / unknown") if g in set(sizes["size"])]
@@ -386,8 +402,8 @@ def _scene_section(scene: str, sweep: pd.DataFrame, matched: pd.DataFrame, sizes
         cells = [f"{int(r.loc[s, 'matched'])}/{int(r.loc[s, 'labels'])}" if s in r.index
                  else "" for s in groups]
         lines.append(f"| {LABELS.get(det, det)} | {pfa} | {n} | " + " | ".join(cells) + " |")
-    lines += ["", "10 m rows: 5d's operating points (CA-CFAR at `cfar.pfa`, THOR at the same "
-              "detection count).", "",
+    lines += ["", "10 m rows without a PFA: 5d's operating points (CA-CFAR at `cfar.pfa`, THOR "
+              "at the same detection count).", "",
               f"Figure (local, gitignored): `{png.relative_to(root).as_posix()}`. Tables: "
               f"`sweep_scored.csv`, `recall_at_matched_counts.csv`, `size_breakdown.csv` "
               "next to it.", ""]

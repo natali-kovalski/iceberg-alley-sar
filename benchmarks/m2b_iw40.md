@@ -7,13 +7,13 @@ Same scoring as 5d (`thor-compare`), so the 40 m curves sit next to 5d's 10 m on
 
 - HyP3 RTC frame (gamma0, HH/HV) multilooked 4x4 to **40 m** (mean of linear intensity), so the paper's windows fit the library (9 / 13 px). Masks: land + 500 m, pack ice, nodata, as in 5d.
 - Reference detectors: the library through `external/cfar_runner`, paper windows (360 / 520 m), HH AND HV merge, per-band ENL for gamma / K, objects of 2-500 px.
-- My CA-CFAR: HV, its own windows (`cfar.guard_m` / `background_m`), co-pol check, ENL estimated on the 40 m HV. Run **without the length rule** and **with the length rule** (the reference detectors have no such rule).
+- My CA-CFAR: HV, co-pol check, ENL estimated on the 40 m HV. Variants: **without the length rule, paper windows**, **with the length rule, paper windows**, **without the length rule, own windows**, **with the length rule, own windows**. Paper windows = the reference detectors' (360 / 520 m), so paper windows without the length rule is the like-for-like run (the reference detectors have no such rule). Own windows = `cfar.guard_m` / `background_m`, as at 10 m. Unlabelled CA-CFAR rows below use the paper windows.
 - Total PFA: 1e-21, 1e-19, 1e-17, 1e-15, 1e-13, 1e-11, 1e-09, 1e-07, 1e-05, 1e-03, 1e-01; a detector stops after the first PFA with more than 5000 objects.
 - Truth: same-pass IIP labels where the SAR is valid. Detections within 5 km of pack ice dropped. One-to-one matching at 500 m.
 - Precision isn't measurable without AIS: compare **recall at matched detection counts**, interpolated in log(detections) between PFA points.
 ## S1A_IW_20190429T094108_DHP_RTC10_G_gpuned_671B
 
-- Labels compared: 267. ENL at 40 m (open-water box): HH 5.964, HV 1.823. My CA-CFAR: ENL 1.884, guard / background 2 / 10 px half-width.
+- Labels compared: 267. ENL at 40 m (open-water box): HH 5.964, HV 1.823. My CA-CFAR: ENL 1.884, guard / background half-widths (px): paper 4 / 6, own 2 / 10.
 
 ### Recall at matched detection counts
 
@@ -25,13 +25,15 @@ Same scoring as 5d (`thor-compare`), so the 40 m curves sit next to 5d's 10 m on
 | Wishart |  |  |  | 13-92 | 11 |
 | NIS |  |  | 0.96 | 597-9957 | 10 |
 | iDPolRAD (window cropped to 41 px) | 0.62 | 0.87 | 0.92 | 134-5943 | 10 |
-| my CA-CFAR, HV, no length rule | 0.64 | 0.86 | 0.92 | 69-1757 | 11 |
-| my CA-CFAR, HV, with length rule | 0.63 | 0.84 | 0.84 | 65-1631 | 11 |
-| my CA-CFAR 10 m, no length rule | 0.58 | 0.83 | 0.92 | 173-1568 | 5d |
-| my CA-CFAR 10 m, with length rule (5d) | 0.53 | 0.75 | 0.82 | 151-1513 | 5d |
+| my CA-CFAR, HV, no length rule | 0.65 | 0.84 | 0.91 | 53-1793 | 11 |
+| my CA-CFAR, HV, with length rule | 0.64 | 0.83 | 0.87 | 51-1705 | 11 |
+| my CA-CFAR, HV, no length rule, own windows | 0.64 | 0.86 | 0.92 | 69-1757 | 11 |
+| my CA-CFAR, HV, with length rule, own windows | 0.63 | 0.84 | 0.84 | 65-1631 | 11 |
+| my CA-CFAR 10 m, no length rule (= current 5d) | 0.58 | 0.83 | 0.92 | 173-1568 | 5d |
+| my CA-CFAR 10 m, with length rule (old 5d) | 0.53 | 0.75 | 0.82 | 151-1513 | 5d |
 | THOR linear 10 m (5d) | 0.66 | 0.90 | 0.95 | 0-3561 | 5d |
 
-Blank: the curve doesn't reach that count. 10 m rows: 5d's CA-CFAR PFA sweep (with the length rule) and THOR's score sweep.
+Blank: the curve doesn't reach that count. 10 m rows (own windows): the CA-CFAR without the length rule is this sweep's `cacfar-nolength-10m`, the same curve as current 5d on this scene; with the rule, the old 5d run with the rule always on (`ref_5d_dir`); THOR, 5d's score sweep.
 
 ### Recall by IIP size, near 500 detections
 
@@ -43,28 +45,44 @@ Blank: the curve doesn't reach that count. 10 m rows: 5d's CA-CFAR PFA sweep (wi
 | Wishart | 1e-01 | 92 | 4/31 | 72/232 | 2/4 |
 | NIS | 1e-21 | 597 | 29/31 | 218/232 | 4/4 |
 | iDPolRAD (window cropped to 41 px) | 1e-07 | 495 | 22/31 | 207/232 | 4/4 |
-| my CA-CFAR, HV, no length rule | 1e-05 | 502 | 18/31 | 208/232 | 4/4 |
-| my CA-CFAR, HV, with length rule | 1e-05 | 476 | 18/31 | 204/232 | 1/4 |
-| my CA-CFAR 10 m, no length rule | 1e-06 | 508 | 20/31 | 198/232 | 4/4 |
-| my CA-CFAR 10 m, with length rule (5d) |  |  | 20/31 | 177/232 | 0/4 |
+| my CA-CFAR, HV, no length rule | 1e-05 | 480 | 17/31 | 203/232 | 4/4 |
+| my CA-CFAR, HV, with length rule | 1e-05 | 462 | 17/31 | 200/232 | 3/4 |
+| my CA-CFAR, HV, no length rule, own windows | 1e-05 | 502 | 18/31 | 208/232 | 4/4 |
+| my CA-CFAR, HV, with length rule, own windows | 1e-05 | 476 | 18/31 | 204/232 | 1/4 |
+| my CA-CFAR 10 m, no length rule (= current 5d) | 1e-06 | 508 | 20/31 | 198/232 | 4/4 |
+| my CA-CFAR 10 m, with length rule (old 5d) |  |  | 20/31 | 177/232 | 0/4 |
 | THOR linear 10 m (5d) |  |  | 22/31 | 211/232 | 4/4 |
 
-10 m rows: 5d's operating points (CA-CFAR at `cfar.pfa`, THOR at the same detection count).
+10 m rows without a PFA: 5d's operating points (CA-CFAR at `cfar.pfa`, THOR at the same detection count).
 
 Figure (local, gitignored): `data/benchmark/iw40/S1A_IW_20190429T094108_DHP_RTC10_G_gpuned_671B/recall_vs_detections.png`. Tables: `sweep_scored.csv`, `recall_at_matched_counts.csv`, `size_breakdown.csv` next to it.
 
 <!-- hand-written notes below; kept when bench-iw-compare re-runs -->
-## Observations (2026-10-23)
+## Observations (2026-10-23, updated 2026-10-28)
 
 One frame, 267 labels: a recall difference of 0.02-0.03 is 5-8 labels, about one binomial
 standard error (~0.02 at recall 0.87). Read small gaps as ties.
 
-- **My CA-CFAR behaves like a standard CFAR.** At 40 m without the length rule it sits on top
-  of gamma, log-normal, K and iDPolRAD in every panel: recall at 500 detections 0.86 vs
-  0.84-0.87. It does this on HV alone, while the reference detectors merge HH AND HV (my
-  co-pol check does a similar job).
-- **The 10 m CA-CFAR's gap, split into rule and resolution** (all four variants of my
-  CA-CFAR, recall at 500 detections; medium / large bergs found):
+**Change on 2026-10-28.** Until then my CA-CFAR ran here with its own windows (`cfar.guard_m` /
+`background_m`: 2 / 10 px half-widths, about 200 / 840 m), while the reference detectors used
+the paper's 9 / 13 px (360 / 520 m). The rows `my CA-CFAR, HV, ...` now use the paper's windows,
+as in 2a; the old runs are the `own windows` rows (re-run, identical numbers).
+
+- **Like for like, my CA-CFAR sits in the pack, at its lower end.** Paper windows, no length
+  rule, recall at 250 / 500 / 1000 detections: 0.65 / 0.84 / 0.91, against gamma 0.64 / 0.87 /
+  0.93, iDPolRAD 0.62 / 0.87 / 0.92, log-normal 0.60 / 0.85 / 0.93, K 0.65 / 0.84 / 0.92. Up to
+  ~300 detections it is level with gamma; from ~400 on it is 0.02-0.03 below (5-8 labels, a tie
+  on one frame). Same direction as 2a on the Færch scene, where HV alone plus the fixed co-pol
+  check costs ~0.025 F against gamma's HH AND HV test at the same windows.
+- **Its own windows do slightly better here:** 0.86 at 500 (+0.02, ~5 labels; medium bergs 208
+  vs 203). A tie, but a hint that the 840 m outer window estimates HyP3 HV clutter (ENL 1.88)
+  more stably than 520 m: 416 ring pixels against 88.
+- **Window size moves the PFA axis.** The CA-CFAR threshold depends on the number of ring
+  pixels N (F(2L, 2NL)): fewer pixels, a higher factor at the same PFA. Paper windows give 53
+  detections at 1e-21 and 1,793 at 1e-1; own windows 69 and 1,757. Matched counts absorb this.
+- **The 10 m CA-CFAR's gap, split into rule and resolution** (own windows at both
+  resolutions, so only the resolution differs; recall at 500 detections; medium / large bergs
+  found):
 
   | | no length rule | with length rule | rule costs |
   |---|---|---|---|
@@ -80,16 +98,22 @@ standard error (~0.02 at recall 0.87). Read small gaps as ties.
   thresholds: from ~750 detections on, 10 m and 40 m are equal (0.90 / 0.92 at 750 / 1000).
   The 10 m HV ENL estimate is 0.37 (40 m: 1.88), so its F threshold is far from the gamma
   model; matched counts make up for that.
-- **With the rule on, recall falls at very high PFA** (0.88 at 1e-3, 0.76 at 1e-1). The grown
-  structures include the CFAR's own detected pixels (`detections.py`: `label(structures |
-  det)`), so at high PFA speckle detections chain neighbouring blobs into structures longer
-  than 300 m, and real bergs are rejected with them. This doesn't matter at the configured
-  PFA (1e-6 at 10 m), but it is one more way the rule couples to the threshold.
-- **This halves THOR's margin on this frame.** At 500 detections, both at 10 m: THOR 0.90 vs
-  my CA-CFAR 0.75 with the length rule (the 5d comparison) but 0.83 without it. Medium bergs:
-  THOR 211, CA-CFAR without the rule 198. So about half of 5d's gap on 04-29 is the length
-  rule, not the CFAR as a method; the rest (0.07, ~20 labels) is real. At 40 m every CFAR is
-  0.84-0.87. Check it on the other three April frames before changing any headline.
+- **The length rule costs less with the paper windows:** 0.83 vs 0.84 at 500, and 3 of 4 large
+  bergs kept (own windows: 1). Likely because the grown blob is set relative to the ring
+  background, and a 520 m ring around a big berg sits closer to it and reads higher, so the
+  blob stays shorter than 300 m. Not checked.
+- **With the rule on, recall falls at very high PFA** (own windows 0.88 at 1e-3, 0.76 at 1e-1;
+  paper windows 0.89, 0.83). The grown structures include the CFAR's own detected pixels
+  (`detections.py`: `label(structures | det)`), so at high PFA speckle detections chain
+  neighbouring blobs into structures longer than 300 m, and real bergs are rejected with
+  them. This doesn't matter at the configured PFA (1e-6 at 10 m), but it is one more way the
+  rule couples to the threshold.
+- **THOR's margin on this frame is 0.07.** Since 2026-10-26, 5d runs 04-29 without the length
+  rule (`length_rule: auto`, open water), and its CA-CFAR curve there is the `10 m, no length
+  rule (= current 5d)` row, point for point. At 500 detections, both at 10 m: THOR 0.90 vs
+  CA-CFAR 0.83 (medium bergs 211 vs 198), about 20 labels. The old 5d comparison, with the
+  rule always on, had the CA-CFAR at 0.75 (`old 5d` row); about half of that gap was the rule.
+  At 40 m every CFAR is 0.84-0.87.
 - **NIS has the highest recall where it runs** (0.94 at 597 detections; THOR 0.925 at 600),
   but its PFA barely moves it: 16 decades of PFA only take it from 597 to 1856 detections, so
   it can't be run below ~600. In 0c it fired along the ice filaments; the 5 km open-water
@@ -99,9 +123,12 @@ standard error (~0.02 at recall 0.87). Read small gaps as ties.
   is real, but it finds little. Its statistic takes one ENL, the HV value (1.82), so HH is
   thresholded for much rougher speckle than it has.
 - **Nominal PFA is not a common scale.** At 1e-9 the detectors give 31 (Wishart) to 1087 (NIS)
-  open-water detections. My CA-CFAR gives 69 at 1e-21 (ENL 1.88) and only 1757 at 1e-1.
-  (Before 2026-10-27 it gave none below 1e-15: scipy's F inverse returned inf there; fixed in 2a.) Matched detection counts are the only fair comparison.
+  open-water detections; my CA-CFAR 244 (paper windows). (Before 2026-10-27 it gave none below
+  1e-15: scipy's F inverse returned inf there; fixed in 2a.) Matched detection counts are the
+  only fair comparison.
 - **40 m doesn't cost small bergs here.** Only 31 of the 267 labels are small (15-60 m). The
   40 m detectors find 15-22 of them (NIS 29), against 20 for the 10 m CA-CFAR and 22 for THOR.
 - **Runtime** (11 PFAs, 40 m frame): iDPolRAD 75 min, K 17, log-normal 16, NIS 7,
-  gamma 5, Wishart 5, my CA-CFAR 5.5.
+  gamma 5, Wishart 5, my CA-CFAR ~1.7 per variant (2026-10-28 runs).
+- **Still to do for 2b:** the other three April frames (04-17, 04-23, 04-24) and the combined
+  figure.

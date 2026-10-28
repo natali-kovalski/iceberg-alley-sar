@@ -168,11 +168,19 @@ iceberg-alley-sar/
   (`benchmark/sweep.py`, `benchmark/iwcompare.py`, config `benchmark.iw_sweep`, report
   `benchmarks/m2b_iw40.md`). 2019-04-29 at 40 m, 6 reference detectors + my CA-CFAR, 11 PFAs
   (every 2 decades), stop above 5,000 objects (runner `--max-objects`), 5d scoring. Recall at 500
-  detections: gamma / iDPolRAD 0.87, my CA-CFAR without length rule 0.86, log-normal / K 0.85 /
-  0.84; NIS 0.94 but can't go below ~600 detections; Wishart stops at 92 (one ENL = HV's).
-  My CA-CFAR, 4 variants at 500: 10 m with rule 0.75, 10 m without 0.83, 40 m with 0.84, 40 m
+  detections: gamma / iDPolRAD 0.87, log-normal / K 0.85 / 0.84, my CA-CFAR without length rule
+  0.84 (paper windows) / 0.86 (own windows); NIS 0.94 but can't go below ~600 detections;
+  Wishart stops at 92 (one ENL = HV's).
+  **Windows (2026-10-28):** `iw_sweep.cacfar_variants` = length rule x window set. Tags `cacfar` /
+  `cacfar-nolength` now use the paper's windows (`iw_sweep.cacfar_windows`, 9 / 13 px, as 2a);
+  `-ownwin` = `cfar.guard_m` / `background_m` (2 / 10 px half-widths), which 2b used before 10-28.
+  A CA-CFAR run.json with other settings is redone, not reused. Like for like, my CA-CFAR is
+  level with gamma to ~300 detections, 0.02-0.03 below from ~400 (a tie on one frame).
+  Own windows, 4 variants at 500: 10 m with rule 0.75, 10 m without 0.83, 40 m with 0.84, 40 m
   without 0.86. The length rule was the main cost at 10 m (all 4 large + 21 medium bergs).
-  Not done: the other three April frames (2b proper), 2a, 2c.
+  The `10 m, no length rule` row is current 5d on 04-29 point for point (THOR 0.90 vs 0.83);
+  `with length rule (old 5d)` is `5d_rule_always`.
+  Not done: the other three April frames (2b proper), 2c.
 - **Length rule only in icy scenes (2026-10-26):** `detections.length_rule: auto`, on when the
   scene's pack-ice mask covers >= `length_rule_min_ice_km2` (500; our scenes are <= 300 or
   >= 1,200 km²). Decision in each detection summary JSON. 5d re-run: pooled 0.85 vs 0.80 (was

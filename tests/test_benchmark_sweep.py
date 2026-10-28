@@ -20,8 +20,12 @@ def test_params_from_config_sorted_and_tagged() -> None:
     p = sweep.SweepParams.from_config(CFG)
     assert p.pfas == sorted(p.pfas) and len(p.pfas) == 11
     assert p.pfas[0] == pytest.approx(1e-21) and p.pfas[-1] == pytest.approx(1e-1)
-    assert p.cacfar_tags == {"cacfar-nolength": False, "cacfar": True}
-    assert replace(p, cacfar_length_rules=[False]).cacfar_tags == {"cacfar-nolength": False}
+    V = sweep.CacfarVariant
+    assert p.cacfar_tags == {"cacfar-nolength": V(False, "paper"), "cacfar": V(True, "paper"),
+                             "cacfar-nolength-ownwin": V(False, "own"),
+                             "cacfar-ownwin": V(True, "own")}
+    assert p.cacfar_windows == {"inner_m": 360, "outer_m": 520}
+    assert list(replace(p, cacfar_variants=[V(False)]).cacfar_tags) == ["cacfar-nolength"]
 
 
 def test_split_bands_masks_both(tmp_path: Path) -> None:
@@ -125,3 +129,54 @@ def test_faerch_cacfar_settings_paper_windows_and_length_rule(tmp_path: Path) ->
     _, _, off = sweep.faerch_cacfar_settings(CFG, hv, length_rule=False)
     assert off.max_structure_px == NO_STRUCTURE_LIMIT
     assert sweep.faerch_cacfar_tags(CFG) == {"cacfar": True, "cacfar-nolength": False}
+
+
+def _hv_raster(path: Path) -> Path:
+    rng = np.random.default_rng(1)
+    with rasterio.open(path, "w", driver="GTiff", width=120, height=120, count=1,
+                       dtype="float32", crs="EPSG:32622",
+                       transform=from_origin(600_000, 5_600_000, 40, 40)) as dst:
+        dst.write(rng.gamma(2.0, 0.005, (120, 120)).astype(np.float32), 1)
+    return path
+
+
+def test_cacfar_settings_paper_or_own_windows(tmp_path: Path) -> None:
+    hv = _hv_raster(tmp_path / "hv.tif")
+    _, own, _ = sweep.cacfar_settings(CFG, hv, length_rule=True)
+    _, paper, _ = sweep.cacfar_settings(CFG, hv, length_rule=True,
+                                        windows={"inner_m": 360, "outer_m": 520})
+    assert (paper.guard_px, paper.background_px) == (4, 6)   # 9 / 13 px at 40 m
+    assert (own.guard_px, own.background_px) == (2, 10)      # cfar.guard_m / background_m
+    assert paper.enl == own.enl
+
+
+def test_run_cacfar_redoes_a_variant_whose_windows_changed(tmp_path: Path, monkeypatch) -> None:
+    """A run.json from other windows must not be reused (2b's tags changed meaning 2026-10-28)."""
+    import geopandas as gpd
+
+    hv = _hv_raster(tmp_path / "hv.tif")
+    calls = []
+    monkeypatch.setattr(sweep, "band_paths", lambda prep: {"HH": hv, "HV": hv})
+
+    def fake_detect(paths, band, cfar, params):
+        calls.append(cfar.pfa)
+        return None, None, None
+
+    monkeypatch.setattr(sweep, "detect_raster", fake_detect)
+    monkeypatch.setattr(sweep, "to_geodataframe",
+                        lambda *a: gpd.GeoDataFrame({"x": [1]}, crs="EPSG:32622",
+                                                    geometry=gpd.points_from_xy([0], [0])))
+    p = replace(sweep.SweepParams.from_config(CFG), pfas=[1e-9, 1e-5])
+    prep = {"work": tmp_path, "scene": "S", "inc": None}
+    v = sweep.CacfarVariant(False, "paper")
+    sweep.run_cacfar(CFG, prep, p, v, None, False, lambda m: None)
+    assert len(calls) == 2
+    sweep.run_cacfar(CFG, prep, p, v, None, False, lambda m: None)   # same settings: cached
+    assert len(calls) == 2
+    meta_f = tmp_path / v.tag / f"{v.tag}_run.json"
+    meta = json.loads(meta_f.read_text(encoding="utf-8"))
+    assert (meta["guard_px"], meta["background_px"], meta["windows"]) == (4, 6, "paper")
+    meta["guard_px"], meta["background_px"] = 2, 10                 # as the old own-window run
+    meta_f.write_text(json.dumps(meta), encoding="utf-8")
+    sweep.run_cacfar(CFG, prep, p, v, None, False, lambda m: None)
+    assert len(calls) == 4

@@ -348,11 +348,21 @@ benchmark:
     # outlier components, the CA-CFAR its final objects.
     max_objects: 5000
     detectors: [gamma, lognorm, k, wishart, nis, idpolrad]
-    # My CA-CFAR with and/or without max_structure_m (tags cacfar / cacfar-nolength). Without it
-    # is the like-for-like run: the reference detectors have no such rule.
-    cacfar_length_rules: [false, true]
-    # My CA-CFAR also at native 10 m without the length rule (tag cacfar-nolength-10m), at 5d's
-    # PFAs (thor.compare.cfar_pfas) so it pairs with 5d's with-rule curve. [] = skip.
+    # My CA-CFAR variants: length rule (max_structure_m) on / off x window set. `paper` =
+    # cacfar_windows, the reference detectors' windows, as in 2a (tags cacfar / cacfar-nolength);
+    # `own` = cfar.guard_m / background_m, 2 / 10 px half-widths at 40 m (tags cacfar-ownwin /
+    # cacfar-nolength-ownwin), the windows the 10 m rows use. Paper windows without the rule is
+    # the like-for-like run: the reference detectors have no such rule. (2026-10-28; before,
+    # 2b ran own windows only, under the tags that now mean paper windows.)
+    cacfar_variants:
+      - {length_rule: false, windows: paper}
+      - {length_rule: true, windows: paper}
+      - {length_rule: false, windows: own}
+      - {length_rule: true, windows: own}
+    cacfar_windows: {inner_m: 360, outer_m: 520}   # diameters -> odd px: 9 / 13 at 40 m
+    # My CA-CFAR also at native 10 m without the length rule (tag cacfar-nolength-10m), own
+    # windows, at 5d's PFAs (thor.compare.cfar_pfas): the same curve as current 5d on 04-29
+    # (rule off there since 2026-10-26), and the pair of the old 5d with-rule curve. [] = skip.
     cacfar_10m_pfas: [1.0e-12, 1.0e-10, 1.0e-8, 1.0e-7, 1.0e-6, 1.0e-5, 1.0e-4, 1.0e-3]
     # Rows per block at 10 m (detections.block_rows is 1024). A 10 m row is 28,591 px, so 1024-row
     # blocks need a few GB; smaller blocks give the same detections (halo) with less peak RAM.
@@ -361,8 +371,9 @@ benchmark:
     # validation.max_dist_m. Recall is read off each curve at these detection counts.
     matched_counts: [250, 500, 1000]
     breakdown_count: 500    # size breakdown at each detector's operating point nearest this count
-    # 5d tables for the 10 m reference rows. 5d now runs the length rule only in icy scenes (off
-    # on 04-29); the "10 m, with length rule" rows are the run with it always on. Unset = thor.compare.out_dir.
+    # 5d tables for the 10 m reference rows (THOR, and the CA-CFAR with the length rule). 5d now
+    # runs the rule only in icy scenes (off on 04-29), so the with-rule rows come from the old 5d
+    # run with it always on. Unset = thor.compare.out_dir.
     ref_5d_dir: data/outputs/thor/5d_rule_always
     report: benchmarks/m2b_iw40.md
   faerch2023:               # Stage 2 / Milestone 1: reproduce Færch 2023 on the Sentinel-1 EW scene

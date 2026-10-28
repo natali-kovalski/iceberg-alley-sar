@@ -6,13 +6,16 @@ Per scene, under `<out_dir>/<scene>/`:
   <scene>_40m_HH_masked.tif / _HV_masked.tif      the stack as single bands, NaN outside the mask
                                                   (the CA-CFAR's input format)
   <detector>/<detector>_pfa<pfa>.geojson          objects per PFA, CA-CFAR schema
-  <detector>/<detector>_run.json                  per-PFA runtime and counts
+  <detector>/<detector>_run.json                  per-PFA runtime, counts and settings
+  cacfar*/                                        my CA-CFAR variants (`cacfar_variants`): length
+                                                  rule on / off x paper or own windows
   cacfar-nolength-10m/                            my CA-CFAR on the 10 m masked rasters, no
                                                   length rule (`cacfar_10m_pfas`, one pass)
   sweep_runtime.csv                               runtime per detector and PFA
 
 PFAs run in ascending order, and a detector stops after the first PFA with more objects than
-`max_objects`. Finished detectors are skipped on a restart (`force` redoes them).
+`max_objects`. Finished detectors are skipped on a restart (`force` redoes them); a CA-CFAR
+variant whose run.json has other settings (windows, ENL, PFAs, cap) is redone.
 """
 
 from __future__ import annotations
@@ -47,6 +50,21 @@ BANDS = ("HH", "HV")
 CACFAR_10M = "cacfar-nolength-10m"
 
 
+WINDOW_SETS = ("paper", "own")
+
+
+@dataclass(frozen=True)
+class CacfarVariant:
+    """One run of my CA-CFAR: length rule on / off, and the window set. `paper` = the reference
+    detectors' windows (`iw_sweep.cacfar_windows`), `own` = `cfar.guard_m` / `background_m`."""
+    length_rule: bool
+    windows: str = "paper"
+
+    @property
+    def tag(self) -> str:
+        return cacfar_tag(self.length_rule) + ("-ownwin" if self.windows == "own" else "")
+
+
 @dataclass(frozen=True)
 class SweepParams:
     scenes: list[str]
@@ -54,7 +72,8 @@ class SweepParams:
     pfas: list[float]
     max_objects: int
     detectors: list[str]
-    cacfar_length_rules: list[bool]
+    cacfar_variants: list[CacfarVariant]
+    cacfar_windows: dict[str, float]
     cacfar_10m_pfas: list[float]
     cacfar_10m_block_rows: int | None = None
 
@@ -67,20 +86,42 @@ class SweepParams:
         unknown = set(s["detectors"]) - set(adapter.DETECTORS)
         if unknown:
             raise ValueError(f"iw_sweep.detectors: unknown {sorted(unknown)}")
+        variants = [CacfarVariant(bool(v["length_rule"]), str(v.get("windows", "paper")))
+                    for v in s["cacfar_variants"]]
+        bad = sorted({v.windows for v in variants} - set(WINDOW_SETS))
+        if bad:
+            raise ValueError(f"iw_sweep.cacfar_variants: windows must be {WINDOW_SETS}: {bad}")
         return cls(scenes=list(s["scenes"]), out_dir=cfg.root / s["out_dir"], pfas=pfas,
                    max_objects=int(s["max_objects"]), detectors=list(s["detectors"]),
-                   cacfar_length_rules=[bool(r) for r in s["cacfar_length_rules"]],
+                   cacfar_variants=variants,
+                   cacfar_windows={k: float(v) for k, v in s["cacfar_windows"].items()},
                    cacfar_10m_pfas=sorted(float(x) for x in s.get("cacfar_10m_pfas") or []),
                    cacfar_10m_block_rows=s.get("cacfar_10m_block_rows"))
 
     @property
-    def cacfar_tags(self) -> dict[str, bool]:
-        """CA-CFAR variant tag -> length rule on."""
-        return {cacfar_tag(r): r for r in self.cacfar_length_rules}
+    def cacfar_tags(self) -> dict[str, CacfarVariant]:
+        """CA-CFAR variant tag -> variant."""
+        return {v.tag: v for v in self.cacfar_variants}
 
 
 def cacfar_tag(length_rule: bool) -> str:
     return "cacfar" if length_rule else "cacfar-nolength"
+
+
+def cacfar_settings(cfg: Config, hv: Path, length_rule: bool,
+                    windows: dict[str, float] | None = None
+                    ) -> tuple[float, CfarParams, DetectionParams]:
+    """`params_for_raster`, with the length rule forced on or off. `windows` ({inner_m, outer_m},
+    diameters as the reference detectors take them -> odd px -> half-widths) replaces the
+    config's `cfar.guard_m` / `background_m`; None keeps them."""
+    pixel_m, base, params = params_for_raster(cfg, hv)
+    if windows is not None:
+        wi = adapter.odd_px(windows["inner_m"], pixel_m)
+        wo = adapter.odd_px(windows["outer_m"], pixel_m)
+        base = replace(base, guard_px=(wi - 1) // 2, background_px=(wo - 1) // 2)
+    if not length_rule:
+        params = replace(params, max_structure_px=NO_STRUCTURE_LIMIT)
+    return pixel_m, base, params
 
 
 def write_geojson(gdf: gpd.GeoDataFrame, path: Path) -> Path:
@@ -151,16 +192,28 @@ def run_reference(cfg: Config, prep: dict[str, Any], name: str, p: SweepParams,
     return rows
 
 
-def run_cacfar(cfg: Config, prep: dict[str, Any], p: SweepParams, length_rule: bool,
+def run_cacfar(cfg: Config, prep: dict[str, Any], p: SweepParams, v: CacfarVariant,
                ice_mask: Path | None, force: bool, log: Callable[[str], None]
                ) -> list[dict[str, Any]]:
     """My CA-CFAR (HV, co-pol check, `detections` rules) on the multilooked bands, per PFA."""
-    tag = cacfar_tag(length_rule)
+    tag, length_rule = v.tag, v.length_rule
     out_dir = prep["work"] / tag
     paths = band_paths(prep)
-    pixel_m, base, params = params_for_raster(cfg, paths["HV"])
-    if not length_rule:
-        params = replace(params, max_structure_px=np.iinfo(np.int32).max)
+    pixel_m, base, params = cacfar_settings(
+        cfg, paths["HV"], length_rule, p.cacfar_windows if v.windows == "paper" else None)
+    settings = {"windows": v.windows, "guard_px": base.guard_px,
+                "background_px": base.background_px, "enl": round(base.enl, 3),
+                "length_rule": length_rule, "pfas_requested": p.pfas,
+                "max_objects": p.max_objects}
+    run_json = out_dir / f"{tag}_run.json"
+    if run_json.is_file() and not force:
+        old = json.loads(run_json.read_text(encoding="utf-8"))
+        if {k: old.get(k) for k in settings} != settings:
+            log(f"{tag}: settings changed, redoing")
+            force = True
+    if force:   # PFAs past a new stopping point must not linger
+        for f in out_dir.glob(f"{tag}_pfa*.geojson"):
+            f.unlink()
     rows, runs, stopped = [], [], False
     for pfa in p.pfas:
         f = out_dir / f"{tag}_pfa{adapter.pfa_tag(pfa)}.geojson"
@@ -182,15 +235,12 @@ def run_cacfar(cfg: Config, prep: dict[str, Any], p: SweepParams, length_rule: b
         if n > p.max_objects:
             stopped = True
             break
-    meta = {"detector": tag, "band": "HV", "pixel_m": pixel_m, "guard_px": base.guard_px,
-            "background_px": base.background_px, "enl": round(base.enl, 3),
-            "length_rule": length_rule,
+    meta = {"detector": tag, "band": "HV", "pixel_m": pixel_m, **settings,
             "max_structure_px": params.max_structure_px if length_rule else None,
-            "copol_min_contrast_db": params.copol_min_contrast_db,
-            "pfas_requested": p.pfas, "max_objects": p.max_objects, "stopped_early": stopped,
+            "copol_min_contrast_db": params.copol_min_contrast_db, "stopped_early": stopped,
             "runs": runs}
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / f"{tag}_run.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    run_json.write_text(json.dumps(meta, indent=2), encoding="utf-8")
     stop = " (stopped: object cap)" if stopped else ""
     log(f"{tag}: {len(runs)} PFAs{stop}, ENL {base.enl:.2f}, guard/background "
         f"{base.guard_px}/{base.background_px} px, {sum(r['runtime_s'] for r in rows):.0f} s new")
@@ -213,7 +263,7 @@ def run_cacfar_10m(cfg: Config, scene: str, p: SweepParams, work: Path, inc: Pat
     interim = cfg.path("interim") / scene
     paths = {pol: interim / f"{scene}_{pol}_masked.tif" for pol in BANDS}
     pixel_m, base, params = params_for_raster(cfg, paths["HV"])
-    params = replace(params, max_structure_px=np.iinfo(np.int32).max)
+    params = replace(params, max_structure_px=NO_STRUCTURE_LIMIT)
     if p.cacfar_10m_block_rows:
         params = replace(params, block_rows=int(p.cacfar_10m_block_rows))
     t0 = time.perf_counter()
@@ -469,12 +519,7 @@ def faerch_cacfar_settings(cfg: Config, hv: Path, length_rule: bool
     """`params_for_raster` with the paper's windows (diameters -> odd px -> half-widths) and
     the length rule forced on or off."""
     s = cfg.section("benchmark")["faerch2023"]["sweep"]["cacfar_windows"]
-    pixel_m, base, params = params_for_raster(cfg, hv)
-    wi, wo = adapter.odd_px(s["inner_m"], pixel_m), adapter.odd_px(s["outer_m"], pixel_m)
-    base = replace(base, guard_px=(wi - 1) // 2, background_px=(wo - 1) // 2)
-    if not length_rule:
-        params = replace(params, max_structure_px=NO_STRUCTURE_LIMIT)
-    return pixel_m, base, params
+    return cacfar_settings(cfg, hv, length_rule, s)
 
 
 def cap_runs(counts: list[int], max_objects: int) -> int:
