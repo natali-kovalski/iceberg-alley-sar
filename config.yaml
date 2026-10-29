@@ -333,7 +333,11 @@ benchmark:
     enl_combine: min        # the single ENL (Wishart, or all in enl_mode single): min, mean, HH or HV
     quicklook_max_px: 2400
   iw_sweep:                 # Milestone 2b, one frame first: reference detectors + my CA-CFAR at 40 m vs IIP labels
-    scenes: [S1A_IW_20190429T094108_DHP_RTC10_G_gpuned_671B]   # same-pass IIP labels (5d: 267 compared)
+    scenes:                 # 5d's four same-pass frames (IIP satellite labels; 512 compared in 5d)
+      - S1A_IW_20190429T094108_DHP_RTC10_G_gpuned_671B
+      - S1A_IW_20190424T093305_DHP_RTC10_G_gpuned_132E
+      - S1B_IW_20190423T094026_DHP_RTC10_G_gpuned_A784
+      - S1A_IW_20190417T094107_DHP_RTC10_G_gpuned_EDB4
     out_dir: data/benchmark/iw40
     multilook: 4            # 10 m -> 40 m: the paper's windows (9 / 13 px) fit the library's 41 px stencil
     multilook_min_valid: 1.0
@@ -371,6 +375,12 @@ benchmark:
     # validation.max_dist_m. Recall is read off each curve at these detection counts.
     matched_counts: [250, 500, 1000]
     breakdown_count: 500    # size breakdown at each detector's operating point nearest this count
+    # Pooled over the frames (5d pools the same way). Frames hold 46-267 labels, so the summary
+    # reads every curve at this many detections per label of the frame (pooled: x 512 = 1024,
+    # near 5d's matched count of 961); the pooled size breakdown uses that count too.
+    summary_detections_per_label: 2
+    pooled_matched_counts: [500, 1000, 2000]
+    pooled_figure: docs/img/m2b_recall_pooled.png
     # 5d tables for the 10 m reference rows (THOR, and the CA-CFAR with the length rule). 5d now
     # runs the rule only in icy scenes (off on 04-29), so the with-rule rows come from the old 5d
     # run with it always on. Unset = thor.compare.out_dir.

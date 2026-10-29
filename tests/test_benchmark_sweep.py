@@ -180,3 +180,33 @@ def test_run_cacfar_redoes_a_variant_whose_windows_changed(tmp_path: Path, monke
     meta_f.write_text(json.dumps(meta), encoding="utf-8")
     sweep.run_cacfar(CFG, prep, p, v, None, False, lambda m: None)
     assert len(calls) == 4
+
+
+def test_pool_sweep_sums_frames_and_drops_settings_one_frame_lacks() -> None:
+    import pandas as pd
+
+    from iceberg_sar.benchmark.iwcompare import pool_sweep
+
+    t = pd.DataFrame({"scene": ["a", "a", "b"], "detector": ["g", "g", "g"],
+                      "setting": [1e-9, 1e-5, 1e-9], "detections": [100, 300, 50],
+                      "matched": [40, 60, 10], "truth": [80, 80, 20]})
+    out = pool_sweep(t, 2)
+    assert out[["setting", "detections", "matched", "truth"]].values.tolist() == [
+        [1e-9, 150, 50, 100]]                       # 1e-5 only ran in frame a
+    assert out["recall"].iloc[0] == pytest.approx(0.5)
+
+
+def test_summary_table_reads_each_frame_at_its_own_label_multiple() -> None:
+    import pandas as pd
+
+    from iceberg_sar.benchmark.iwcompare import POOLED, pool_sweep, summary_table
+
+    t = pd.DataFrame({"scene": ["a", "a", "b", "b"], "detector": ["g"] * 4,
+                      "setting": [1e-9, 1e-5] * 2, "detections": [100, 400, 10, 40],
+                      "matched": [40, 80, 5, 10], "truth": [100, 100, 10, 10]})
+    t["recall"] = t["matched"] / t["truth"]
+    s = summary_table(t, pool_sweep(t, 2), ["a", "b"], per_label=2)
+    r = s.iloc[0]
+    assert r["a"] == pytest.approx(0.6, abs=1e-3)   # 200 detections: half way 100..400 in log
+    assert r["b"] == pytest.approx(0.75, abs=1e-3)  # 20 detections: half way 10..40
+    assert r[POOLED] == pytest.approx((45 / 110 + 90 / 110) / 2, abs=1e-3)   # 220 of 110..440

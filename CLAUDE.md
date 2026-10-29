@@ -164,23 +164,28 @@ iceberg-alley-sar/
   below PFA ~1e-16; now via `betaincinv` (unchanged >= 1e-12). 2b's 40 m CA-CFAR runs redone
   (matched-count recall unchanged); 2b's 10 m "with length rule" rows now read
   `iw_sweep.ref_5d_dir: data/outputs/thor/5d_rule_always` (5d itself is `auto` since 10-26).
-- **Stage 2 / Milestone 2b, one frame (2026-10-23/26):** `bench-iw-sweep` + `bench-iw-compare`
+- **Stage 2 / Milestone 2b (2026-10-23/29): done.** `bench-iw-sweep` + `bench-iw-compare`
   (`benchmark/sweep.py`, `benchmark/iwcompare.py`, config `benchmark.iw_sweep`, report
-  `benchmarks/m2b_iw40.md`). 2019-04-29 at 40 m, 6 reference detectors + my CA-CFAR, 11 PFAs
-  (every 2 decades), stop above 5,000 objects (runner `--max-objects`), 5d scoring. Recall at 500
-  detections: gamma / iDPolRAD 0.87, log-normal / K 0.85 / 0.84, my CA-CFAR without length rule
-  0.84 (paper windows) / 0.86 (own windows); NIS 0.94 but can't go below ~600 detections;
-  Wishart stops at 92 (one ENL = HV's).
+  `benchmarks/m2b_iw40.md`, pooled figure `docs/img/m2b_recall_pooled.png`). 5d's four frames
+  (04-17, 04-23, 04-24, 04-29; 512 labels) at 40 m, 6 reference detectors + 4 CA-CFAR variants,
+  11 PFAs (every 2 decades), stop above 5,000 objects, 5d scoring; plus my 10 m CA-CFAR without
+  the rule and 5d's 10 m curves (old 5d with the rule, current 5d, THOR). Pooled like 5d (sum
+  per PFA, settings every frame ran); cross-frame summary at 2 detections per label
+  (`summary_detections_per_label`; pooled 1,024). Full 3-frame sweep ~4 h.
   **Windows (2026-10-28):** `iw_sweep.cacfar_variants` = length rule x window set. Tags `cacfar` /
-  `cacfar-nolength` now use the paper's windows (`iw_sweep.cacfar_windows`, 9 / 13 px, as 2a);
+  `cacfar-nolength` use the paper's windows (`iw_sweep.cacfar_windows`, 9 / 13 px, as 2a);
   `-ownwin` = `cfar.guard_m` / `background_m` (2 / 10 px half-widths), which 2b used before 10-28.
-  A CA-CFAR run.json with other settings is redone, not reused. Like for like, my CA-CFAR is
-  level with gamma to ~300 detections, 0.02-0.03 below from ~400 (a tie on one frame).
-  Own windows, 4 variants at 500: 10 m with rule 0.75, 10 m without 0.83, 40 m with 0.84, 40 m
-  without 0.86. The length rule was the main cost at 10 m (all 4 large + 21 medium bergs).
-  The `10 m, no length rule` row is current 5d on 04-29 point for point (THOR 0.90 vs 0.83);
-  `with length rule (old 5d)` is `5d_rule_always`.
-  Not done: the other three April frames (2b proper), 2c.
+  A CA-CFAR run.json with other settings is redone, not reused.
+  **Result:** like for like my CA-CFAR = gamma: pooled 0.82 vs 0.83 at 1,024 (log-normal 0.82,
+  K 0.81), 0.63 / 0.82 / 0.89 vs 0.63 / 0.83 / 0.89 at 500 / 1,000 / 2,000, large 13 / 14 both.
+  Windows don't matter pooled (own 0.83). THOR (10 m) 0.86. NIS best where it runs (0.88 at
+  its minimum 1,082; most small bergs) but can't go stricter; Wishart can't go looser (932 max).
+  iDPolRAD pooled 0.66 is an artefact (global fit: one PFA floods 04-17), in the pack per frame.
+  **Length rule in icy frames:** in the scored area (> 5 km from pack ice) it only drops bergs
+  there too: 10 m 04-17 0.67 vs 0.83 at 500, 04-23 0.82 vs 0.85; pooled current 5d 0.81 vs rule
+  off 0.82 (0.80 vs 0.82 at 1,000; large 10 vs 13 / 14). Its benefit within 5 km isn't scored.
+  Open: decide whether to drop the rule everywhere (5d headline would be THOR 0.86 vs 0.82);
+  2c (`docs/cacfar-validation.md`).
 - **Length rule only in icy scenes (2026-10-26):** `detections.length_rule: auto`, on when the
   scene's pack-ice mask covers >= `length_rule_min_ice_km2` (500; our scenes are <= 300 or
   >= 1,200 km²). Decision in each detection summary JSON. 5d re-run: pooled 0.85 vs 0.80 (was
