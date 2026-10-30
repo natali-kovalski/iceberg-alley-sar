@@ -164,6 +164,18 @@ iceberg-alley-sar/
   below PFA ~1e-16; now via `betaincinv` (unchanged >= 1e-12). 2b's 40 m CA-CFAR runs redone
   (matched-count recall unchanged); 2b's 10 m "with length rule" rows now read
   `iw_sweep.ref_5d_dir: data/outputs/thor/5d_rule_always` (5d itself is `auto` since 10-26).
+- **THOR on the Færch scene (2026-10-28, beyond the plan):** `bench-thor-smoke` (3 crops) and
+  `bench-thor` (`benchmark/thor_faerch.py`, config `benchmark.faerch2023.thor`, report
+  `docs/faerch2023-thor.md`, figure `docs/img/faerch2023_thor_f.png`). Final linear head
+  unchanged; 5.12 km crops (128 px) give the training grid (64 x 64 tokens of 80 m), either
+  `upsample` (bands declared 10 m, THOR resizes to 512 px) or `native` (`IW_HH_40`, 2 x 2 px
+  patches; `load_encoder(band_gsd_m=...)`). Scored like `bench-score`, threshold swept like PFA.
+  Best F (verified): noTNR upsample 0.568 (0.770) at 0.12, P 0.83 R 0.43: level with my CA-CFAR
+  (0.567 / 0.587), below Wishart 0.653 / gamma 0.636; the gap is medium bergs (0.49 vs 0.65-0.72).
+  TNR upsample 0.516 (K 0.533, gamma 0.428). Upsample > native on both stacks; THOR's EW
+  normalisation stats are worse (0.503), so IW stats stay. First THOR precision number; on an
+  unseen mode / resolution / month THOR ties my baseline (the IW headline doesn't carry over).
+  ~4 min per run on the GPU over the scoring area (3,475 windows); runs cached per tag.
 - **Stage 2 / Milestone 2b (2026-10-23/29): done.** `bench-iw-sweep` + `bench-iw-compare`
   (`benchmark/sweep.py`, `benchmark/iwcompare.py`, config `benchmark.iw_sweep`, report
   `benchmarks/m2b_iw40.md`, pooled figure `docs/img/m2b_recall_pooled.png`). 5d's four frames

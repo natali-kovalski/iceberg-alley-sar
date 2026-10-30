@@ -86,8 +86,24 @@ def to_model_input(
     return np.stack(out)
 
 
-def load_encoder(params: ThorParams, pixel_m: float, device: str = "cpu") -> Any:
-    """Build the frozen THOR backbone (weights from the Hugging Face hub, cached)."""
+def model_band_names(bands: tuple[str, ...], band_gsd_m: int | None = None) -> list[str]:
+    """THOR band names, with a GSD suffix (`IW_HH_40`) when the bands aren't THOR's default 10 m.
+
+    THOR resizes each band to ground_cover / GSD pixels, so without a suffix a 40 m crop is
+    upsampled to 10 m pixels before it is cut into patches.
+    """
+    names = [THOR_BANDS[b] for b in bands]
+    if band_gsd_m is None or band_gsd_m == 10:
+        return names
+    return [f"{n}_{int(band_gsd_m)}" for n in names]
+
+
+def load_encoder(params: ThorParams, pixel_m: float, device: str = "cpu",
+                 band_gsd_m: int | None = None) -> Any:
+    """Build the frozen THOR backbone (weights from the Hugging Face hub, cached).
+
+    `band_gsd_m`: the GSD THOR is told the bands have (default 10 m; see `model_band_names`).
+    """
     import importlib.util
 
     import torch._dynamo
@@ -103,7 +119,7 @@ def load_encoder(params: ThorParams, pixel_m: float, device: str = "cpu") -> Any
     model = BACKBONE_REGISTRY.build(
         params.model,
         pretrained=True,
-        model_bands=[THOR_BANDS[b] for b in params.bands],
+        model_bands=model_band_names(params.bands, band_gsd_m),
         ground_cover=int(round(params.crop_px * pixel_m)),
         patch_sizes=params.patch_px,
         merge_method="concat",

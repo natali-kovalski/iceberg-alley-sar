@@ -810,6 +810,38 @@ def bench_score(
         typer.echo(f"ok  {key}: {path}")
 
 
+@app.command("bench-thor-smoke")
+def bench_thor_smoke(
+    n_crops: Annotated[int | None, typer.Option(
+        help="Crops to run. Default: benchmark.faerch2023.thor.smoke.n_crops.")] = None,
+    device: Annotated[str | None, typer.Option(
+        help="cuda or cpu (default: cuda if found).")] = None,
+    config: ConfigOption = DEFAULT_CONFIG,
+) -> None:
+    """THOR on the Færch 2023 EW scene (40 m), smoke test: both input variants (upsampled to
+    10 m / native 40 m) on both stacks (TNR / noTNR), a few crops with verified labels."""
+    from iceberg_sar.benchmark.thor_faerch import run_thor_smoke
+
+    out = run_thor_smoke(load_config(config), device, n_crops, log=typer.echo)
+    for key, path in out.items():
+        typer.echo(f"ok  {key}: {path}")
+
+
+@app.command("bench-thor")
+def bench_thor(
+    device: Annotated[str | None, typer.Option(
+        help="cuda or cpu (default: cuda if found).")] = None,
+    force: Annotated[bool, typer.Option(help="Rerun finished (stack, variant) runs.")] = False,
+    config: ConfigOption = DEFAULT_CONFIG,
+) -> None:
+    """THOR on the Færch 2023 EW scene over the scoring area: both input variants on both
+    stacks, scored like `bench-score` per score threshold; figure and report. Resumable."""
+    from iceberg_sar.benchmark.thor_faerch import run_thor
+
+    for key, path in run_thor(load_config(config), device, force, log=typer.echo).items():
+        typer.echo(f"ok  {key}: {path}")
+
+
 @app.command("bench-iw-compare")
 def bench_iw_compare(config: ConfigOption = DEFAULT_CONFIG) -> None:
     """Stage 2 / 2b: score the `bench-iw-sweep` detections against same-pass IIP labels (5d

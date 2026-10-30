@@ -458,6 +458,32 @@ benchmark:
       figure_fig6_style: docs/img/faerch2023_f_vs_pfa_fig6style.png   # all detectors, one panel
       report: docs/faerch2023-reproduction.md
       table_csv: data/benchmark/faerch2023/score/scores.csv
+    thor:                   # THOR (head trained on 10 m HyP3 IW) on the 40 m EW stack: smoke test (2026-10-28)
+      head: linear          # <paths.models>/thor/<head>/final/head.pt (thor-fetch-head)
+      crop_m: 5120          # training crop: 512 px at 10 m = 5.12 km; 128 px here
+      # THOR resizes each band to crop / GSD px. Both variants give 64 x 64 tokens of 80 m, as in training.
+      variants:
+        upsample: {band_gsd_m: 10, patch_px: 8}   # declared 10 m: THOR resamples 128 -> 512 px (bilinear)
+        native: {band_gsd_m: 40, patch_px: 2}     # declared 40 m (IW_HH_40): 2 x 2 px patches, embedding resized
+      # Input normalisation (dB mean, std per band). `iw` = thor.norm, what the head was trained
+      # with (the default); others from THOR's own table (thor_dataset_base.py, S1-EW-HH-10m).
+      norms:
+        ew: {HH: [-12.7691, 6.6416], HV: [-22.6922, 7.2472]}
+      smoke:
+        n_crops: 3          # crops with the most verified labels, inside the scoring area
+        min_valid: 0.9      # sea (valid) fraction of a crop
+        out_dir: data/benchmark/faerch2023/thor_smoke
+      run:                  # `bench-thor`: every variant x stack over the scoring area, F vs score threshold
+        out_dir: data/benchmark/faerch2023/thor   # peaks GeoJSON + heatmap per (stack, variant), resumable
+        overlap_m: 1280     # window overlap: thor.infer.overlap_px (128) at 10 m
+        score_min: 0.02     # peaks cached at or above this (smoke: water p99 0.01-0.07)
+        # Swept like the CFARs' PFA. The head's scores sit lower than on 10 m IW (smoke: bergs
+        # 0.06-0.26), so the viewer's 0.35 is near the top, not the middle.
+        thresholds: [0.02, 0.03, 0.04, 0.05, 0.06, 0.08, 0.1, 0.12, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5]
+        # Runs on top of every variant x stack with `iw` (2026-10-28: EW stats on the best combination).
+        extra: [{variant: upsample, stack: noTNR, norm: ew}]
+        figure: docs/img/faerch2023_thor_f.png
+        report: docs/faerch2023-thor.md
     labels_source: faerch   # labels for 1e/1f: faerch (Path A) | reconstructed (Path B); --source overrides
     labels_faerch:          # 1d Path A: the paper's validation set, from Laust Færch (email, 2026-10-24). Private: never commit
       dir: data/benchmark/faerch2023/labels_faerch/data-for-natalia   # unzipped as sent (LZMA zip: Explorer can't open it)
