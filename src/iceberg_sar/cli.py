@@ -842,6 +842,19 @@ def bench_thor(
         typer.echo(f"ok  {key}: {path}")
 
 
+@app.command("bench-thor-bergs")
+def bench_thor_bergs(
+    device: Annotated[str | None, typer.Option(
+        help="cuda or cpu (default: cuda if found).")] = None,
+    config: ConfigOption = DEFAULT_CONFIG,
+) -> None:
+    """Medium bergs through THOR, one figure: Færch scene hits / misses under every
+    `bench-thor` run, and training-chip bergs at 10 m and averaged to 40 m."""
+    from iceberg_sar.benchmark.thor_bergs import run_bergs
+
+    typer.echo(f"ok  {run_bergs(load_config(config), device, log=typer.echo)}")
+
+
 @app.command("bench-iw-compare")
 def bench_iw_compare(config: ConfigOption = DEFAULT_CONFIG) -> None:
     """Stage 2 / 2b: score the `bench-iw-sweep` detections against same-pass IIP labels (5d

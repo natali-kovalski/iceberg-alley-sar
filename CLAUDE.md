@@ -176,6 +176,10 @@ iceberg-alley-sar/
   normalisation stats are worse (0.503), so IW stats stay. First THOR precision number; on an
   unseen mode / resolution / month THOR ties my baseline (the IW headline doesn't carry over).
   ~4 min per run on the GPU over the scoring area (3,475 windows); runs cached per tag.
+  `bench-thor-bergs` (`benchmark/thor_bergs.py`, `thor.bergs`, `docs/img/faerch2023_thor_medium_bergs.png`):
+  Færch medium hits / misses under every run next to training IIP "MED" bergs at 10 m and
+  averaged to 40 m. 40 m alone costs 0.1-0.2 score, not detection; the Færch misses are faint
+  1-3 px targets, much weaker than the training "MED" bergs (size classes may not match).
 - **Stage 2 / Milestone 2b (2026-10-23/29): done.** `bench-iw-sweep` + `bench-iw-compare`
   (`benchmark/sweep.py`, `benchmark/iwcompare.py`, config `benchmark.iw_sweep`, report
   `benchmarks/m2b_iw40.md`, pooled figure `docs/img/m2b_recall_pooled.png`). 5d's four frames

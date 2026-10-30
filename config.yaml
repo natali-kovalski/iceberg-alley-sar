@@ -484,6 +484,16 @@ benchmark:
         extra: [{variant: upsample, stack: noTNR, norm: ew}]
         figure: docs/img/faerch2023_thor_f.png
         report: docs/faerch2023-thor.md
+      bergs:                # `bench-thor-bergs`: medium bergs, Færch scene vs training chips, one figure
+        window_m: 2560      # panel size around each berg (32 tokens of 80 m)
+        reference: {variant: upsample, stack: noTNR}   # run whose hits / misses pick the Færch bergs
+        n_hits: 3           # Færch verified medium bergs, picked at spread-out lengths
+        n_misses: 3
+        train_size: MED     # IIP size class of the training bergs (61-120 m, as Færch's medium)
+        n_train: 4          # training bergs at evenly spaced quantiles of their training score
+        multilook: 4        # 10 m -> 40 m (mean of linear intensity), as Stage 2's IW runs
+        match_m: 250        # score at a berg = best token / peak within this (verified radius)
+        figure: docs/img/faerch2023_thor_medium_bergs.png
     labels_source: faerch   # labels for 1e/1f: faerch (Path A) | reconstructed (Path B); --source overrides
     labels_faerch:          # 1d Path A: the paper's validation set, from Laust Færch (email, 2026-10-24). Private: never commit
       dir: data/benchmark/faerch2023/labels_faerch/data-for-natalia   # unzipped as sent (LZMA zip: Explorer can't open it)
