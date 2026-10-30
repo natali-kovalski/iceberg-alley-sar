@@ -29,7 +29,7 @@ def test_reversed_direction_flips_land() -> None:
 
 def test_island_only_sea_has_hole() -> None:
     gdf = coastline_land([ISLAND], BBOX)
-    assert len(gdf) == 1 and abs(gdf.area.sum() - 4) < 1e-9
+    assert len(gdf) == 1 and abs(gdf.union_all().area - 4) < 1e-9  # shapely area: no CRS warning
 
 
 def test_loose_end_is_closed_to_the_frame() -> None:
