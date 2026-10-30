@@ -869,11 +869,12 @@ def bench_iw_compare(config: ConfigOption = DEFAULT_CONFIG) -> None:
 @app.command("bench-scenes")
 def bench_scenes(
     write_config: Annotated[bool, typer.Option(
-        help="Write the scene list into config.yaml (benchmark.faerch2023.scenes).")] = False,
+        help="Write the scene list into benchmarks/config.yaml (benchmark.faerch2023.scenes).")] = False,
     config: ConfigOption = DEFAULT_CONFIG,
 ) -> None:
     """Stage 2 / 1a: parse scenes.csv and check it against Table 1 of faerch2023.xml."""
-    from iceberg_sar.benchmark.scenes import check_scenes, load_scenes, table1, write_config_block
+    from iceberg_sar.benchmark.scenes import (check_scenes, config_block_file, load_scenes, table1,
+                                              write_config_block)
 
     cfg = load_config(config)
     fc = cfg.section("benchmark")["faerch2023"]
@@ -886,8 +887,9 @@ def bench_scenes(
     for c in bad:
         typer.echo(f"MISMATCH  {c.product}\n          {c.field}: paper {c.paper!r}, ours {c.ours!r}")
     if write_config:
-        write_config_block(cfg.root / Path(config).name, scenes)
-        typer.echo(f"ok  benchmark.faerch2023.scenes written ({len(scenes)} products)")
+        target = config_block_file(cfg.files)
+        write_config_block(target, scenes)
+        typer.echo(f"ok  benchmark.faerch2023.scenes written to {target} ({len(scenes)} products)")
 
 
 @app.command("bench-download")

@@ -8,6 +8,7 @@ from iceberg_sar.benchmark.scenes import (
     CONFIG_BEGIN,
     CONFIG_END,
     check_scenes,
+    config_block_file,
     load_scenes,
     parse_product,
     table1,
@@ -68,6 +69,15 @@ def test_table1_from_xml_and_committed_csv() -> None:
         "csv.paper_tile_orbit", "product.abs_orbit", "product.rel_orbit", "product.format"}
     assert [c.product for c in checks if c.field == "product.format" and not c.ok] == [
         "S1A_EW_GRDM_1SDH_20190704T102730_20190704T102831_027966_032866_4053"]
+
+
+def test_config_block_file_finds_include(tmp_path: Path) -> None:
+    main, inc = tmp_path / "config.yaml", tmp_path / "bench.yaml"
+    main.write_text("a: 1\n", encoding="utf-8")
+    inc.write_text(f"{CONFIG_BEGIN}\n{CONFIG_END}\n", encoding="utf-8")
+    assert config_block_file([main, inc]) == inc
+    with pytest.raises(ValueError, match="Markers"):
+        config_block_file([main])
 
 
 def test_write_config_block(tmp_path: Path) -> None:

@@ -258,7 +258,7 @@ python -m iceberg_sar.cli classify data\raw\<product_dir>
 
 ## Repository layout
 
-- `config.yaml`: all parameters (`thor:` block for the foundation model). `aoi.geojson`: the area of interest (EPSG:4326).
+- `config.yaml`: all pipeline parameters (`thor:` block for the foundation model). Stage 2 benchmark settings (`benchmark:`) are in `benchmarks/config.yaml`, included from it. `aoi.geojson`: the area of interest (EPSG:4326).
 - `src/iceberg_sar/thor/`: the THOR detector (`encoder.py`, `chips.py`, `targets.py`, `heads.py`, `train.py`, `infer.py`, `compare.py`).
 - `src/iceberg_sar/`: the classical pipeline. `pipeline.py` is the end-to-end `run`, `seaice.py` + `landmask.py` the masks, `cfar.py` + `detections.py` the CFAR baseline, `pointval.py` + `matching.py` the validation, `export_czml.py` the viewer export, `publish.py` the web data, `classify/` the experimental CNN.
 - `viewer/`: Vue 3 + Vite + CesiumJS (`src/scene.ts` holds the Cesium logic). `viewer/public/data/` is the published data (committed).

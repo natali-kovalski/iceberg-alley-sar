@@ -509,7 +509,8 @@ Milestone numbering restarts at 0 for Stage 2. Stage 1 milestones stay as they a
 
 - New code lives in `src/iceberg_sar/benchmark/` (`adapter.py`, `pfa.py`,
   `preprocess.py`, `landmask.py`, `labels.py`, `sweep.py`, `score.py`, `plots.py`).
-  Parameters go in a `benchmark:` block in `config.yaml`. Nothing hardcoded.
+  Parameters go in the `benchmark:` block in `benchmarks/config.yaml` (included from
+  `config.yaml`, keys unchanged). Nothing hardcoded.
 - The GPL-3.0 CFAR library is NEVER imported into `src/iceberg_sar/` and never
   copied into this repo. It runs in its own environment, called through a small
   runner script in `external/cfar_runner/` (own LICENSE file, GPL-3.0), which

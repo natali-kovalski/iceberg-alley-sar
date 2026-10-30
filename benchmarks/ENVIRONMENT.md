@@ -21,7 +21,7 @@ was last run on Python 3.10.9.
 ## Environment
 
 uv venv (no conda on this machine), Python **3.10.9**, at `external/cfar-bench/` (gitignored).
-`benchmark.cfar_env_python` in `config.yaml` points at its `python.exe`.
+`benchmark.cfar_env_python` in `benchmarks/config.yaml` points at its `python.exe`.
 
 | Package | Version |
 |---|---|

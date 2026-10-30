@@ -143,8 +143,16 @@ def config_block(scenes: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
+def config_block_file(files: tuple[Path, ...] | list[Path]) -> Path:
+    """The config file (main or included) that holds the generated scenes block."""
+    for f in files:
+        if CONFIG_BEGIN in f.read_text(encoding="utf-8"):
+            return f
+    raise ValueError(f"Markers for the generated scenes block not found in {', '.join(map(str, files))}")
+
+
 def write_config_block(config_path: Path, scenes: list[dict[str, str]]) -> None:
-    """Replace the generated block in config.yaml in place (comments elsewhere are kept)."""
+    """Replace the generated block in a config file in place (comments elsewhere are kept)."""
     text = config_path.read_text(encoding="utf-8")
     i, j = text.find(CONFIG_BEGIN), text.find(CONFIG_END)
     if i < 0 or j < i:

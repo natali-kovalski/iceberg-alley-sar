@@ -1,0 +1,270 @@
+# Iceberg Alley SAR: Stage 2 benchmark configuration (Færch et al. 2023 and the IW sweeps).
+# Included from config.yaml (`include:`); merged into the same config, so keys are still
+# `benchmark.*`. Paths are relative to the repo root, as in config.yaml.
+
+benchmark:
+  # Stage 2: published CFAR detectors (Færch et al. 2023, The Cryosphere 17, 5335). The GPL-3.0
+  # library runs in its own env through external/cfar_runner/run_cfar.py, files in and out.
+  # Library behaviour behind these settings: benchmarks/cfar_api_notes.md.
+  cfar_env_python: external/cfar-bench/Scripts/python.exe
+  cfar_runner: external/cfar_runner/run_cfar.py
+  out_dir: data/benchmark
+  window_limit_px: 41       # library stencil is +-20 px; wider windows are silently cropped
+  merge: AND                # HH/HV merge for gamma, lognorm, k (paper sec. 3.3)
+  minsize_px: 2             # library drops objects smaller than this (paper: no 1-px objects)
+  max_object_px: 500        # paper sec. 3.3: larger objects dropped as processing errors
+  object_connectivity: 4    # same as the library's small-object filter
+  masked_as_nan: true       # keep masked pixels out of the clutter ring (library checks the centre only)
+  min_ring_fraction: 0.5    # skip pixels whose ring is mostly masked, as cfar.min_background_fraction; 0 = as-is
+  # per_band: gamma / K use each band's own ENL (HyP3 HV water ENL << HH). single: the
+  # library's one ENL for both (smoke.enl_combine). Wishart always takes the single value.
+  enl_mode: per_band
+  repro_tolerance_f1: 0.05  # Milestone 1f: |my F - paper F| at each detector's optimum PFA
+  # Window diameters in metres -> nearest odd pixel count per raster (360 / 520 m = 9 / 13 px at 40 m)
+  detectors:
+    gamma:    {inner_m: 360, outer_m: 520}
+    lognorm:  {inner_m: 360, outer_m: 520}
+    k:        {inner_m: 360, outer_m: 520}
+    nis:      {inner_m: 360, outer_m: 520}
+    wishart:  {inner_m: 360, outer_m: 520}
+    # iDPolRAD: test / training window, 3x3 / 57x57 px at 40 m in the paper. 57 px exceeds the
+    # 41 px stencil, so the library crops it to 41x41 (as it must have for the paper).
+    idpolrad: {inner_m: 120, outer_m: 2280, allow_window_crop: true}
+  smoke:                    # Milestone 0c: all detectors on one IW frame
+    scene: S1A_IW_20190429T094108_DHP_RTC10_G_gpuned_671B
+    multilook: 4            # 10 m -> 40 m, mean of linear intensity
+    multilook_min_valid: 1.0  # share of the 4x4 block that must be valid
+    pfa: 1.0e-9             # total PFA (per channel 3.16e-5 for AND)
+    enl_box_m: 2000         # side of the open-water boxes the ENL is estimated in
+    enl_box: auto           # auto = the median-ENL box among fully valid boxes; or [W, S, E, N] in EPSG:4326
+    enl_combine: min        # the single ENL (Wishart, or all in enl_mode single): min, mean, HH or HV
+    quicklook_max_px: 2400
+  iw_sweep:                 # Milestone 2b, one frame first: reference detectors + my CA-CFAR at 40 m vs IIP labels
+    scenes:                 # 5d's four same-pass frames (IIP satellite labels; 512 compared in 5d)
+      - S1A_IW_20190429T094108_DHP_RTC10_G_gpuned_671B
+      - S1A_IW_20190424T093305_DHP_RTC10_G_gpuned_132E
+      - S1B_IW_20190423T094026_DHP_RTC10_G_gpuned_A784
+      - S1A_IW_20190417T094107_DHP_RTC10_G_gpuned_EDB4
+    out_dir: data/benchmark/iw40
+    multilook: 4            # 10 m -> 40 m: the paper's windows (9 / 13 px) fit the library's 41 px stencil
+    multilook_min_valid: 1.0
+    enl_box_m: 2000
+    enl_box: auto
+    enl_combine: min
+    # Total PFA, every 2 decades (the paper's 21 levels halved). Curves are compared at matched
+    # detection counts, so sparser points only cost interpolation.
+    pfas: [1.0e-21, 1.0e-19, 1.0e-17, 1.0e-15, 1.0e-13, 1.0e-11, 1.0e-9, 1.0e-7, 1.0e-5, 1.0e-3, 1.0e-1]
+    # PFAs run in ascending order; a detector stops after the first PFA with more objects than
+    # this (~20x the labels; 5d's 10 m CFAR curve ends at 1513). Reference detectors count raw
+    # outlier components, the CA-CFAR its final objects.
+    max_objects: 5000
+    detectors: [gamma, lognorm, k, wishart, nis, idpolrad]
+    # My CA-CFAR variants: length rule (max_structure_m) on / off x window set. `paper` =
+    # cacfar_windows, the reference detectors' windows, as in 2a (tags cacfar / cacfar-nolength);
+    # `own` = cfar.guard_m / background_m, 2 / 10 px half-widths at 40 m (tags cacfar-ownwin /
+    # cacfar-nolength-ownwin), the windows the 10 m rows use. Paper windows without the rule is
+    # the like-for-like run: the reference detectors have no such rule. (2026-10-28; before,
+    # 2b ran own windows only, under the tags that now mean paper windows.)
+    cacfar_variants:
+      - {length_rule: false, windows: paper}
+      - {length_rule: true, windows: paper}
+      - {length_rule: false, windows: own}
+      - {length_rule: true, windows: own}
+    cacfar_windows: {inner_m: 360, outer_m: 520}   # diameters -> odd px: 9 / 13 at 40 m
+    # My CA-CFAR also at native 10 m without the length rule (tag cacfar-nolength-10m), own
+    # windows, at 5d's PFAs (thor.compare.cfar_pfas): the same curve as current 5d on 04-29
+    # (rule off there since 2026-10-26), and the pair of the old 5d with-rule curve. [] = skip.
+    cacfar_10m_pfas: [1.0e-12, 1.0e-10, 1.0e-8, 1.0e-7, 1.0e-6, 1.0e-5, 1.0e-4, 1.0e-3]
+    # Rows per block at 10 m (detections.block_rows is 1024). A 10 m row is 28,591 px, so 1024-row
+    # blocks need a few GB; smaller blocks give the same detections (halo) with less peak RAM.
+    cacfar_10m_block_rows: 256
+    # Scoring as in 5d (thor.compare): same labels, open-water filter (viewer.near_ice_km), radius
+    # validation.max_dist_m. Recall is read off each curve at these detection counts.
+    matched_counts: [250, 500, 1000]
+    breakdown_count: 500    # size breakdown at each detector's operating point nearest this count
+    # Pooled over the frames (5d pools the same way). Frames hold 46-267 labels, so the summary
+    # reads every curve at this many detections per label of the frame (pooled: x 512 = 1024,
+    # near 5d's matched count of 961); the pooled size breakdown uses that count too.
+    summary_detections_per_label: 2
+    pooled_matched_counts: [500, 1000, 2000]
+    pooled_figure: docs/img/m2b_recall_pooled.png
+    # 5d tables for the 10 m reference rows (THOR, and the CA-CFAR with the length rule). 5d now
+    # runs the rule only in icy scenes (off on 04-29), so the with-rule rows come from the old 5d
+    # run with it always on. Unset = thor.compare.out_dir.
+    ref_5d_dir: data/outputs/thor/5d_rule_always
+    report: benchmarks/m2b_iw40.md
+  faerch2023:               # Stage 2 / Milestone 1: reproduce Færch 2023 on the Sentinel-1 EW scene
+    paper_xml: benchmarks/faerch2023/faerch2023.xml
+    scenes_csv: benchmarks/faerch2023/scenes.csv
+    dir: data/benchmark/faerch2023   # raw/, interim/, labels/, quicklooks/ below this
+    # Scene grid: UTM 20N is the five S2 tiles' own CRS, so labels need no reprojection.
+    # The paper resampled to a local polar stereographic grid for its C- vs L-band comparison.
+    crs: EPSG:32620
+    pixel_m: 40
+    cdse:                   # Copernicus Data Space; search is public, download needs CDSE_USERNAME / CDSE_PASSWORD in .env
+      catalogue_url: https://catalogue.dataspace.copernicus.eu/odata/v1/Products
+      token_url: https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token
+      download_url: https://download.dataspace.copernicus.eu/odata/v1/Products({id})/$value
+    # Sentinel-2: CDSE only has the 2022 reprocessing (N0500); Google's public bucket still has the
+    # original 2019 product (N0207), the one the paper could use. Only these files are fetched.
+    s2_bucket_url: https://storage.googleapis.com/storage/v1/b/gcp-public-data-sentinel-2/o
+    s2_files: [_B02.jp2, _B03.jp2, _B04.jp2, _B08.jp2, _B11.jp2, MTD_MSIL1C.xml, MTD_TL.xml, MSK_CLOUDS_B00.gml]
+    footprint_png: data/benchmark/faerch2023/quicklooks/footprints.png
+    # Table 1 says EW GRDH, but its ENL (10.7) and 40 m spacing point to GRDM; both are in the
+    # scene list. This picks the one the pipeline (labels, detectors) uses; --s1 overrides it.
+    s1_format: GRDM         # 2026-10-23: open-water ENL at 40 m is HH 9.5 for GRDM vs 2.45 for GRDH (Table 1: 10.7)
+    # The paper's AOI is only drawn in Fig. 1; `bench-fig1` georeferences it from these points.
+    fig1_points: benchmarks/faerch2023/fig1_points.csv
+    fig1_outlines: benchmarks/faerch2023/fig1_outlines.geojson
+    snap:                   # 1b: SNAP GPT preprocessing (graph quotes the paper's processing text)
+      gpt: ~/AppData/Local/Programs/esa-snap/bin/gpt.exe   # SNAP 14.0.0, installed 2026-10-22
+      graph: benchmarks/faerch2023/s1_ew_preprocess.xml
+      cache: 6G             # gpt -c; must stay below -Xmx10G in gpt.vmoptions (16 GB RAM)
+      threads: 8
+      resampling: NEAREST_NEIGHBOUR   # paper: nearest neighbour, "to avoid averaging pixel intensities"
+      # Paper: thermal noise removal on. With SNAP 14 it breaks the paper's ENL (HV ENL 0.98,
+      # 23.7 % of HV clipped to -115 dB); without it ENL is HH 10.74 / HV 11.45 vs Table 1's 10.7.
+      # false (decided 2026-10-26): files tagged `_noTNR`, sweep in `<sweep.out_dir>_noTNR`.
+      # `--tnr` on bench-preprocess / bench-landmask switches back to the as-described variant.
+      remove_thermal_noise: false
+    land:
+      buffer_m: 500         # paper sec. 3.1
+      # Fallback when osmdata.openstreetmap.de is unreachable: land built from the coastline ways
+      # of this Geofabrik extract (same OSM data the land polygons are made from).
+      osm_pbf: data/land/newfoundland-and-labrador-261020.osm.pbf
+    sweep:                  # 1e: every reference detector x 21 PFAs on the 40 m EW stack (`bench-sweep`)
+      out_dir: data/benchmark/faerch2023/sweep
+      # Paper sec. 3.3: "21 different PFA levels varying from 1e-21 to 1e-1" (one per decade)
+      pfa_min_exp: -21
+      pfa_max_exp: -1
+      detectors: [gamma, lognorm, k, wishart, nis, idpolrad]
+      # One ENL for both bands, as the paper (Table 1: 10.7, read from scenes.csv `paper_enl`).
+      # Measured on GRDM: HH 9.5 / HV 0.98. `table1` or a number.
+      enl: table1
+      # PFAs run in ascending order; a detector stops after the first PFA with more objects than
+      # this in the whole scene. The AOI is ~1/5 of the scene, so the last PFA scored has >~4000
+      # objects in it vs 492 labels (F < 0.2); the paper's optimum has 24-74 false positives.
+      max_objects: 20000
+      # 2a: my CA-CFAR as it is (HV test, co-pol check, `detections` rules, `cfar.enl` measured
+      # on the scene) with the length rule on and off (tags cacfar / cacfar-nolength). All PFAs
+      # in one pass; the cap counts final objects. Windows: the paper's (diameters, 9 / 13 px at
+      # 40 m), not `cfar.guard_m` / `background_m`, so window size isn't a variable.
+      cacfar_length_rules: [true, false]
+      cacfar_windows: {inner_m: 360, outer_m: 520}
+    score:                  # 1f: match detections to labels, recall / precision / F per (detector, PFA)
+      # Scoring area: S1 valid (swath, no land buffer) x the S2 and ALOS-2 outlines of Fig. 1
+      # (`fig1`), or the Path B AOI that also drops clouds and S2 nodata (`reconstructed`).
+      aoi: fig1
+      aoi_sensitivity: reconstructed   # also scored, reported as one row (FP depend on the area)
+      # Detections within this of an "unknown SAR object" (Path A) are ignored: neither TP nor FP
+      # (paper: bright objects under clouds, bergs drifting in, one ship were removed).
+      unknown_ignore_m: 250
+      reference: benchmarks/faerch2023/reference.yaml
+      fig6_csv: benchmarks/faerch2023/reference_fig6.csv   # digitized by hand; overlay only if present
+      figure: docs/img/faerch2023_f_vs_pfa.png
+      figure_fig6_style: docs/img/faerch2023_f_vs_pfa_fig6style.png   # all detectors, one panel
+      report: docs/faerch2023-reproduction.md
+      table_csv: data/benchmark/faerch2023/score/scores.csv
+    thor:                   # THOR (head trained on 10 m HyP3 IW) on the 40 m EW stack: smoke test (2026-10-28)
+      head: linear          # <paths.models>/thor/<head>/final/head.pt (thor-fetch-head)
+      crop_m: 5120          # training crop: 512 px at 10 m = 5.12 km; 128 px here
+      # THOR resizes each band to crop / GSD px. Both variants give 64 x 64 tokens of 80 m, as in training.
+      variants:
+        upsample: {band_gsd_m: 10, patch_px: 8}   # declared 10 m: THOR resamples 128 -> 512 px (bilinear)
+        native: {band_gsd_m: 40, patch_px: 2}     # declared 40 m (IW_HH_40): 2 x 2 px patches, embedding resized
+      # Input normalisation (dB mean, std per band). `iw` = thor.norm, what the head was trained
+      # with (the default); others from THOR's own table (thor_dataset_base.py, S1-EW-HH-10m).
+      norms:
+        ew: {HH: [-12.7691, 6.6416], HV: [-22.6922, 7.2472]}
+      smoke:
+        n_crops: 3          # crops with the most verified labels, inside the scoring area
+        min_valid: 0.9      # sea (valid) fraction of a crop
+        out_dir: data/benchmark/faerch2023/thor_smoke
+      run:                  # `bench-thor`: every variant x stack over the scoring area, F vs score threshold
+        out_dir: data/benchmark/faerch2023/thor   # peaks GeoJSON + heatmap per (stack, variant), resumable
+        overlap_m: 1280     # window overlap: thor.infer.overlap_px (128) at 10 m
+        score_min: 0.02     # peaks cached at or above this (smoke: water p99 0.01-0.07)
+        # Swept like the CFARs' PFA. The head's scores sit lower than on 10 m IW (smoke: bergs
+        # 0.06-0.26), so the viewer's 0.35 is near the top, not the middle.
+        thresholds: [0.02, 0.03, 0.04, 0.05, 0.06, 0.08, 0.1, 0.12, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5]
+        # Runs on top of every variant x stack with `iw` (2026-10-28: EW stats on the best combination).
+        extra: [{variant: upsample, stack: noTNR, norm: ew}]
+        figure: docs/img/faerch2023_thor_f.png
+        report: docs/faerch2023-thor.md
+      bergs:                # `bench-thor-bergs`: medium bergs, Færch scene vs training chips, one figure
+        window_m: 2560      # panel size around each berg (32 tokens of 80 m)
+        reference: {variant: upsample, stack: noTNR}   # run whose hits / misses pick the Færch bergs
+        n_hits: 3           # Færch verified medium bergs, picked at spread-out lengths
+        n_misses: 3
+        train_size: MED     # IIP size class of the training bergs (61-120 m, as Færch's medium)
+        n_train: 4          # training bergs at evenly spaced quantiles of their training score
+        multilook: 4        # 10 m -> 40 m (mean of linear intensity), as Stage 2's IW runs
+        match_m: 250        # score at a berg = best token / peak within this (verified radius)
+        figure: docs/img/faerch2023_thor_medium_bergs.png
+    labels_source: faerch   # labels for 1e/1f: faerch (Path A) | reconstructed (Path B); --source overrides
+    labels_faerch:          # 1d Path A: the paper's validation set, from Laust Færch (email, 2026-10-24). Private: never commit
+      dir: data/benchmark/faerch2023/labels_faerch/data-for-natalia   # unzipped as sent (LZMA zip: Explorer can't open it)
+      drift_paths: matching-sentinel2-sentinel1-interpolated.shp   # lines S2 -> S1 position, EPSG:5938
+      unknown_objects: sentinel1-unknown-objects.shp               # bright SAR objects without an optical match
+      verified_methods: [manual]    # `method` of verified drift paths; "interpolate" = expected drift paths
+      s2_pixel_m: 10                # `length` / `width` / `area` are in Sentinel-2 pixels
+      radius_verified_m: 250        # paper sec. 3.4
+      radius_interpolated_m: 1789
+      compare_m: 50                 # report only: rebuilt (Path B) S2 target <-> Færch S2 position
+      out_dir: data/benchmark/faerch2023/labels
+      report: benchmarks/faerch2023/labels_faerch.md
+    labels:                 # 1d Path B: labels rebuilt from Sentinel-2 -> RECONSTRUCTED LABELS
+      dir: data/benchmark/faerch2023/labels
+      report: benchmarks/faerch2023/labels_rebuilt.md
+      bands: [B02, B03, B04, B08]   # paper sec. 3.4: sum of the 10 m bands B2, B3, B4, B8
+      n_sigma: 4                    # paper: mean background + 4 standard deviations
+      guard_m: 360                  # window not given for S2; the paper's SAR window is reused
+      outer_m: 520
+      min_ring_fraction: 0.5        # skip pixels whose ring is mostly land / cloud / nodata
+      min_area_px: 2                # 1 px (10 m) objects are mostly noise at 4 sigma
+      max_area_m2: 300000           # paper: one berg >= 360 m long; larger objects are floes / glitches
+      swir_band: B11                # ice is dark in SWIR, clouds are bright
+      # The paper removed artifacts by eye. These two rules stand in for that; both were read off a
+      # gallery of 4-sigma targets on T20VNL (2026-10-22): 4-sigma alone keeps ~55k objects per tile,
+      # almost all wave texture at ~1.3x the water level; bergs have B11 <= 0.026, haze/cloud 0.04-0.09.
+      min_contrast: 2.0             # object peak / ring mean (open water ~0.2 summed reflectance)
+      max_swir: 0.035               # mean B11 TOA reflectance over the object
+      land_buffer_m: 100            # OSM land + 100 m: coastline surf and beaches (the SAR mask is 500 m)
+      cloud_min_area_m2: 1000000    # L1C cloud-mask polygons smaller than this are ignored (bergs get flagged)
+      cloud_buffer_m: 500
+      dedupe_m: 30                  # tiles overlap: one target per object
+      aoi_alos2: true               # AOI also inside the ALOS-2 scene (Fig. 1: all bergs are in S1 x S2 x ALOS-2)
+      drift:
+        incidence_bin_deg: 0.5      # SAR targets: intensity / median at the same incidence angle
+        # Global threshold on that ratio, HH AND HV. GRDH needed 12 dB (8 dB: 88k objects of HV
+        # speckle); on GRDM (HH ENL 9.5) 8 dB is clean: ~2k objects. Swept 6-10 dB x support
+        # 3/4/6 on GRDM (2026-10-23): coherent settings verify 50-60 labels, all slow bergs.
+        sar_threshold_db: 8
+        max_area_px: 500            # paper's object size limit at 40 m
+        search_m: 10000             # max drift per axis; paper mean drift 3953 m
+        bin_m: 100                  # displacement histogram
+        node_spacing_m: 5000
+        neighbourhood_m: 15000      # labels within this of a node share its drift
+        min_node_labels: 5
+        # Labels that must line up with SAR objects at a node's drift. Swept 3/4/6 x SAR rules
+        # (2026-10-22): looser settings "verify" chance alignments (mean drift ~7 km = random in
+        # +-10 km); 6 keeps only matches that several bergs agree on.
+        min_support: 6
+        verify_radius_m: 300        # moved-back label to SAR target, one-to-one
+        radius_verified_m: 250      # paper sec. 3.4 search radii, used by the scorer in 1f
+        radius_interpolated_m: 1789
+        holdout_fraction: 0.1       # paper: interpolation tested on 10 % of the data
+    quicklook_max_px: 2400
+    # >>> scenes: generated from scenes.csv by `bench-scenes --write-config`
+    scenes:
+      - {sensor: Sentinel-1, product_id: S1A_EW_GRDH_1SDH_20190704T102730_20190704T102831_027966_032866_DEF7, source: cdse, basis: table1, start: '2019-07-04T10:27:30'}
+      - {sensor: Sentinel-1, product_id: S1A_EW_GRDM_1SDH_20190704T102730_20190704T102831_027966_032866_4053, source: cdse, basis: table1_note_format, start: '2019-07-04T10:27:30'}
+      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VNJ_20190704T190623, source: gcs, basis: table1, start: '2019-07-04T15:36:09'}
+      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VNL_20190704T190623, source: gcs, basis: table1, start: '2019-07-04T15:36:09'}
+      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VPJ_20190704T190623, source: gcs, basis: table1, start: '2019-07-04T15:36:09'}
+      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VPK_20190704T190623, source: gcs, basis: table1, start: '2019-07-04T15:36:09'}
+      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VPL_20190704T190623, source: gcs, basis: table1, start: '2019-07-04T15:36:09'}
+      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VNK_20190704T190623, source: gcs, basis: fig1, start: '2019-07-04T15:36:09'}
+      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VMK_20190704T190623, source: gcs, basis: fig1, start: '2019-07-04T15:36:09'}
+      - {sensor: Sentinel-2, product_id: S2B_MSIL1C_20190704T153609_N0207_R111_T20VML_20190704T190623, source: gcs, basis: fig1, start: '2019-07-04T15:36:09'}
+    # <<< scenes

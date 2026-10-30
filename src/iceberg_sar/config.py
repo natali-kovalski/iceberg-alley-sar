@@ -1,4 +1,9 @@
-"""Load and access `config.yaml`."""
+"""Load and access `config.yaml`.
+
+`include: [file, ...]` in the main config merges more top-level sections from other files
+(paths relative to the main config). Paths inside them still resolve against the main config's
+directory, and a section may be defined only once.
+"""
 
 from __future__ import annotations
 
@@ -19,6 +24,7 @@ class Config:
 
     root: Path
     raw: dict[str, Any] = field(repr=False)
+    files: tuple[Path, ...] = ()  # main config first, then its includes
 
     def section(self, name: str) -> dict[str, Any]:
         if name not in self.raw:
@@ -42,15 +48,31 @@ def metres_to_px(metres: float, pixel_m: float, minimum: int = 1) -> int:
     return max(minimum, round(metres / pixel_m))
 
 
-def load_config(path: str | Path = DEFAULT_CONFIG) -> Config:
-    config_path = Path(path).resolve()
-    if not config_path.is_file():
-        raise FileNotFoundError(f"Config file not found: {config_path}")
-    with config_path.open(encoding="utf-8") as f:
+def _read_mapping(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        raise FileNotFoundError(f"Config file not found: {path}")
+    with path.open(encoding="utf-8") as f:
         raw = yaml.safe_load(f) or {}
     if not isinstance(raw, dict):
-        raise ValueError(f"Config root must be a mapping: {config_path}")
+        raise ValueError(f"Config root must be a mapping: {path}")
+    return raw
+
+
+def load_config(path: str | Path = DEFAULT_CONFIG) -> Config:
+    config_path = Path(path).resolve()
+    raw = _read_mapping(config_path)
+    files = [config_path]
+    for inc in raw.pop("include", None) or []:
+        inc_path = (config_path.parent / inc).resolve()
+        extra = _read_mapping(inc_path)
+        if "include" in extra:
+            raise ValueError(f"Nested include is not supported: {inc_path}")
+        dup = sorted(raw.keys() & extra.keys())
+        if dup:
+            raise ValueError(f"Config sections defined twice ({inc_path}): {', '.join(dup)}")
+        raw.update(extra)
+        files.append(inc_path)
     missing = [s for s in REQUIRED_SECTIONS if s not in raw]
     if missing:
         raise ValueError(f"Config is missing sections: {', '.join(missing)}")
-    return Config(root=config_path.parent, raw=raw)
+    return Config(root=config_path.parent, raw=raw, files=tuple(files))
