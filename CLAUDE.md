@@ -216,6 +216,20 @@ iceberg-alley-sar/
   `iw_sweep.cacfar_10m_and_pfas` 1e-16..1e-3, ~48 min, figure `docs/img/m2b_recall_10m_and.png`):
   pooled 0.83 @1,000 / 0.84 at 2 per label vs 6 dB check 0.82 / 0.82, THOR 0.86 / 0.86; floods
   past ~2 per label (1e-4: 20k).
+- **Review revision (branch `review-revision`, 2026-11-02):** plan in `docs/internal/` (local
+  only, never commit). Shared evaluation mask `evaluation.EvalDomain` in every scorer (EW 487 /
+  IW 474 labels); `size_table` PFA lookup fixed; iDPolRAD PFA <= 1e-17 flagged `unreliable`;
+  `score.matching` (greedy | optimal, metres | epsg5938); verified-only recall replaces
+  verified-only F; IW budgets from real runs (`at_budget`, `budget_min_fraction`); "THOR
+  pipeline" labels (`thor.PIPELINE`). New commands and reports: `bench-robustness`
+  (`docs/revision-robustness.md`: N1 matching, N2 chance matches, bootstrap CIs),
+  `bench-near-ice` (`docs/revision-near-ice.md`: rule shows no benefit near ice),
+  `bench-ablation` (`docs/revision-ablation.md`: CA-CFAR -> gamma steps, `cfar.ring_shape`,
+  `detections.connectivity`), `bench-thor-iw40` (`docs/revision-thor-iw40.md`: 0.91 at 40 m),
+  `bench-tnr-ablation` (`docs/revision-tnr-ablation.md`: floored subtraction keeps gamma's F
+  0.640; clipping drives the TNR drop). `bench-thor-bergs` writes `medium_contrast.csv`. Report
+  doc revised (claude.ai Doc "Iceberg CFAR benchmark: summary (Revised)"). Open: ask Laust for
+  his SNAP settings; viewer CZMLs / compare charts need `czml` + `publish` + push.
 - **Stage 1 uses HH AND HV (2026-11-02):** `detections.copol_test: and` (default; `db` = old 6 dB
   check), `detections.copol_setup` / `and_cfars` in `detect` / `run` / 5d's sweep. `cfar.pfa` 1e-11
   (total; per band sqrt), set to match the 6 dB check's pooled count at 1e-6 on the 5d frames (no
