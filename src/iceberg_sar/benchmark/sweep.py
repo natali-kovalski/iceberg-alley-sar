@@ -8,9 +8,11 @@ Per scene, under `<out_dir>/<scene>/`:
   <detector>/<detector>_pfa<pfa>.geojson          objects per PFA, CA-CFAR schema
   <detector>/<detector>_run.json                  per-PFA runtime, counts and settings
   cacfar*/                                        my CA-CFAR variants (`cacfar_variants`): length
-                                                  rule on / off x paper or own windows
+                                                  rule on / off x paper or own windows x co-pol
+                                                  test (`-and`: HH AND HV CFAR, 2c)
   cacfar-nolength-10m/                            my CA-CFAR on the 10 m masked rasters, no
                                                   length rule (`cacfar_10m_pfas`, one pass)
+  cacfar-nolength-10m-and/                        the same with HH AND HV (`cacfar_10m_and_pfas`)
   sweep_runtime.csv                               runtime per detector and PFA
 
 PFAs run in ascending order, and a detector stops after the first PFA with more objects than
@@ -23,7 +25,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +34,7 @@ import numpy as np
 import pandas as pd
 import rasterio
 
+from iceberg_sar import detections
 from iceberg_sar.benchmark import adapter
 from iceberg_sar.benchmark.pfa import detector_channel_pfa
 from iceberg_sar.benchmark.smoke import prepare
@@ -48,21 +51,31 @@ from iceberg_sar.detections import (
 
 BANDS = ("HH", "HV")
 CACFAR_10M = "cacfar-nolength-10m"
+CACFAR_10M_AND = "cacfar-nolength-10m-and"
 
 
 WINDOW_SETS = ("paper", "own")
+# Co-pol test of my CA-CFAR: `db` = Stage 1's fixed check (HH peak over the HH background by
+# `detections.copol_min_contrast_db`, per object); `and` = a CA-CFAR on HH as well, per pixel,
+# both bands at the per-channel PFA of an AND merge (`pfa.py`) with their own measured ENL (2c).
+COPOL_TESTS = ("db", "and")
+# Settings that older run.json files don't record, with the value they ran with
+SETTING_DEFAULTS: dict[str, Any] = {"copol": "db", "enl_copol": None}
 
 
 @dataclass(frozen=True)
 class CacfarVariant:
-    """One run of my CA-CFAR: length rule on / off, and the window set. `paper` = the reference
-    detectors' windows (`iw_sweep.cacfar_windows`), `own` = `cfar.guard_m` / `background_m`."""
+    """One run of my CA-CFAR: length rule on / off, the window set and the co-pol test.
+    `paper` = the reference detectors' windows (`iw_sweep.cacfar_windows`), `own` =
+    `cfar.guard_m` / `background_m`; `copol` one of `COPOL_TESTS`."""
     length_rule: bool
     windows: str = "paper"
+    copol: str = "db"
 
     @property
     def tag(self) -> str:
-        return cacfar_tag(self.length_rule) + ("-ownwin" if self.windows == "own" else "")
+        return (cacfar_tag(self.length_rule) + ("-ownwin" if self.windows == "own" else "")
+                + ("-and" if self.copol == "and" else ""))
 
 
 @dataclass(frozen=True)
@@ -76,6 +89,7 @@ class SweepParams:
     cacfar_windows: dict[str, float]
     cacfar_10m_pfas: list[float]
     cacfar_10m_block_rows: int | None = None
+    cacfar_10m_and_pfas: list[float] = field(default_factory=list)
 
     @classmethod
     def from_config(cls, cfg: Config) -> SweepParams:
@@ -86,22 +100,33 @@ class SweepParams:
         unknown = set(s["detectors"]) - set(adapter.DETECTORS)
         if unknown:
             raise ValueError(f"iw_sweep.detectors: unknown {sorted(unknown)}")
-        variants = [CacfarVariant(bool(v["length_rule"]), str(v.get("windows", "paper")))
-                    for v in s["cacfar_variants"]]
+        variants = [CacfarVariant(bool(v["length_rule"]), str(v.get("windows", "paper")),
+                                  str(v.get("copol", "db"))) for v in s["cacfar_variants"]]
         bad = sorted({v.windows for v in variants} - set(WINDOW_SETS))
         if bad:
             raise ValueError(f"iw_sweep.cacfar_variants: windows must be {WINDOW_SETS}: {bad}")
+        bad = sorted({v.copol for v in variants} - set(COPOL_TESTS))
+        if bad:
+            raise ValueError(f"iw_sweep.cacfar_variants: copol must be {COPOL_TESTS}: {bad}")
         return cls(scenes=list(s["scenes"]), out_dir=cfg.root / s["out_dir"], pfas=pfas,
                    max_objects=int(s["max_objects"]), detectors=list(s["detectors"]),
                    cacfar_variants=variants,
                    cacfar_windows={k: float(v) for k, v in s["cacfar_windows"].items()},
                    cacfar_10m_pfas=sorted(float(x) for x in s.get("cacfar_10m_pfas") or []),
-                   cacfar_10m_block_rows=s.get("cacfar_10m_block_rows"))
+                   cacfar_10m_block_rows=s.get("cacfar_10m_block_rows"),
+                   cacfar_10m_and_pfas=sorted(float(x)
+                                              for x in s.get("cacfar_10m_and_pfas") or []))
 
     @property
     def cacfar_tags(self) -> dict[str, CacfarVariant]:
         """CA-CFAR variant tag -> variant."""
         return {v.tag: v for v in self.cacfar_variants}
+
+    @property
+    def cacfar_10m_tags(self) -> dict[str, list[float]]:
+        """10 m CA-CFAR tag -> its PFAs, for the configured ones."""
+        return {t: pfas for t, pfas in [(CACFAR_10M, self.cacfar_10m_pfas),
+                                        (CACFAR_10M_AND, self.cacfar_10m_and_pfas)] if pfas}
 
 
 def cacfar_tag(length_rule: bool) -> str:
@@ -122,6 +147,15 @@ def cacfar_settings(cfg: Config, hv: Path, length_rule: bool,
     if not length_rule:
         params = replace(params, max_structure_px=NO_STRUCTURE_LIMIT)
     return pixel_m, base, params
+
+
+def and_cfars(cfg: Config, hh: Path, base: CfarParams, pfas: list[float]
+              ) -> tuple[list[CfarParams], list[CfarParams], float]:
+    """HV and HH CA-CFAR settings for an HH AND HV test at each total PFA: both at the AND merge's
+    per-channel PFA (sqrt of the total), HV with `base`'s ENL, HH with its own, estimated as
+    `cfar.enl` says (auto: 1 / median(CV)^2 over `enl_cell_m` cells). Returns (HV, HH, HH ENL).
+    Same as Stage 1's `detections.and_cfars`."""
+    return detections.and_cfars(cfg, hh, base, pfas)
 
 
 def write_geojson(gdf: gpd.GeoDataFrame, path: Path) -> Path:
@@ -195,43 +229,56 @@ def run_reference(cfg: Config, prep: dict[str, Any], name: str, p: SweepParams,
 def run_cacfar(cfg: Config, prep: dict[str, Any], p: SweepParams, v: CacfarVariant,
                ice_mask: Path | None, force: bool, log: Callable[[str], None]
                ) -> list[dict[str, Any]]:
-    """My CA-CFAR (HV, co-pol check, `detections` rules) on the multilooked bands, per PFA."""
+    """My CA-CFAR (HV, co-pol check or HH AND HV, `detections` rules) on the multilooked bands,
+    per PFA."""
     tag, length_rule = v.tag, v.length_rule
     out_dir = prep["work"] / tag
     paths = band_paths(prep)
     pixel_m, base, params = cacfar_settings(
         cfg, paths["HV"], length_rule, p.cacfar_windows if v.windows == "paper" else None)
+    hv_c, hh_c, enl_hh = [replace(base, pfa=q) for q in p.pfas], None, None
+    if v.copol == "and":
+        hv_c, hh_c, enl_hh = and_cfars(cfg, paths["HH"], base, p.pfas)
+        params = replace(params, copol_min_contrast_db=None)
     settings = {"windows": v.windows, "guard_px": base.guard_px,
                 "background_px": base.background_px, "enl": round(base.enl, 3),
                 "length_rule": length_rule, "pfas_requested": p.pfas,
-                "max_objects": p.max_objects}
+                "max_objects": p.max_objects, "copol": v.copol,
+                "enl_copol": None if enl_hh is None else round(enl_hh, 3)}
     run_json = out_dir / f"{tag}_run.json"
     if run_json.is_file() and not force:
         old = json.loads(run_json.read_text(encoding="utf-8"))
-        if {k: old.get(k) for k in settings} != settings:
+        if {k: old.get(k, SETTING_DEFAULTS.get(k)) for k in settings} != settings:
             log(f"{tag}: settings changed, redoing")
             force = True
     if force:   # PFAs past a new stopping point must not linger
         for f in out_dir.glob(f"{tag}_pfa*.geojson"):
             f.unlink()
     rows, runs, stopped = [], [], False
-    for pfa in p.pfas:
+    for i, pfa in enumerate(p.pfas):
         f = out_dir / f"{tag}_pfa{adapter.pfa_tag(pfa)}.geojson"
         if f.is_file() and not force:
             n = len(gpd.read_file(f))
             runtime = None
         else:
             t0 = time.perf_counter()
-            table, transform, crs = detect_raster(paths, "HV", replace(base, pfa=pfa), params)
+            if hh_c is None:
+                table, transform, crs = detect_raster(paths, "HV", hv_c[i], params)
+            else:
+                tables, transform, crs = detect_raster_multi(paths, "HV", [hv_c[i]], params,
+                                                             [hh_c[i]])
+                table = tables[0]
             gdf = to_geodataframe(table, transform, crs, prep["scene"], prep["inc"], ice_mask)
             gdf["detector"] = tag
             gdf["pfa"] = pfa
-            gdf["pfa_per_channel"] = pfa   # one test, on HV
+            gdf["pfa_per_channel"] = hv_c[i].pfa   # = pfa for the one HV test
             write_geojson(gdf, f)
             n, runtime = len(gdf), round(time.perf_counter() - t0, 2)
             rows.append({"detector": tag, "pfa": pfa, "objects": n, "runtime_s": runtime})
-        runs.append({"pfa": pfa, "objects": n, "runtime_s": runtime,
-                     "alpha_db": round(10 * np.log10(replace(base, pfa=pfa).alpha), 2)})
+        runs.append({"pfa": pfa, "pfa_per_channel": hv_c[i].pfa, "objects": n,
+                     "runtime_s": runtime, "alpha_db": round(10 * np.log10(hv_c[i].alpha), 2)}
+                    | ({} if hh_c is None
+                       else {"alpha_db_copol": round(10 * np.log10(hh_c[i].alpha), 2)}))
         if n > p.max_objects:
             stopped = True
             break
@@ -242,23 +289,25 @@ def run_cacfar(cfg: Config, prep: dict[str, Any], p: SweepParams, v: CacfarVaria
     out_dir.mkdir(parents=True, exist_ok=True)
     run_json.write_text(json.dumps(meta, indent=2), encoding="utf-8")
     stop = " (stopped: object cap)" if stopped else ""
-    log(f"{tag}: {len(runs)} PFAs{stop}, ENL {base.enl:.2f}, guard/background "
+    enls = f"ENL {base.enl:.2f}" + ("" if enl_hh is None else f" (HH {enl_hh:.2f})")
+    log(f"{tag}: {len(runs)} PFAs{stop}, {enls}, guard/background "
         f"{base.guard_px}/{base.background_px} px, {sum(r['runtime_s'] for r in rows):.0f} s new")
     return rows
 
 
 def run_cacfar_10m(cfg: Config, scene: str, p: SweepParams, work: Path, inc: Path | None,
-                   ice_mask: Path | None, force: bool, log: Callable[[str], None]
-                   ) -> list[dict[str, Any]]:
-    """My CA-CFAR on the native 10 m masked rasters without the length rule, all of
-    `cacfar_10m_pfas` in one pass (as 5d's sweep). Skipped if every PFA is on disk."""
-    out_dir = work / CACFAR_10M
-    files = {pfa: out_dir / f"{CACFAR_10M}_pfa{adapter.pfa_tag(pfa)}.geojson"
-             for pfa in p.cacfar_10m_pfas}
+                   ice_mask: Path | None, force: bool, log: Callable[[str], None],
+                   tag: str = CACFAR_10M) -> list[dict[str, Any]]:
+    """My CA-CFAR on the native 10 m masked rasters without the length rule, all of the tag's
+    PFAs in one pass (as 5d's sweep): `CACFAR_10M` with the 6 dB co-pol check, `CACFAR_10M_AND`
+    with HH AND HV (as `and_cfars`). Skipped if every PFA is on disk."""
+    pfas = p.cacfar_10m_tags[tag]
+    out_dir = work / tag
+    files = {pfa: out_dir / f"{tag}_pfa{adapter.pfa_tag(pfa)}.geojson" for pfa in pfas}
     done = (all(f.is_file() for f in files.values())
-            and (out_dir / f"{CACFAR_10M}_run.json").is_file())
+            and (out_dir / f"{tag}_run.json").is_file())
     if done and not force:
-        log(f"{CACFAR_10M}: done, skipped")
+        log(f"{tag}: done, skipped")
         return []
     interim = cfg.path("interim") / scene
     paths = {pol: interim / f"{scene}_{pol}_masked.tif" for pol in BANDS}
@@ -267,28 +316,36 @@ def run_cacfar_10m(cfg: Config, scene: str, p: SweepParams, work: Path, inc: Pat
     if p.cacfar_10m_block_rows:
         params = replace(params, block_rows=int(p.cacfar_10m_block_rows))
     t0 = time.perf_counter()
-    cfars = [replace(base, pfa=pfa) for pfa in p.cacfar_10m_pfas]
-    tables, transform, crs = detect_raster_multi(paths, "HV", cfars, params)
+    cfars, hh_c, enl_hh = [replace(base, pfa=pfa) for pfa in pfas], None, None
+    if tag == CACFAR_10M_AND:
+        cfars, hh_c, enl_hh = and_cfars(cfg, paths["HH"], base, pfas)
+        params = replace(params, copol_min_contrast_db=None)
+    tables, transform, crs = detect_raster_multi(paths, "HV", cfars, params, hh_c)
     # One GeoDataFrame for the whole sweep: incidence and distance to ice are sampled once
     tagged = [t.assign(sweep_k=k) for k, t in enumerate(tables) if not t.empty]
     allg = to_geodataframe(pd.concat(tagged, ignore_index=True) if tagged else pd.DataFrame(),
                            transform, crs, scene, inc, ice_mask)
     runtime = round(time.perf_counter() - t0, 2)
     runs = []
-    for k, c in enumerate(cfars):
+    for k, (pfa, c) in enumerate(zip(pfas, cfars, strict=True)):
         gdf = allg[allg["sweep_k"] == k].drop(columns="sweep_k") if len(allg) else allg
-        gdf = gdf.assign(detector=CACFAR_10M, pfa=c.pfa, pfa_per_channel=c.pfa)
-        write_geojson(gdf, files[c.pfa])
-        runs.append({"pfa": c.pfa, "objects": len(gdf),
-                     "alpha_db": round(10 * np.log10(c.alpha), 2)})
-    meta = {"detector": CACFAR_10M, "band": "HV", "pixel_m": pixel_m, "guard_px": base.guard_px,
+        gdf = gdf.assign(detector=tag, pfa=pfa, pfa_per_channel=c.pfa)
+        write_geojson(gdf, files[pfa])
+        runs.append({"pfa": pfa, "pfa_per_channel": c.pfa, "objects": len(gdf),
+                     "alpha_db": round(10 * np.log10(c.alpha), 2)}
+                    | ({} if hh_c is None
+                       else {"alpha_db_copol": round(10 * np.log10(hh_c[k].alpha), 2)}))
+    meta = {"detector": tag, "band": "HV", "pixel_m": pixel_m, "guard_px": base.guard_px,
             "background_px": base.background_px, "enl": round(base.enl, 3), "length_rule": False,
+            "copol": "db" if hh_c is None else "and",
+            "enl_copol": None if enl_hh is None else round(enl_hh, 3),
             "copol_min_contrast_db": params.copol_min_contrast_db,
-            "pfas_requested": p.cacfar_10m_pfas, "runtime_s_all_pfas": runtime, "runs": runs}
-    (out_dir / f"{CACFAR_10M}_run.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
-    log(f"{CACFAR_10M}: {len(runs)} PFAs in one pass, ENL {base.enl:.2f}, guard/background "
+            "pfas_requested": pfas, "runtime_s_all_pfas": runtime, "runs": runs}
+    (out_dir / f"{tag}_run.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    enls = f"ENL {base.enl:.2f}" + ("" if enl_hh is None else f" (HH {enl_hh:.2f})")
+    log(f"{tag}: {len(runs)} PFAs in one pass, {enls}, guard/background "
         f"{base.guard_px}/{base.background_px} px, {runtime:.0f} s")
-    return [{"detector": CACFAR_10M, "pfa": r["pfa"], "objects": r["objects"],
+    return [{"detector": tag, "pfa": r["pfa"], "objects": r["objects"],
              "runtime_s": runtime / len(runs)} for r in runs]
 
 
@@ -297,7 +354,7 @@ def run_sweep(cfg: Config, force: bool = False, only: list[str] | None = None,
     """Every scene of `iw_sweep`: reference detectors, then my CA-CFAR. Returns the work dirs."""
     p = SweepParams.from_config(cfg)
     sc = cfg.section("benchmark")["iw_sweep"]
-    names = [*p.detectors, *p.cacfar_tags] + ([CACFAR_10M] if p.cacfar_10m_pfas else [])
+    names = [*p.detectors, *p.cacfar_tags, *p.cacfar_10m_tags]
     if only:
         names = [n for n in names if n in only]
     out = []
@@ -311,9 +368,9 @@ def run_sweep(cfg: Config, force: bool = False, only: list[str] | None = None,
         for name in names:
             if name in p.cacfar_tags:
                 rows += run_cacfar(cfg, prep, p, p.cacfar_tags[name], ice_mask, force, log)
-            elif name == CACFAR_10M:
+            elif name in p.cacfar_10m_tags:
                 rows += run_cacfar_10m(cfg, scene, p, prep["work"], prep["inc"], ice_mask,
-                                       force, log)
+                                       force, log, tag=name)
             else:
                 rows += run_reference(cfg, prep, name, p, ice_mask, force, log)
         if rows:
@@ -484,8 +541,8 @@ def run_faerch_sweep(cfg: Config, force: bool = False, only: list[str] | None = 
         t0 = time.perf_counter()
         rows += sweep_detector(cfg, name, p, force, tlog)
         tlog(f"{name}: wall time {(time.perf_counter() - t0) / 60:.1f} min")
-    for rule in cacfar.values():
-        rows += sweep_cacfar_faerch(cfg, p, rule, force, tlog)
+    for v in cacfar.values():
+        rows += sweep_cacfar_faerch(cfg, p, v, force, tlog)
     return merge_runtime_rows(p.out_dir / "sweep_runtime.csv", rows)
 
 
@@ -508,10 +565,17 @@ def merge_runtime_rows(f: Path, rows: list[dict[str, Any]]) -> Path:
 # the valid mask), the format `detections.detect_raster` reads.
 
 
-def faerch_cacfar_tags(cfg: Config) -> dict[str, bool]:
-    """CA-CFAR variant tag -> length rule on, from `faerch2023.sweep.cacfar_length_rules`."""
-    rules = cfg.section("benchmark")["faerch2023"]["sweep"].get("cacfar_length_rules") or []
-    return {cacfar_tag(bool(r)): bool(r) for r in rules}
+def faerch_cacfar_tags(cfg: Config) -> dict[str, CacfarVariant]:
+    """CA-CFAR variant tag -> variant: `faerch2023.sweep.cacfar_length_rules` x `cacfar_copol`
+    (co-pol tests, default [db]); always the paper's windows."""
+    s = cfg.section("benchmark")["faerch2023"]["sweep"]
+    tests = [str(t) for t in s.get("cacfar_copol") or ["db"]]
+    bad = sorted(set(tests) - set(COPOL_TESTS))
+    if bad:
+        raise ValueError(f"faerch2023.sweep.cacfar_copol must be in {COPOL_TESTS}: {bad}")
+    vs = [CacfarVariant(bool(r), "paper", t) for t in tests
+          for r in s.get("cacfar_length_rules") or []]
+    return {v.tag: v for v in vs}
 
 
 def faerch_cacfar_settings(cfg: Config, hv: Path, length_rule: bool
@@ -530,12 +594,12 @@ def cap_runs(counts: list[int], max_objects: int) -> int:
     return len(counts)
 
 
-def sweep_cacfar_faerch(cfg: Config, p: FaerchSweepParams, length_rule: bool, force: bool,
+def sweep_cacfar_faerch(cfg: Config, p: FaerchSweepParams, v: CacfarVariant, force: bool,
                         log: Callable[[str], None]) -> list[dict[str, Any]]:
     """My CA-CFAR over every PFA of the sweep in one pass; returns `sweep_runtime.csv` rows."""
     from iceberg_sar.benchmark.reproduce import scene_paths
 
-    tag = cacfar_tag(length_rule)
+    tag, length_rule = v.tag, v.length_rule
     sp = scene_paths(cfg)
     out_dir = p.out_dir / tag
     run_json = out_dir / f"{tag}_run.json"
@@ -545,39 +609,48 @@ def sweep_cacfar_faerch(cfg: Config, p: FaerchSweepParams, length_rule: bool, fo
     if force or not all(f.is_file() for f in paths.values()):
         split_bands(sp.stack, sp.valid, paths)
     pixel_m, base, params = faerch_cacfar_settings(cfg, paths["HV"], length_rule)
+    cfars, hh_c, enl_hh = [replace(base, pfa=pfa) for pfa in p.pfas], None, None
+    if v.copol == "and":
+        cfars, hh_c, enl_hh = and_cfars(cfg, paths["HH"], base, p.pfas)
+        params = replace(params, copol_min_contrast_db=None)
     settings = {"guard_px": base.guard_px, "background_px": base.background_px,
                 "enl": round(base.enl, 3), "length_rule": length_rule,
-                "pfas_requested": p.pfas, "max_objects": p.max_objects}
+                "pfas_requested": p.pfas, "max_objects": p.max_objects, "copol": v.copol,
+                "enl_copol": None if enl_hh is None else round(enl_hh, 3)}
     if run_json.is_file() and not force:
         meta = json.loads(run_json.read_text(encoding="utf-8"))
-        if {k: meta.get(k) for k in settings} == settings:
+        if {k: meta.get(k, SETTING_DEFAULTS.get(k)) for k in settings} == settings:
             log(f"{tag}: done, skipped")
             return meta["rows"]
     t0 = time.perf_counter()
-    cfars = [replace(base, pfa=pfa) for pfa in p.pfas]
-    tables, transform, crs = detect_raster_multi(paths, "HV", cfars, params)
+    tables, transform, crs = detect_raster_multi(paths, "HV", cfars, params, hh_c)
     runtime = round(time.perf_counter() - t0, 2)
     keep = cap_runs([len(t) for t in tables], p.max_objects)
     out_dir.mkdir(parents=True, exist_ok=True)
     rows = []
-    for c, t in zip(cfars[:keep], tables[:keep], strict=True):
+    for pfa, c, t in zip(p.pfas[:keep], cfars[:keep], tables[:keep], strict=True):
         over = len(t) > p.max_objects
-        geo = out_dir / f"{tag}_pfa{adapter.pfa_tag(c.pfa)}.geojson"
+        geo = out_dir / f"{tag}_pfa{adapter.pfa_tag(pfa)}.geojson"
         if not over:
             gdf = to_geodataframe(t, transform, crs, sp.product, sp.inc)
-            write_geojson(gdf.assign(detector=tag, pfa=c.pfa, pfa_per_channel=c.pfa), geo)
-        rows.append({"detector": tag, "pfa": c.pfa, "pfa_per_channel": c.pfa,   # one test, HV
+            write_geojson(gdf.assign(detector=tag, pfa=pfa, pfa_per_channel=c.pfa), geo)
+        rows.append({"detector": tag, "pfa": pfa, "pfa_per_channel": c.pfa,   # = pfa for HV only
                      "outlier_px": np.nan, "objects_raw": len(t),
                      "runtime_s": round(runtime / len(cfars), 2), "over_cap": over,
                      "geojson": geo.name if not over else ""})
     meta = {"detector": tag, "band": "HV", "pixel_m": pixel_m, **settings,
-            "alpha_db": {f"{c.pfa:.0e}": round(10 * np.log10(c.alpha), 2) for c in cfars},
+            "alpha_db": {f"{q:.0e}": round(10 * np.log10(c.alpha), 2)
+                         for q, c in zip(p.pfas, cfars, strict=True)},
+            **({} if hh_c is None else {"alpha_db_copol": {
+                f"{q:.0e}": round(10 * np.log10(c.alpha), 2)
+                for q, c in zip(p.pfas, hh_c, strict=True)}}),
             "max_structure_px": None if not length_rule else params.max_structure_px,
             "copol_min_contrast_db": params.copol_min_contrast_db,
             "runtime_s_all_pfas": runtime, "stopped_early": keep < len(cfars), "rows": rows}
     run_json.write_text(json.dumps(meta, indent=2), encoding="utf-8")
-    stop = f", over the cap from {_e(cfars[keep - 1].pfa)}" if rows[-1]["over_cap"] else ""
-    log(f"{tag}: {len(rows)} PFAs{stop}, ENL {base.enl:.2f}, guard/background "
+    stop = f", over the cap from {_e(p.pfas[keep - 1])}" if rows[-1]["over_cap"] else ""
+    enls = f"ENL {base.enl:.2f}" + ("" if enl_hh is None else f" (HH {enl_hh:.2f})")
+    log(f"{tag}: {len(rows)} PFAs{stop}, {enls}, guard/background "
         f"{base.guard_px}/{base.background_px} px, {runtime / 60:.1f} min")
     return rows
 

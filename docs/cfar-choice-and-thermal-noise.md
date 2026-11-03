@@ -90,7 +90,8 @@ How wide the optimum is on the clean stack (PFAs within 0.03 F of the best, of 2
 The measured ENL is my CA-CFAR's strength; the fixed 6 dB HH check is its weakness. Replacing
 the check with an HH CFAR test at the same per-channel PFA (HH AND HV, like gamma), while keeping
 the measured ENL, should land near gamma on clean data and keep the robustness with TNR.
-That is a hypothesis to test in Milestone 2c.
+Tested in Milestone 2c ([cacfar-validation.md](cacfar-validation.md)): it does. Without the
+length rule, F is 0.639 without TNR (gamma 0.636) and 0.495 with TNR (gamma 0.428).
 
 ## Reproduce
 

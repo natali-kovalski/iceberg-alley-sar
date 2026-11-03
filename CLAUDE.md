@@ -3,7 +3,7 @@
 ## What this project is
 Detect icebergs off the coast of Newfoundland & Labrador in Sentinel-1 SAR imagery with **THOR**, a SAR foundation model (frozen encoder + a small trained head), benchmarked against a classical **CA-CFAR** detector, and display the results on an interactive **CesiumJS** globe with a timeline.
 
-**Main story (since Milestone 5):** THOR is the detector, the CA-CFAR is the baseline. The classical SAR pipeline (HyP3 calibration, land mask, HV pack-ice mask) feeds both, and THOR depends on it. Headline (since 2026-10-26): on four held-out April 2019 passes (512 same-pass IIP labels), THOR finds 0.85 vs. CFAR 0.80 at the same number of detections, and 11 vs. 10 of 14 large bergs; the gain is mostly medium bergs (0.88 vs 0.81). The old 0.84 vs 0.74 (11 vs 4 large) had the CFAR's ice-strip rule on in every scene; it now applies only with pack ice (`detections.length_rule: auto`), and that cutoff was set after seeing 04-29 (no labels used): say so with the headline. Don't use the old CFAR 78% as a headline: it counts near-ice detections and isn't comparable. Keep the caveats with the headline: one month of one year, THOR learned from IIP analyst labels, precision unknown without AIS.
+**Main story (since Milestone 5):** THOR is the detector, the CA-CFAR is the baseline. The classical SAR pipeline (HyP3 calibration, land mask, HV pack-ice mask) feeds both, and THOR depends on it. Headline (since 2026-11-02, CFAR with HH AND HV): on four held-out April 2019 passes (512 same-pass IIP labels), THOR finds 0.86 vs. CFAR 0.81 at the same number of detections (975), and 11 vs. 10 of 14 large bergs; the gain is mostly medium bergs (0.88 vs 0.82), small bergs 0.73 vs 0.75. (With the 6 dB check, 2026-10-26: 0.85 vs 0.80.) The old 0.84 vs 0.74 (11 vs 4 large) had the CFAR's ice-strip rule on in every scene; it now applies only with pack ice (`detections.length_rule: auto`), and that cutoff was set after seeing 04-29 (no labels used): say so with the headline. Don't use the old CFAR 78% as a headline: it counts near-ice detections and isn't comparable. Keep the caveats with the headline: one month of one year, THOR learned from IIP analyst labels, precision unknown without AIS.
 
 This is a portfolio project. It should show hands-on SAR and maritime-domain skills to remote sensing / ocean-tech employers in St. John's, NL. Clarity, reproducibility, and a polished demo matter more than state-of-the-art accuracy.
 
@@ -200,8 +200,24 @@ iceberg-alley-sar/
   **Length rule in icy frames:** in the scored area (> 5 km from pack ice) it only drops bergs
   there too: 10 m 04-17 0.67 vs 0.83 at 500, 04-23 0.82 vs 0.85; pooled current 5d 0.81 vs rule
   off 0.82 (0.80 vs 0.82 at 1,000; large 10 vs 13 / 14). Its benefit within 5 km isn't scored.
-  Open: decide whether to drop the rule everywhere (5d headline would be THOR 0.86 vs 0.82);
-  2c (`docs/cacfar-validation.md`).
+  Open: decide whether to drop the rule everywhere (5d headline would be THOR 0.86 vs 0.82).
+- **Stage 2 / Milestone 2c (2026-10-30): done.** `docs/cacfar-validation.md`. At matched counts my
+  CA-CFAR = gamma; on F it lagged (0.587 vs 0.636) because of the fixed 6 dB co-pol check.
+  Experiment: HH AND HV CA-CFAR per pixel (both at sqrt(PFA), own measured ENL per band; tags
+  `*-and`, `sweep.and_cfars`, `detect_raster_multi(copol_cfars=...)`, config
+  `faerch2023.sweep.cacfar_copol`, `iw_sweep.cacfar_variants` `copol: and`). Results: Færch
+  0.639 no TNR / 0.495 TNR (gamma 0.636 / 0.428); IW pooled 0.83 (gamma 0.83). `bench-sweep
+  --tnr/--no-tnr` overrides the stack. Stage 1 still uses the 6 dB check; the AND variant is
+  untested at 10 m (HV ENL ~0.4). 10 m run on the 5d frames (2026-11-02, tag `cacfar-nolength-10m-and`,
+  `iw_sweep.cacfar_10m_and_pfas` 1e-16..1e-3, ~48 min, figure `docs/img/m2b_recall_10m_and.png`):
+  pooled 0.83 @1,000 / 0.84 at 2 per label vs 6 dB check 0.82 / 0.82, THOR 0.86 / 0.86; floods
+  past ~2 per label (1e-4: 20k).
+- **Stage 1 uses HH AND HV (2026-11-02):** `detections.copol_test: and` (default; `db` = old 6 dB
+  check), `detections.copol_setup` / `and_cfars` in `detect` / `run` / 5d's sweep. `cfar.pfa` 1e-11
+  (total; per band sqrt), set to match the 6 dB check's pooled count at 1e-6 on the 5d frames (no
+  labels). `thor.compare.cfar_pfas` 1e-5..1e-20. 5d re-run: THOR 0.86 (438) vs CFAR 0.81 (414) at
+  975; old 6 dB tables in `data/outputs/thor/5d_6db_check/`. README has the comparison. Viewer
+  CZMLs still show the 6 dB CFAR: need `detect` + `czml` + `publish`. Length rule unchanged (auto).
 - **Length rule only in icy scenes (2026-10-26):** `detections.length_rule: auto`, on when the
   scene's pack-ice mask covers >= `length_rule_min_ice_km2` (500; our scenes are <= 300 or
   >= 1,200 km²). Decision in each detection summary JSON. 5d re-run: pooled 0.85 vs 0.80 (was

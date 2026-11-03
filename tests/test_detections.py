@@ -89,6 +89,28 @@ def test_copol_check_drops_cross_pol_only_target(scene: dict[str, Path]) -> None
     assert found(6.0) == {ON_BLOCK_EDGE}
 
 
+def test_copol_cfar_and_drops_cross_pol_only_target(scene: dict[str, Path]) -> None:
+    """HH AND HV per pixel: a target flat in HH fails the HH CFAR test; the others pass both."""
+    with rasterio.open(scene["HH"]) as src:
+        hh = src.read(1)
+    hh[COMPACT[0] : COMPACT[0] + 2, COMPACT[1] : COMPACT[1] + 2] = 0.01  # sea level in HH
+    scene = {**scene, "HH": _write(scene["HH"].with_name("hh_flat.tif"), hh)}
+    hv_c = [CfarParams(guard_px=3, background_px=10, pfa=1e-3, enl=4.0)]
+    hh_c = [CfarParams(guard_px=3, background_px=10, pfa=1e-3, enl=4.0)]
+    p = DetectionParams(min_area_px=2, max_area_px=500, edge_buffer_px=10, max_extent_px=20)
+    (alone,), _, _ = detect_raster_multi(scene, "HV", hv_c, p)
+    (both,), _, _ = detect_raster_multi(scene, "HV", hv_c, p, hh_c)
+
+    def found(t: pd.DataFrame) -> set[tuple[int, int]]:
+        return {(round(r - 0.5), round(c - 0.5)) for r, c in zip(t.row, t.col, strict=True)}
+
+    assert {COMPACT, ON_BLOCK_EDGE} <= found(alone)
+    assert found(both) == {ON_BLOCK_EDGE}
+    assert len(both) < len(alone)               # HV speckle hits without HH support go too
+    with pytest.raises(ValueError):
+        detect_raster_multi(scene, "HV", hv_c, p, hh_c * 2)
+
+
 @pytest.mark.parametrize("merge", [False, True])
 def test_split_target_merged_by_structure(scene: dict[str, Path], merge: bool) -> None:
     # One ship-like target: two CFAR cores 5 px apart in azimuth, joined by a dimmer
@@ -206,3 +228,42 @@ def test_length_rule_auto_without_ice_mask_stays_on(tmp_path: Path) -> None:
                                                 "length_rule_min_ice_km2": 500})
     rule = length_rule_for_scene(cfg, tmp_path / "missing.tif")
     assert rule["length_rule"] is True and rule["ice_km2"] is None
+
+
+def _copol_cfg(test: str):
+    from types import SimpleNamespace
+
+    sections = {"detections": {"copol_test": test},
+                "cfar": {"enl": "auto", "enl_cell_m": 500}}
+    return SimpleNamespace(section=lambda name: sections[name])
+
+
+def test_copol_setup_and_runs_both_bands_at_sqrt_pfa(scene: dict[str, Path]) -> None:
+    from iceberg_sar.detections import copol_setup
+
+    base = CfarParams(guard_px=3, background_px=10, pfa=1e-6, enl=4.0)
+    p = DetectionParams(min_area_px=2, max_area_px=500, edge_buffer_px=10, max_extent_px=20,
+                        max_structure_px=15, copol_min_contrast_db=6.0)
+    cfars, copol, params, info = copol_setup(_copol_cfg("and"), scene, "HV", base, p, [1e-12])
+    assert cfars[0].pfa == pytest.approx(1e-6) and copol[0].pfa == pytest.approx(1e-6)
+    assert cfars[0].enl == 4.0 and copol[0].enl == pytest.approx(info["enl_copol"], abs=1e-3)
+    assert 3 < copol[0].enl < 5   # HH is HV x 10: same gamma(4) statistics, measured
+    assert params.copol_min_contrast_db is None and info["copol_test"] == "and"
+    table = detect_raster_multi(scene, "HV", cfars, params, copol)[0][0]
+    rows, cols = table["row"] - 0.5, table["col"] - 0.5
+    assert {(round(r), round(c)) for r, c in zip(rows, cols, strict=True)} == {COMPACT,
+                                                                               ON_BLOCK_EDGE}
+
+
+def test_copol_setup_db_and_fallback_without_hh(scene: dict[str, Path]) -> None:
+    from iceberg_sar.detections import copol_setup
+
+    base = CfarParams(guard_px=3, background_px=10, pfa=1e-6, enl=4.0)
+    p = DetectionParams(min_area_px=2, max_area_px=500, edge_buffer_px=10, max_extent_px=20,
+                        max_structure_px=15, copol_min_contrast_db=6.0)
+    for cfg, bands in [(_copol_cfg("db"), scene), (_copol_cfg("and"), {"HV": scene["HV"]})]:
+        cfars, copol, params, info = copol_setup(cfg, bands, "HV", base, p, [1e-6])
+        assert copol is None and cfars[0].pfa == 1e-6 and params.copol_min_contrast_db == 6.0
+        assert info["copol_test"] == "db"
+    with pytest.raises(ValueError, match="copol_test"):
+        copol_setup(_copol_cfg("or"), scene, "HV", base, p, [1e-6])

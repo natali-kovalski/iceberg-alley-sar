@@ -224,19 +224,29 @@ def detect_raster_multi(
     cfar_band: str,
     cfars: list[CfarParams],
     p: DetectionParams,
+    copol_cfars: list[CfarParams] | None = None,
 ) -> tuple[list[pd.DataFrame], rasterio.Affine, rasterio.crs.CRS]:
     """`detect_raster` at several thresholds (e.g. a PFA sweep) in one pass over the scene.
 
     The CFAR windows must match; only the threshold differs. Background, grown structures and
     the co-pol background are computed once per block, so each extra threshold only costs its
     component table.
+
+    `copol_cfars` (one per entry of `cfars`, same windows): a pixel is a detection only if it
+    also passes a CA-CFAR on the co-pol band (HH for HV) with these settings, i.e. HH AND HV
+    per pixel as in the Færch 2023 gamma detector. Pass each test's per-channel PFA and band ENL.
     """
     cfar = cfars[0]
     if any((c.guard_px, c.background_px, c.min_background_fraction)
-           != (cfar.guard_px, cfar.background_px, cfar.min_background_fraction) for c in cfars):
+           != (cfar.guard_px, cfar.background_px, cfar.min_background_fraction)
+           for c in [*cfars, *(copol_cfars or [])]):
         raise ValueError("All CFAR settings must share the windows and background fraction")
+    if copol_cfars is not None and len(copol_cfars) != len(cfars):
+        raise ValueError("copol_cfars needs one entry per CFAR setting")
     halo = cfar.background_px + p.edge_buffer_px + p.max_extent_px
     copol_band = COPOL.get(cfar_band, "")
+    if copol_cfars is not None and copol_band not in paths:
+        raise ValueError(f"Co-pol CFAR test needs band {copol_band or '?'} for {cfar_band}")
     trusted_margin = cfar.background_px + p.edge_buffer_px
     srcs = {pol: rasterio.open(path) for pol, path in paths.items()}
     try:
@@ -260,9 +270,14 @@ def detect_raster_multi(
             grown = bright_structures(x, bg, p.grow_db)
             trusted_stop = h if w1 == h else w1 - trusted_margin
             copol = None
+            if copol_cfars is not None:
+                copol_bg, _ = ring_mean(bands[copol_band], cfar.guard_px, cfar.background_px)
+                copol = (copol_band, copol_bg)
             for i, c in enumerate(cfars):
                 with np.errstate(invalid="ignore"):
                     det = candidate & (x > c.alpha * bg)   # = ca_cfar(x, c)
+                    if copol_cfars is not None:
+                        det &= bands[copol_band] > copol_cfars[i].alpha * copol[1]
                 if copol is None and copol_band in bands and det.any():
                     copol_bg, _ = ring_mean(bands[copol_band], cfar.guard_px, cfar.background_px)
                     copol = (copol_band, copol_bg)
@@ -428,6 +443,48 @@ def _product_setup(
     return masked, band, pixel_m, cfar, params, rule
 
 
+COPOL_TESTS = ("and", "db")
+
+
+def and_cfars(cfg: Config, copol_path: Path, base: CfarParams, pfas: list[float]
+              ) -> tuple[list[CfarParams], list[CfarParams], float]:
+    """Cross- and co-pol CA-CFAR settings for a co-pol AND cross-pol test at each total PFA: both
+    at the AND merge's per-channel PFA (sqrt of the total, Færch 2023 sec. 2.1.1), the cross-pol
+    with `base`'s ENL, the co-pol with its own, estimated as `cfar.enl` says. Returns
+    (cross-pol, co-pol, co-pol ENL)."""
+    from iceberg_sar.benchmark.pfa import per_channel_pfa
+
+    c = cfg.section("cfar")
+    with rasterio.open(copol_path) as src:
+        pixel_m = abs(src.transform.a)
+    enl = resolve_enl(c.get("enl", "auto"), copol_path,
+                      metres_to_px(float(c.get("enl_cell_m", 500)), pixel_m))
+    ch = [per_channel_pfa(p, "AND") for p in pfas]
+    return ([replace(base, pfa=q) for q in ch], [replace(base, pfa=q, enl=enl) for q in ch], enl)
+
+
+def copol_setup(cfg: Config, masked: dict[str, Path], band: str, base: CfarParams,
+                params: DetectionParams, pfas: list[float]
+                ) -> tuple[list[CfarParams], list[CfarParams] | None, DetectionParams,
+                           dict[str, object]]:
+    """The co-pol test of `detections.copol_test` for these total PFAs.
+
+    `and` (default since 2026-11-02): HH AND HV CA-CFAR per pixel (`and_cfars`), the fixed dB
+    check off. `db`: the CFAR band alone at each PFA plus `copol_min_contrast_db` per object.
+    `and` without the co-pol band falls back to `db`. Returns (CFARs on `band`, co-pol CFARs or
+    None, detection parameters, summary fields)."""
+    test = str(cfg.section("detections").get("copol_test", "db")).lower()
+    if test not in COPOL_TESTS:
+        raise ValueError(f"detections.copol_test must be one of {COPOL_TESTS}, not {test!r}")
+    copol_band = COPOL.get(band, "")
+    if test == "and" and copol_band in masked:
+        cfars, copol, enl = and_cfars(cfg, masked[copol_band], base, pfas)
+        return (cfars, copol, replace(params, copol_min_contrast_db=None),
+                {"copol_test": "and", "copol_band": copol_band, "enl_copol": round(enl, 3)})
+    return ([replace(base, pfa=float(p)) for p in pfas], None, params,
+            {"copol_test": "db", "copol_min_contrast_db": params.copol_min_contrast_db})
+
+
 def params_for_raster(cfg: Config, cfar_path: Path) -> tuple[float, CfarParams, DetectionParams]:
     """Pixel size, CFAR and detection parameters for a masked CFAR-band raster (metres from the
     config converted at its pixel size; `enl: auto` estimated on it)."""
@@ -471,7 +528,9 @@ def detect_product(product_dir: Path, cfg: Config, band: str | None = None) -> d
     name = product_dir.name
     interim = cfg.path("interim") / name
     masked, band, pixel_m, cfar, params, rule = _product_setup(product_dir, cfg, band)
-    table, transform, crs = detect_raster(masked, band, cfar, params)
+    (test,), copol, params, copol_info = copol_setup(cfg, masked, band, cfar, params, [cfar.pfa])
+    tables, transform, crs = detect_raster_multi(masked, band, [test], params, copol)
+    table = tables[0]
     inc = find_rtc_bands(product_dir).get("inc") if product_dir.is_dir() else None
     ice_mask = interim / f"{name}_seaice_mask.tif"
     gdf = to_geodataframe(table, transform, crs, name, inc,
@@ -488,7 +547,8 @@ def detect_product(product_dir: Path, cfg: Config, band: str | None = None) -> d
     p = cfg.section("preprocess")
     db, factor = read_downsampled_db(masked[band], p["quicklook_max_px"], p["quicklook_pool"])
     vmin, vmax = db_stretch(db, p.get("quicklook_db_range"))
-    title = f"{name}  {band}  CA-CFAR pfa={cfar.pfa:g}  n={len(gdf)}"
+    title = (f"{name}  {band}{' AND ' + str(copol_info['copol_band']) if copol else ''}  "
+             f"CA-CFAR pfa={cfar.pfa:g}  n={len(gdf)}")
     overlay = save_overlay(db, factor, vmin, vmax, gdf, out_dir / f"{name}_{band}_detections.png",
                            title)
 
@@ -500,9 +560,11 @@ def detect_product(product_dir: Path, cfg: Config, band: str | None = None) -> d
         "guard_px": cfar.guard_px,
         "background_px": cfar.background_px,
         "pfa": cfar.pfa,
+        "pfa_per_channel": test.pfa,
         "enl": round(cfar.enl, 3),
-        "alpha": round(cfar.alpha, 3),
-        "alpha_db": round(float(to_db(cfar.alpha)), 2),
+        "alpha": round(test.alpha, 3),
+        "alpha_db": round(float(to_db(test.alpha)), 2),
+        **copol_info,
         "n_detections": len(gdf),
         **rule,
         "area_px_quantiles": (gdf["area_px"].quantile([0.1, 0.5, 0.9]).tolist()
@@ -527,8 +589,9 @@ def detect_product_sweep(
     name = product_dir.name
     interim = cfg.path("interim") / name
     masked, band, pixel_m, base, params, rule = _product_setup(product_dir, cfg, band)
-    cfars = [replace(base, pfa=float(pfa)) for pfa in pfas]
-    tables, transform, crs = detect_raster_multi(masked, band, cfars, params)
+    pfas = [float(p) for p in pfas]
+    cfars, copol, params, copol_info = copol_setup(cfg, masked, band, base, params, pfas)
+    tables, transform, crs = detect_raster_multi(masked, band, cfars, params, copol)
     inc = find_rtc_bands(product_dir).get("inc") if product_dir.is_dir() else None
     ice_mask = interim / f"{name}_seaice_mask.tif"
     # One GeoDataFrame for the whole sweep, so incidence and distance to ice (a full-scene
@@ -537,9 +600,9 @@ def detect_product_sweep(
     allg = to_geodataframe(pd.concat(tagged, ignore_index=True) if tagged else pd.DataFrame(),
                            transform, crs, name, inc, ice_mask if ice_mask.is_file() else None)
     out = {}
-    for k, c in enumerate(cfars):
+    for k, (pfa, c) in enumerate(zip(pfas, cfars, strict=True)):
         gdf = allg[allg["sweep_k"] == k].drop(columns="sweep_k") if len(allg) else allg
-        d = Path(out_dir_for(c.pfa))
+        d = Path(out_dir_for(pfa))
         d.mkdir(parents=True, exist_ok=True)
         geojson = d / f"{name}_{band}_detections.geojson"
         if gdf.empty:
@@ -548,10 +611,10 @@ def detect_product_sweep(
             gdf.to_file(geojson, driver="GeoJSON")
         summary = {"product": name, "timestamp": scene_timestamp(name), "cfar_band": band,
                    "pixel_m": pixel_m, "guard_px": c.guard_px, "background_px": c.background_px,
-                   "pfa": c.pfa, "enl": round(c.enl, 3), "alpha": round(c.alpha, 3),
-                   "alpha_db": round(float(to_db(c.alpha)), 2), "n_detections": len(gdf),
-                   **rule}
+                   "pfa": pfa, "pfa_per_channel": c.pfa, "enl": round(c.enl, 3),
+                   "alpha": round(c.alpha, 3), "alpha_db": round(float(to_db(c.alpha)), 2),
+                   **copol_info, "n_detections": len(gdf), **rule}
         (d / f"{name}_{band}_detections.json").write_text(json.dumps(summary, indent=2),
                                                            encoding="utf-8")
-        out[c.pfa] = geojson
+        out[pfa] = geojson
     return out

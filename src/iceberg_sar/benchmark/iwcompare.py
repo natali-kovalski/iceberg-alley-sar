@@ -32,7 +32,7 @@ import pandas as pd
 import rasterio
 
 from iceberg_sar.benchmark import adapter
-from iceberg_sar.benchmark.sweep import CACFAR_10M, SweepParams
+from iceberg_sar.benchmark.sweep import CACFAR_10M, CACFAR_10M_AND, SweepParams
 from iceberg_sar.config import Config
 from iceberg_sar.pointval import load_truth, point_val_params, sar_valid_at
 from iceberg_sar.thor.compare import POOLED, SIZE_GROUPS, open_water, score_points, xy
@@ -50,6 +50,8 @@ LABELS = {
     "cacfar": "my CA-CFAR, HV, with length rule",
     "cacfar-nolength-ownwin": "my CA-CFAR, HV, no length rule, own windows",
     "cacfar-ownwin": "my CA-CFAR, HV, with length rule, own windows",
+    "cacfar-nolength-and": "my CA-CFAR, HH AND HV, no length rule",
+    "cacfar-and": "my CA-CFAR, HH AND HV, with length rule",
     "gamma": "gamma (HH AND HV)",
     "lognorm": "log-normal (HH AND HV)",
     "k": "K (HH AND HV)",
@@ -58,6 +60,7 @@ LABELS = {
     "idpolrad": "iDPolRAD (window cropped to 41 px)",
     "cacfar-10m": "my CA-CFAR 10 m, with length rule (old 5d)",
     CACFAR_10M: "my CA-CFAR 10 m, no length rule",
+    CACFAR_10M_AND: "my CA-CFAR 10 m, HH AND HV, no length rule",
     CURRENT_5D: "my CA-CFAR 10 m, current 5d (length rule in icy frames)",
     "thor-linear-10m": "THOR linear 10 m (5d)",
 }
@@ -219,7 +222,7 @@ def run_iw_compare(cfg: Config, log: Callable[[str], None] = print) -> dict[str,
     for scene in sp.scenes:
         work = sp.out_dir / scene
         truth, t_xy, crs = scene_truth(cfg, scene)
-        tags = [*sp.detectors, *sp.cacfar_tags] + ([CACFAR_10M] if sp.cacfar_10m_pfas else [])
+        tags = [*sp.detectors, *sp.cacfar_tags, *sp.cacfar_10m_tags]
         dets = {t: load_detections(work / t, t, p.near_ice_km) for t in tags}
         sweep = sweep_table(dets, t_xy, crs, p.radius_m)
         ref = reference_10m(p.ref_5d, scene)
@@ -348,8 +351,16 @@ def run_pooled(scenes: dict[str, dict[str, Any]], p: IwCompareParams, root: Path
                   grey={CURRENT_5D: ("s", ":"), "thor-linear-10m": (None, "--")})
     paths["pooled figure"] = png
     log(f"pooled: {len(scenes)} frames, {n_truth} labels; figure {png}")
+    if CACFAR_10M_AND in set(pooled["detector"]):
+        paths["10 m figure"] = ten_m_figure(scenes, order, pooled, n_truth, p,
+                                            png.with_name(png.stem.replace("_pooled", "")
+                                                          + "_10m_and.png"))
     section = _pooled_section(scenes, order, pooled, summary, sizes, n_truth, count, p, png,
                               root)
+    if "10 m figure" in paths:
+        rel = Path(os.path.relpath(paths["10 m figure"], p.report.parent)).as_posix()
+        section += ("\n### 10 m: HH AND HV vs the 6 dB check, with THOR\n\n"
+                    f"![10 m recall vs detections]({rel})\n")
     return {"paths": paths, "section": section}
 
 
@@ -460,8 +471,9 @@ def recall_figure(sweep: pd.DataFrame, sp: SweepParams, n_truth: int, p: IwCompa
         # CA-CFAR variants share the orange (one detector); the length rule is dashed + hollow.
         # Only the paper-window variants: the like-for-like ones (own windows: tables only).
         paper = {t: v for t, v in sp.cacfar_tags.items() if v.windows == "paper"}
-        mine_styles = {t: ("-", mine) if not v.length_rule else ("--", SURFACE)
-                       for t, v in paper.items()}
+        # HH AND HV (2c) dotted
+        mine_styles = {t: ((":" if v.copol == "and" else "-", mine) if not v.length_rule
+                           else ("--", SURFACE)) for t, v in paper.items()}
         for tag, color, marker in ([(t, mine, "s") for t in paper] + [(det, ref_c, "o")]):
             g = sweep[sweep["detector"] == tag].sort_values("detections")
             ls, face = mine_styles.get(tag, ("-", color))
@@ -505,6 +517,71 @@ def recall_figure(sweep: pd.DataFrame, sp: SweepParams, n_truth: int, p: IwCompa
              f"label. Detections within {p.near_ice_km:g} km of pack ice are dropped.",
              fontsize=7.5, color=TEXT_2)
     fig.tight_layout(rect=(0, 0.03, 1, 0.92))
+    png.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(png, dpi=150, facecolor=SURFACE)
+    plt.close(fig)
+    return png
+
+
+def ten_m_figure(scenes: dict[str, dict[str, Any]], order: list[str], pooled: pd.DataFrame,
+                 n_truth: int, p: IwCompareParams, png: Path) -> Path:
+    """10 m only: THOR vs my CA-CFAR with the 6 dB co-pol check and with HH AND HV (both
+    without the length rule), current 5d in grey; one panel per frame plus the pooled one."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    from iceberg_sar.figures import FOUND, GRID, MISSED, SAR_ONLY, SURFACE, TEXT, TEXT_2
+    from iceberg_sar.thor.compare_figure import scene_date
+
+    styles = {   # tag -> (colour, marker, line style, label)
+        CURRENT_5D: ("#9a9890", "s", ":", "CA-CFAR, current 5d (length rule in icy frames)"),
+        CACFAR_10M: (SAR_ONLY, "s", "-", "CA-CFAR, HV + 6 dB HH check (Stage 1)"),
+        CACFAR_10M_AND: (MISSED, "^", "-", "CA-CFAR, HH AND HV"),
+        "thor-linear-10m": (FOUND, "o", "-", "THOR linear head (5d)"),
+    }
+    panels = [(f"{scene_date(s)[5:]} ({len(scenes[s]['t_xy'])} labels)", scenes[s]["sweep"],
+               len(scenes[s]["t_xy"])) for s in order]
+    panels.append((f"pooled ({n_truth} labels)", pooled, n_truth))
+    fig, axes = plt.subplots(1, len(panels), figsize=(3.3 * len(panels), 3.9), sharey=True,
+                             facecolor=SURFACE, squeeze=False)
+    for ax, (title, sweep, n) in zip(axes[0], panels, strict=True):
+        ax.set_facecolor(SURFACE)
+        xs = np.append(np.geomspace(1, n, 60), 1e5)
+        ax.plot(xs, np.minimum(xs / n, 1), color=TEXT_2, lw=1, ls=(0, (1, 3)), zorder=1)
+        for tag, (color, marker, ls, label) in styles.items():
+            g = sweep[(sweep["detector"] == tag) & (sweep["detections"] > 0)]
+            g = g.sort_values("detections")
+            if g.empty:
+                continue
+            ax.plot(g["detections"], g["recall"], color=color, lw=2 if tag != CURRENT_5D else 1.5,
+                    ls=ls, marker=marker if tag != "thor-linear-10m" else None, ms=6,
+                    markeredgecolor=SURFACE, markeredgewidth=1,
+                    zorder=2 if tag == CURRENT_5D else 3, label=label)
+        ax.axvline(p.per_label * n, color=GRID, lw=1.2, zorder=0)
+        ax.set_title(title, loc="left", fontsize=9.5, color=TEXT)
+        ax.set_xscale("log")
+        ax.set_xlim(10, 1e4)
+        ax.set_ylim(0, 1)
+        ax.grid(True, which="major", color=GRID, lw=0.8)
+        for side in ("top", "right"):
+            ax.spines[side].set_visible(False)
+        for side in ("left", "bottom"):
+            ax.spines[side].set_color(GRID)
+        ax.tick_params(colors=TEXT_2, labelsize=8)
+        ax.set_xlabel("Detections in open water", color=TEXT_2, fontsize=8.5)
+    axes[0][0].set_ylabel(f"Recall (match ≤ {p.radius_m:.0f} m)", color=TEXT_2, fontsize=8.5)
+    handles, labels = axes[0][-1].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="upper left", ncol=4, frameon=False, fontsize=8,
+               bbox_to_anchor=(0.01, 0.995), labelcolor=TEXT)
+    fig.text(0.01, 0.01,
+             "10 m, same-pass IIP labels, April 2019; CA-CFAR curves without the length rule "
+             "unless noted. Vertical line: "
+             f"{p.per_label:g} detections per label. Dotted diagonal: every detection is a label. "
+             f"Detections within {p.near_ice_km:g} km of pack ice are dropped.",
+             fontsize=7.5, color=TEXT_2)
+    fig.tight_layout(rect=(0, 0.04, 1, 0.9))
     png.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(png, dpi=150, facecolor=SURFACE)
     plt.close(fig)

@@ -778,14 +778,20 @@ def bench_sweep(
     force: Annotated[bool, typer.Option(help="Rerun finished PFAs.")] = False,
     only: Annotated[list[str] | None, typer.Option(
         help="Run only these detectors (repeat), e.g. --only gamma --only cacfar.")] = None,
+    tnr: Annotated[bool | None, typer.Option(
+        "--tnr/--no-tnr", help="Stack with / without thermal noise removal. "
+        "Default: benchmark.faerch2023.snap.remove_thermal_noise.")] = None,
     config: ConfigOption = DEFAULT_CONFIG,
 ) -> None:
     """Stage 2 / 1e: every reference detector x 21 PFAs on the Færch 2023 EW scene (40 m),
-    then (2a) my CA-CFAR with and without the length rule (cacfar, cacfar-nolength; one pass
-    each). Resumable per detector and PFA; run it overnight."""
+    then (2a, 2c) my CA-CFAR variants (`faerch2023.sweep.cacfar_length_rules` x `cacfar_copol`;
+    one pass each). Resumable per detector and PFA; run it overnight."""
     from iceberg_sar.benchmark.sweep import run_faerch_sweep
 
-    typer.echo(f"ok  {run_faerch_sweep(load_config(config), force, only, log=typer.echo)}")
+    cfg = load_config(config)
+    if tnr is not None:
+        cfg.section("benchmark")["faerch2023"]["snap"]["remove_thermal_noise"] = tnr
+    typer.echo(f"ok  {run_faerch_sweep(cfg, force, only, log=typer.echo)}")
 
 
 @app.command("bench-reference")

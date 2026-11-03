@@ -87,7 +87,10 @@ cfar:
   # Window sizes are in metres and converted per scene (5 / 20 px at 20 m, 10 / 40 px at 10 m).
   guard_m: 100              # guard half-width, keeps a target's own energy out of the background estimate
   background_m: 400         # background half-width
-  pfa: 1.0e-6               # false-alarm probability, sets the threshold factor
+  # Total false-alarm probability. With detections.copol_test: and, each band's test runs at
+  # sqrt(pfa). 1e-11 (2026-11-02) gives the same detection count as the 6 dB check at its old
+  # 1e-6 on the four 5d frames (~1,000 pooled; set by count, no labels used).
+  pfa: 1.0e-11
   band: HV                  # cross-pol usually gives better target/sea contrast; fallback VH
   enl: auto                 # speckle looks for the threshold; "auto" = 1/median(CV)^2 over water
   enl_cell_m: 500           # cell size for the ENL estimate
@@ -106,7 +109,12 @@ detections:
   # Our scenes: <= 300 km² (open water) or >= 1200 km² (2025-05-08, where it was tuned: 2100).
   length_rule: auto
   length_rule_min_ice_km2: 500
-  copol_min_contrast_db: 6  # HH peak over HH background; drops HV-only speckle (10 m HV noise ~0 dB, bergs 3-20 dB). null = off
+  # Co-pol test (2026-11-02): `and` = a CA-CFAR on HH too, per pixel (HH AND HV, both at
+  # sqrt(cfar.pfa), each with its own measured ENL), like the Færch 2023 gamma detector.
+  # `db` = the old fixed check, copol_min_contrast_db below, per object. AND matched or beat
+  # the 6 dB check at 40 m and 10 m (docs/cacfar-validation.md). `and` without HH falls back to db.
+  copol_test: and
+  copol_min_contrast_db: 6  # `db` only: HH peak over HH background; drops HV-only speckle (10 m HV noise ~0 dB, bergs 3-20 dB). null = off
   merge_by_structure: true  # CFAR cores in one grown blob = one target (ships split into 2 cores ~50 m apart)
   block_rows: 512           # rows per processing block (memory vs. overhead; same detections at any size)
 
@@ -289,7 +297,8 @@ thor:
       S1B_IW_20190423T094026_DHP_RTC10_G_gpuned_A784: iip-satellite
       S1A_IW_20190424T093305_DHP_RTC10_G_gpuned_132E: iip-satellite
       S1A_IW_20190417T094107_DHP_RTC10_G_gpuned_EDB4: iip-satellite
-    cfar_pfas: [1.0e-3, 1.0e-4, 1.0e-5, 1.0e-6, 1.0e-7, 1.0e-8, 1.0e-10, 1.0e-12]
+    # Total PFAs (HH AND HV since 2026-11-02; the 6 dB check swept 1e-3 .. 1e-12). Must hold cfar.pfa.
+    cfar_pfas: [1.0e-5, 1.0e-6, 1.0e-8, 1.0e-10, 1.0e-11, 1.0e-12, 1.0e-14, 1.0e-16, 1.0e-18, 1.0e-20]
     thor_models: [thor-linear, thor-centernet]   # detection tags from `thor-detect` (final models)
     view_score: 0.35        # folds' best-F1 threshold: THOR operating point for the viewer
     # Aircraft truth drifts: one offset per scene from the pooled detections of both detectors

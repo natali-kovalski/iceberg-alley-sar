@@ -28,6 +28,8 @@ all-labels F.
 | Wishart | 1e-20 | 1e-5 | 276 / 70 / 216 | 268 / 61 / 224 | 0.659 | 0.653 | -0.006 | yes | 0.854 / 0.870 (1e-7) | 0.656 | none |
 | My CA-CFAR | – | 1e-5 | – | 200 / 14 / 292 | – | 0.567 | – | – | 0.796 / 0.796 (1e-5) | 0.557 | 0.468 (1e-4) |
 | My CA-CFAR, no length rule | – | 1e-1 | – | 220 / 38 / 272 | – | 0.587 | – | – | 0.803 / 0.814 (1e-3) | 0.586 | 0.494 (1e-4) |
+| My CA-CFAR, HH AND HV | – | 1e-7 | – | 244 / 42 / 248 | – | 0.627 | – | – | 0.829 / 0.843 (1e-9) | 0.620 | 0.466 (1e-9) |
+| My CA-CFAR, HH AND HV, no length rule | – | 1e-7 | – | 251 / 42 / 241 | – | 0.639 | – | – | 0.844 / 0.858 (1e-9) | 0.633 | 0.495 (1e-9) |
 
 ![F vs PFA](img/faerch2023_f_vs_pfa.png)
 
@@ -69,6 +71,12 @@ Table 5 uses its own optimum PFA, which differs from Table 3 for Gamma, K, Log-n
 | My CA-CFAR, no length rule | small | – | – | 6.1 |
 | My CA-CFAR, no length rule | medium | – | – | 52.0 |
 | My CA-CFAR, no length rule | large | – | – | 86.8 |
+| My CA-CFAR, HH AND HV | small | – | – | 8.8 |
+| My CA-CFAR, HH AND HV | medium | – | – | 63.4 |
+| My CA-CFAR, HH AND HV | large | – | – | 86.0 |
+| My CA-CFAR, HH AND HV, no length rule | small | – | – | 9.4 |
+| My CA-CFAR, HH AND HV, no length rule | medium | – | – | 63.4 |
+| My CA-CFAR, HH AND HV, no length rule | large | – | – | 90.4 |
 
 ## Discussion
 
@@ -186,6 +194,50 @@ It measures its ENL on the scene (HV 1.05 here, 13.4 without TNR), so its thresh
 the rougher statistics; gamma and Wishart keep Table 1's 10.7. Gamma, NIS and iDPolRAD peak at
 1e-21, the end of the sweep, so their TNR optimum may lie lower still. My remaining loss is the
 clipped -115 dB pixels: false positives 81 vs 14, true positives 175 vs 200 at the optimum.
+
+### THOR on this scene (2026-10-28)
+
+`bench-thor`, report in `docs/faerch2023-thor.md`. The final linear head from Milestone 5,
+unchanged: trained on 10 m HyP3 IW frames off Newfoundland (April-June), never on EW, 40 m or
+July, and nothing tuned here except the score threshold, which is swept like the PFA. Crops of
+5.12 km (128 px) give the training token grid (64 x 64 tokens of 80 m) in two ways: `upsample`
+declares the bands 10 m and THOR resizes the crop to 512 px; `native` declares them 40 m and
+cuts 2 x 2 px patches. This is the first precision number for THOR: the IIP frames have none.
+
+**Result.** Best F (verified only): no TNR, upsample 0.568 (0.770) at threshold 0.12, P 0.83
+R 0.43, level with my CA-CFAR (0.567 / 0.587 without the length rule) and below Wishart 0.653,
+NIS 0.650 and gamma 0.636. With TNR, upsample 0.516, behind K (0.533) and ahead of my CA-CFAR
+(0.494) and gamma (0.428). The IW headline (THOR 0.85 vs CFAR 0.80 recall at matched counts)
+does not carry over to this scene: here THOR ties my baseline.
+
+**Where it loses: medium bergs.** Recall at the optimum, small / medium / large: THOR 0.06 /
+0.49 / 0.86, gamma 0.10 / 0.65 / 0.91, Wishart 0.09 / 0.72 / 0.93. Precision is as good as the
+CFARs'. Small bergs are lost by everyone at 40 m.
+
+**Upsample beats native** on both stacks (0.568 vs 0.512, 0.516 vs 0.482), mostly through
+precision (0.83 vs 0.65 at similar recall): THOR does better seeing the crop at the 10 m grid
+it was trained on than with a resized 2 x 2 px patch embedding.
+
+**Thermal noise removal costs THOR 0.05 F**, against gamma's 0.21: it has no ENL to break. The
+3-crop smoke test pointed the other way (TNR scored bergs higher); over the scoring area the
+clipped HV floor gives 4x as many weak peaks (330k vs 84k above 0.02), so no TNR wins, as for
+the CFARs.
+
+**Normalisation.** THOR's own EW stats (HH -12.8 / 6.6 dB, HV -22.7 / 7.2) instead of the IW
+stats the head was trained with: F 0.503 vs 0.568, medium recall 0.40 vs 0.49. The head is tied
+to the inputs it learned on, so the medium-berg gap is not a normalisation offset.
+
+**Calibration.** Scores are compressed: the best threshold is 0.12 (no TNR) or 0.25 (TNR),
+against 0.35 in the viewer, so a THOR operating point does not transfer between products.
+
+**HH AND HV instead of the 6 dB check (2c, 2026-10-30).** Tags `cacfar-and` / `cacfar-nolength-and`:
+a CA-CFAR on HH as well, per pixel, both bands at sqrt(PFA) (the AND merge of sec. 2.1.1), each with
+its own measured ENL (HV 13.4, HH 12.7). Best F without TNR: 0.639 at 1e-7 without the length rule
+(TP / FP 251 / 42, precision 0.86; small / medium / large 9.4 / 63.4 / 90.4 %), 0.627 with it.
+That equals gamma (0.636) and is within 0.015 of Wishart and NIS. With TNR: 0.495 / 0.466, the
+same as the HV-only runs, so it keeps the robustness of the measured ENL. The curve now
+follows gamma's shape, about a decade further left (higher ENL). Summary:
+`docs/cacfar-validation.md`.
 
 ## Files
 

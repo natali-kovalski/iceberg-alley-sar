@@ -6,7 +6,7 @@ Detecting icebergs off Newfoundland & Labrador in Sentinel-1 radar imagery with 
 
 ![Cesium viewer: spring 2025 detections off NE Newfoundland](docs/img/viewer.png)
 
-**In short:** the frozen THOR foundation model with a 769-parameter linear head finds **85% of the icebergs that International Ice Patrol analysts marked** on four held-out Sentinel-1 passes (435 of 512). A well-tuned classical CA-CFAR detector finds **80%** at the same number of detections. THOR's gain is mostly in medium-sized bergs; for large bergs (> 120 m) it is 11 of 14 against the CFAR's 10. The classical SAR pipeline still matters: calibration, the land mask and the pack-ice mask come from it, and THOR depends on them.
+**In short:** the frozen THOR foundation model with a 769-parameter linear head finds **86% of the icebergs that International Ice Patrol analysts marked** on four held-out Sentinel-1 passes (438 of 512). A well-tuned classical CA-CFAR detector finds **81%** at the same number of detections. THOR's gain is mostly in medium-sized bergs; for large bergs (> 120 m) it is 11 of 14 against the CFAR's 10. The classical SAR pipeline still matters: calibration, the land mask and the pack-ice mask come from it, and THOR depends on them.
 
 ## The problem
 
@@ -16,24 +16,24 @@ This project builds that pipeline on free Copernicus Sentinel-1 data, for the co
 
 ## Results
 
-Both detectors ran on four held-out April 2019 passes with same-pass IIP analyst labels (512 bergs), with identical land and pack-ice masks and the same 500 m one-to-one matching. Precision can't be measured without AIS ship positions, so the comparison is **recall at the same number of detections**: the CFAR is swept over its false-alarm rate, THOR over its score, and both are read at the CFAR's detection count at PFA 10⁻⁶. THOR was not tuned on these passes. The CFAR's ice-strip rule now applies only in scenes with pack ice (≥ 500 km² in its mask); that cutoff was set after seeing one of these passes, though it uses no labels (see [docs/thor-vs-cfar.md](docs/thor-vs-cfar.md)).
+Both detectors ran on four held-out April 2019 passes with same-pass IIP analyst labels (512 bergs), with identical land and pack-ice masks and the same 500 m one-to-one matching. Precision can't be measured without AIS ship positions, so the comparison is **recall at the same number of detections**: the CFAR is swept over its false-alarm rate, THOR over its score, and both are read at the CFAR's detection count at its operating point (PFA 10⁻¹¹, HH AND HV). THOR was not tuned on these passes. The CFAR's ice-strip rule now applies only in scenes with pack ice (≥ 500 km² in its mask); that cutoff was set after seeing one of these passes, though it uses no labels (see [docs/thor-vs-cfar.md](docs/thor-vs-cfar.md)).
 
 | Recall at the same detection count | **THOR** (linear head) | CA-CFAR (baseline) |
 |---|---|---|
-| **4 passes pooled, 512 labels** | **0.85** (435) | 0.80 (408) |
-| 2019-04-29 (267 labels) | **0.90** | 0.83 |
+| **4 passes pooled, 512 labels** | **0.86** (438) | 0.81 (414) |
+| 2019-04-29 (267 labels) | **0.90** | 0.85 |
 | Large bergs, > 120 m (14) | **11 of 14** | 10 of 14 |
-| Medium bergs, 61–120 m (425) | **0.88** | 0.81 |
-| Small bergs, 15–60 m (73) | 0.71 | 0.71 |
+| Medium bergs, 61–120 m (425) | **0.88** | 0.82 |
+| Small bergs, 15–60 m (73) | 0.73 | **0.75** |
 | Highest recall, any setting | 0.92 | 0.89 |
 | Compute per 10 m scene | GPU, 8–15 min (laptop RTX 3070) | CPU |
 
 ![Recall vs. detections per pass, THOR vs. CA-CFAR](docs/img/thor_vs_cfar_recall.png)
 
-- **THOR leads on every pass**, by 2 to 7 points. It reaches the CFAR's pooled recall with about 18% fewer detections.
-- **The CFAR flattens out.** Loosening its false-alarm rate from 10⁻⁵ to 10⁻³ adds about 3,600 detections and 23 bergs. THOR keeps climbing.
+- **THOR leads pooled by 5 points**, mostly on medium bergs. It reaches the CFAR's pooled recall with about 17% fewer detections.
+- **The CFAR flattens out.** Loosening its false-alarm rate from 10⁻⁸ to 10⁻⁵ adds about 3,600 detections and 16 bergs. THOR keeps climbing.
 - **Large bergs:** the CFAR sees them (30+ dB above the sea), but its 300 m ice-strip rule throws them away. With the rule applied in every scene, the CFAR found 4 of 14 and THOR led by 10 points (0.84 vs 0.74). Applied only where there is pack ice, the CFAR finds 10, and half of that gap is gone.
-- **Small bergs are a tie.** A THOR token covers 80 m, which is coarse for a 20 m target. A 4×4 patch run is the next test.
+- **Small bergs:** the CFAR is now slightly ahead (55 vs 53 of 73). A THOR token covers 80 m, which is coarse for a 20 m target. A 4×4 patch run is the next test.
 - **Caveats.** It is one month of one year, and the passes share some bergs. THOR learned from IIP analyst labels, so part of the gap may be agreement with their labelling style. Neither detector's precision is known.
 
 The viewer shows 32 scenes (28 passes) from spring 2019, 2020 and 2025 and autumn 2026, with THOR and CFAR as separate layers. Each test pass opens its own recall chart:
@@ -61,7 +61,7 @@ flowchart LR
     A[ASF search<br/>HH+HV scenes over AOI] --> B[HyP3 RTC<br/>10 m]
     B --> C[Masks<br/>land + 500 m, pack ice from HV]
     C --> T[THOR detector<br/>frozen encoder + linear head]
-    C --> D[CA-CFAR baseline<br/>HV, size + strip + HH filters]
+    C --> D[CA-CFAR baseline<br/>HH AND HV, size + strip filters]
     T --> F[GeoJSON<br/>same schema for both]
     D --> F
     F --> G[CZML] --> H[Vue + CesiumJS<br/>viewer]
@@ -94,17 +94,31 @@ Following Forgaard et al., "Efficient iceberg detection in Sentinel-1 imagery us
 Parameters are in [config.yaml](config.yaml), with lengths in metres so tuning carries over between 10 m and 20 m pixels.
 
 1. **Masks** (used by both detectors). Land from OSM, buffered 500 m. OSM land polygons only cover coastlines mapped as lines, so the thousands of offshore rocks and islets mapped as single points (many from the CanVec import) are added too. Pack ice from HV statistics on 200 m cells: pack ice is bright and uniform, open water is dark, and a cell with an iceberg is spiky. Pack ice is masked with a 1 km buffer, and each detection keeps its distance to the ice.
-2. **CA-CFAR on HV.** The background is the mean of a ring (400 m half-width, minus a 100 m guard window that keeps the target's own energy out). The threshold comes from a false-alarm rate of 10⁻⁶ under a gamma speckle model, with ENL estimated from the scene. HyP3 removes the HV thermal noise floor, so open-water HV sits at −30 to −40 dB with ENL below 1. A textbook ENL would set the threshold far too low.
+2. **CA-CFAR on HV AND HH.** The background is the mean of a ring (400 m half-width, minus a 100 m guard window that keeps the target's own energy out). A pixel is a detection only if it passes the test in both bands. The total false-alarm rate is 10⁻¹¹, so each band runs at √10⁻¹¹ ≈ 3·10⁻⁶, under a gamma speckle model with its own ENL estimated from the scene. 10 m IW GRD is oversampled (true resolution about 20 m), so HV speckle grains span about 2×2 px and would pass the size filter; requiring HH too removes them, since real targets are bright in both polarizations. HyP3 removes the HV thermal noise floor, so open-water HV sits at −30 to −40 dB with ENL below 1. A textbook ENL would set the threshold far too low.
 3. **Connected components** of 2 px to 0.8 km². Components within 200 m of land, ice or nodata are dropped.
 4. **Ice-strip rejection.** Each target is grown to the region more than 4 dB above background. Structures longer than 300 m are treated as thin strips of loose ice. This rule also drops large bergs, so it applies only in scenes where the pack-ice mask covers at least 500 km² (`detections.length_rule: auto`); strips break off pack ice.
-5. **HH co-pol check.** A target must also be 6 dB above background in HH. 10 m IW GRD is oversampled (true resolution about 20 m), so HV speckle grains span about 2×2 px and pass the size filter. Real targets are bright in both polarizations.
-6. **Output:** GeoJSON points with area, extent, structure length, peak and mean dB per band, contrast, incidence angle and distance to pack ice. CZML for the viewer, with one time interval per scene.
-7. **Static targets.** Bergs drift hundreds of metres or more between passes; a rock returns to the same spot within the ~10–30 m geolocation error. Targets detected within 50 m of each other on three or more dates are treated as unmapped rocks or islets. They are listed in `data/outputs/static_targets_HV.geojson` and left out of the viewer (the detection files keep them).
+5. **Output:** GeoJSON points with area, extent, structure length, peak and mean dB per band, contrast, incidence angle and distance to pack ice. CZML for the viewer, with one time interval per scene.
+6. **Static targets.** Bergs drift hundreds of metres or more between passes; a rock returns to the same spot within the ~10–30 m geolocation error. Targets detected within 50 m of each other on three or more dates are treated as unmapped rocks or islets. They are listed in `data/outputs/static_targets_HV.geojson` and left out of the viewer (the detection files keep them).
 
 ![CFAR detections, HV, 2025-05-08](docs/img/detections_20250508.png)
 *HV backscatter on 2025-05-08 with land and pack ice masked (black) and CFAR detections circled in red. The vertical brightness steps are the three IW sub-swaths.*
 
 How the CFAR was tuned is in [docs/milestone2-cfar-findings.md](docs/milestone2-cfar-findings.md).
+
+#### HH AND HV instead of the 6 dB co-pol check (November 2026)
+
+Until November 2026 the CFAR ran on HV alone, and each target also had to be 6 dB above its background in HH. That check is a second threshold that doesn't move with the false-alarm rate, so it capped recall. Since 2026-11-02 the pipeline runs a CA-CFAR on HH as well, per pixel, both bands at √PFA with their own measured ENL, as the gamma detector of Færch et al. 2023 does (`detections.copol_test: and`; `db` restores the old check). The new default PFA of 10⁻¹¹ gives the same number of detections as the 6 dB check at its old 10⁻⁶ (chosen by count, no labels used).
+
+| Recall at matched detection counts | 6 dB check | HH AND HV |
+|---|---|---|
+| Færch 2023 EW scene, 40 m, best F (paper's gamma: 0.636) | 0.587 | **0.639** |
+| 4 IW passes at 40 m, pooled @ 1,024 (gamma: 0.83) | 0.82 | **0.83** |
+| 4 IW passes at 10 m, no ice-strip rule, pooled @ 1,000 | 0.82 | **0.83** |
+| 5d at the operating point (rule in icy passes), pooled | 0.80 (408 of 512, 961 det.) | **0.81** (414, 975 det.) |
+| — small / medium / large bergs | 52 / 346 / 10 | **55 / 349 / 10** |
+| THOR at the same count | 0.85 | 0.86 |
+
+The gain is small (about 1 point), but the baseline now behaves like a standard dual-pol gamma CA-CFAR. At loose settings the AND curve floods faster: past about 2 detections per label the 6 dB check was hiding HV speckle. Details: [docs/cacfar-validation.md](docs/cacfar-validation.md). The 6 dB run is kept in `data/outputs/thor/5d_6db_check/`.
 
 ## Quickstart
 
@@ -213,7 +227,7 @@ python -m iceberg_sar.cli validate-points data\raw\<product_dir> --truth s2
 - Point matching is one-to-one (Hungarian assignment) within 500 m. When the truth is not simultaneous with the radar pass, a common drift offset is estimated and checked against chance.
 - The scores use IIP sightings marked on the same Sentinel-1 pass. That has no drift, but it is not independent: the analysts looked at the same radar image. Aircraft sightings (5–7 h later) and Sentinel-2 (loose sea ice in April, bergs mostly inshore in June) were inconclusive.
 - The NAIS chart is published only as an image. The counts per 1° square are hand-transcribed in [validation/](validation/). For the three spring 2025 passes, open-water CFAR detections are within 2–4× of the chart estimate: a sanity check, not a measurement.
-- **About the earlier 78% and 74%.** Before THOR, the CFAR was validated on 2019-04-29 alone: it matched 207 of 267 labels (78%, median offset 67 m). That count includes detections near pack ice. The THOR comparison drops detections within 5 km of pack ice for both detectors, which gave the CFAR 0.74 on the same pass with the ice-strip rule on. With the rule now off in open-water scenes, it is 0.83 there (0.80 pooled). Use those when comparing with THOR.
+- **About the earlier 78% and 74%.** Before THOR, the CFAR was validated on 2019-04-29 alone: it matched 207 of 267 labels (78%, median offset 67 m). That count includes detections near pack ice. The THOR comparison drops detections within 5 km of pack ice for both detectors, which gave the CFAR 0.74 on the same pass with the ice-strip rule on. With the rule now off in open-water scenes, it is 0.83 there (0.80 pooled); with HH AND HV, 0.85 (0.81 pooled). Use those when comparing with THOR.
 
 ![CFAR detections vs. IIP labels, 2019-04-29](docs/img/validation_20190429.png)
 
@@ -221,14 +235,14 @@ The details are in [docs/validation-findings.md](docs/validation-findings.md).
 
 ## Limitations
 
-- **Precision is unknown for both detectors.** At the matched count, the CFAR has 553 and THOR 526 detections without an IIP label on the test passes. They are a mix of unrecorded bergs, fishing vessels and false alarms, in unknown proportions. Separating them needs AIS vessel positions.
+- **Precision is unknown for both detectors.** At the matched count, the CFAR has 561 and THOR 537 detections without an IIP label on the test passes. They are a mix of unrecorded bergs, fishing vessels and false alarms, in unknown proportions. Separating them needs AIS vessel positions.
 - **THOR depends on the classical pipeline.** On its own it fires on pack ice (34–82% of its peaks on icy passes fall in the pack-ice mask), so it needs the HV pack-ice mask. It also needs a GPU, and `run` doesn't include it yet.
 - **One month of one year.** The test passes are all April 2019, at incidence angles of 35–47°. Near range is untested.
-- **Small bergs** are a tie (0.71). THOR's 80 m patches are coarse for them, and the CFAR removes single-pixel targets with its 2 px minimum.
+- **Small bergs:** THOR 0.73, CFAR 0.75. THOR's 80 m patches are coarse for them, and the CFAR removes single-pixel targets with its 2 px minimum.
 - **In icy scenes the CFAR still drops large bergs** with its 300 m ice-strip rule. The rule now applies only where the pack-ice mask covers ≥ 500 km² (the four large bergs it still misses are on those passes). A shape-based strip test could fix that.
 - **Sea state matters.** On rougher days the HV background rises 3–4 dB and small bergs lose contrast.
 - **Near pack ice, many detections are ice floes.** They are flagged by distance to ice, not removed.
-- **CA-CFAR with gamma speckle** understates the heavy tails of real sea clutter, so its actual false-alarm rate is higher than 10⁻⁶. OS-CFAR or K-distribution CFAR would be a stronger baseline (`cfar.variant` has a slot for it).
+- **CA-CFAR with gamma speckle** understates the heavy tails of real sea clutter, so its actual false-alarm rate is higher than the nominal 10⁻¹¹. OS-CFAR or K-distribution CFAR would be a stronger baseline (`cfar.variant` has a slot for it).
 - **Static-target filter trade-off.** A berg grounded at the same spot for three or more passes is removed with the rocks. An unmapped rock seen on only two dates stays in. `static_targets.min_dates` and `min_span_days` set the balance.
 - **No ship/iceberg discrimination** you can rely on (see the experimental classifier below).
 

@@ -70,11 +70,20 @@ benchmark:
       - {length_rule: true, windows: paper}
       - {length_rule: false, windows: own}
       - {length_rule: true, windows: own}
+      # 2c: HH AND HV instead of the 6 dB co-pol check (tag suffix -and): a CA-CFAR on HH too,
+      # per pixel, both at sqrt(PFA) with their own measured ENL, like the paper's gamma detector.
+      - {length_rule: false, windows: paper, copol: and}
     cacfar_windows: {inner_m: 360, outer_m: 520}   # diameters -> odd px: 9 / 13 at 40 m
     # My CA-CFAR also at native 10 m without the length rule (tag cacfar-nolength-10m), own
     # windows, at 5d's PFAs (thor.compare.cfar_pfas): the same curve as current 5d on 04-29
     # (rule off there since 2026-10-26), and the pair of the old 5d with-rule curve. [] = skip.
     cacfar_10m_pfas: [1.0e-12, 1.0e-10, 1.0e-8, 1.0e-7, 1.0e-6, 1.0e-5, 1.0e-4, 1.0e-3]
+    # The same at 10 m with HH AND HV instead of the 6 dB check (tag cacfar-nolength-10m-and,
+    # 2026-11-02): is the 2c result true at Stage 1's resolution? Total PFAs (sqrt per band).
+    # Starts stricter than above (the AND test is stricter at a given total PFA: 77 objects on
+    # 04-24 at 1e-6); stops at 1e-3, since all PFAs run in one pass and a flooded one costs RAM.
+    cacfar_10m_and_pfas: [1.0e-16, 1.0e-14, 1.0e-12, 1.0e-10, 1.0e-8, 1.0e-6, 1.0e-5, 1.0e-4,
+                          1.0e-3]
     # Rows per block at 10 m (detections.block_rows is 1024). A 10 m row is 28,591 px, so 1024-row
     # blocks need a few GB; smaller blocks give the same detections (halo) with less peak RAM.
     cacfar_10m_block_rows: 256
@@ -150,6 +159,9 @@ benchmark:
       # in one pass; the cap counts final objects. Windows: the paper's (diameters, 9 / 13 px at
       # 40 m), not `cfar.guard_m` / `background_m`, so window size isn't a variable.
       cacfar_length_rules: [true, false]
+      # Co-pol test x length rules: db = Stage 1's 6 dB HH check (tags cacfar / cacfar-nolength),
+      # and = HH AND HV CA-CFAR per pixel at sqrt(PFA), own ENL per band (2c; tags *-and).
+      cacfar_copol: [db, and]
       cacfar_windows: {inner_m: 360, outer_m: 520}
     score:                  # 1f: match detections to labels, recall / precision / F per (detector, PFA)
       # Scoring area: S1 valid (swath, no land buffer) x the S2 and ALOS-2 outlines of Fig. 1

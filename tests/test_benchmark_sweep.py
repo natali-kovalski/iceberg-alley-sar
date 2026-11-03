@@ -23,9 +23,19 @@ def test_params_from_config_sorted_and_tagged() -> None:
     V = sweep.CacfarVariant
     assert p.cacfar_tags == {"cacfar-nolength": V(False, "paper"), "cacfar": V(True, "paper"),
                              "cacfar-nolength-ownwin": V(False, "own"),
-                             "cacfar-ownwin": V(True, "own")}
+                             "cacfar-ownwin": V(True, "own"),
+                             "cacfar-nolength-and": V(False, "paper", "and")}
     assert p.cacfar_windows == {"inner_m": 360, "outer_m": 520}
     assert list(replace(p, cacfar_variants=[V(False)]).cacfar_tags) == ["cacfar-nolength"]
+
+
+def test_10m_tags_only_for_configured_pfas() -> None:
+    p = sweep.SweepParams.from_config(CFG)
+    tags = p.cacfar_10m_tags
+    assert list(tags) == [sweep.CACFAR_10M, sweep.CACFAR_10M_AND]
+    assert tags[sweep.CACFAR_10M_AND] == sorted(tags[sweep.CACFAR_10M_AND])
+    assert list(replace(p, cacfar_10m_and_pfas=[]).cacfar_10m_tags) == [sweep.CACFAR_10M]
+    assert replace(p, cacfar_10m_pfas=[], cacfar_10m_and_pfas=[]).cacfar_10m_tags == {}
 
 
 def test_split_bands_masks_both(tmp_path: Path) -> None:
@@ -128,7 +138,10 @@ def test_faerch_cacfar_settings_paper_windows_and_length_rule(tmp_path: Path) ->
     assert 7 < cfar.enl < 13                                                 # gamma(L=10) speckle
     _, _, off = sweep.faerch_cacfar_settings(CFG, hv, length_rule=False)
     assert off.max_structure_px == NO_STRUCTURE_LIMIT
-    assert sweep.faerch_cacfar_tags(CFG) == {"cacfar": True, "cacfar-nolength": False}
+    V = sweep.CacfarVariant
+    assert sweep.faerch_cacfar_tags(CFG) == {
+        "cacfar": V(True), "cacfar-nolength": V(False),
+        "cacfar-and": V(True, copol="and"), "cacfar-nolength-and": V(False, copol="and")}
 
 
 def _hv_raster(path: Path) -> Path:
@@ -210,3 +223,43 @@ def test_summary_table_reads_each_frame_at_its_own_label_multiple() -> None:
     assert r["a"] == pytest.approx(0.6, abs=1e-3)   # 200 detections: half way 100..400 in log
     assert r["b"] == pytest.approx(0.75, abs=1e-3)  # 20 detections: half way 10..40
     assert r[POOLED] == pytest.approx((45 / 110 + 90 / 110) / 2, abs=1e-3)   # 220 of 110..440
+
+
+def test_and_cfars_per_channel_pfa_and_own_enl(tmp_path: Path) -> None:
+    hv = _hv_raster(tmp_path / "hv.tif")
+    hh = tmp_path / "hh.tif"
+    rng = np.random.default_rng(2)
+    with rasterio.open(hv) as src:
+        profile = src.profile
+    with rasterio.open(hh, "w", **profile) as dst:
+        dst.write(rng.gamma(8.0, 0.01, (120, 120)).astype(np.float32), 1)
+    _, base, _ = sweep.cacfar_settings(CFG, hv, length_rule=False)
+    hv_c, hh_c, enl_hh = sweep.and_cfars(CFG, hh, base, [1e-10, 1e-4])
+    assert [c.pfa for c in hv_c] == pytest.approx([1e-5, 1e-2])   # sqrt: AND merge
+    assert [c.pfa for c in hh_c] == pytest.approx([1e-5, 1e-2])
+    assert all(c.enl == base.enl for c in hv_c) and all(c.enl == enl_hh for c in hh_c)
+    assert 5 < enl_hh < 11 and enl_hh > 2 * base.enl              # gamma(8) vs gamma(2)
+
+
+def test_old_run_json_without_copol_stays_cached(tmp_path: Path, monkeypatch) -> None:
+    """run.json files from before 2c have no `copol` key; they ran the 6 dB check (db)."""
+    import geopandas as gpd
+
+    hv = _hv_raster(tmp_path / "hv.tif")
+    calls = []
+    monkeypatch.setattr(sweep, "band_paths", lambda prep: {"HH": hv, "HV": hv})
+    monkeypatch.setattr(sweep, "detect_raster",
+                        lambda paths, band, cfar, params: calls.append(1) or (None, None, None))
+    monkeypatch.setattr(sweep, "to_geodataframe",
+                        lambda *a: gpd.GeoDataFrame({"x": [1]}, crs="EPSG:32622",
+                                                    geometry=gpd.points_from_xy([0], [0])))
+    p = replace(sweep.SweepParams.from_config(CFG), pfas=[1e-9])
+    prep = {"work": tmp_path, "scene": "S", "inc": None}
+    v = sweep.CacfarVariant(False, "paper")
+    sweep.run_cacfar(CFG, prep, p, v, None, False, lambda m: None)
+    meta_f = tmp_path / v.tag / f"{v.tag}_run.json"
+    meta = json.loads(meta_f.read_text(encoding="utf-8"))
+    del meta["copol"], meta["enl_copol"]
+    meta_f.write_text(json.dumps(meta), encoding="utf-8")
+    sweep.run_cacfar(CFG, prep, p, v, None, False, lambda m: None)
+    assert len(calls) == 1

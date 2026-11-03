@@ -7,7 +7,7 @@ Same scoring as 5d (`thor-compare`), so the 40 m curves sit next to 5d's 10 m on
 
 - HyP3 RTC frame (gamma0, HH/HV) multilooked 4x4 to **40 m** (mean of linear intensity), so the paper's windows fit the library (9 / 13 px). Masks: land + 500 m, pack ice, nodata, as in 5d.
 - Reference detectors: the library through `external/cfar_runner`, paper windows (360 / 520 m), HH AND HV merge, per-band ENL for gamma / K, objects of 2-500 px.
-- My CA-CFAR: HV, co-pol check, ENL estimated on the 40 m HV. Variants: **without the length rule, paper windows**, **with the length rule, paper windows**, **without the length rule, own windows**, **with the length rule, own windows**. Paper windows = the reference detectors' (360 / 520 m), so paper windows without the length rule is the like-for-like run (the reference detectors have no such rule). Own windows = `cfar.guard_m` / `background_m`, as at 10 m. Unlabelled CA-CFAR rows below use the paper windows.
+- My CA-CFAR: HV, co-pol check, ENL estimated on the 40 m HV. Variants: **without the length rule, paper windows**, **with the length rule, paper windows**, **without the length rule, own windows**, **with the length rule, own windows**, **without the length rule, paper windows**. Paper windows = the reference detectors' (360 / 520 m), so paper windows without the length rule is the like-for-like run (the reference detectors have no such rule). Own windows = `cfar.guard_m` / `background_m`, as at 10 m. Unlabelled CA-CFAR rows below use the paper windows.
 - Total PFA: 1e-21, 1e-19, 1e-17, 1e-15, 1e-13, 1e-11, 1e-09, 1e-07, 1e-05, 1e-03, 1e-01; a detector stops after the first PFA with more than 5000 objects.
 - Truth: same-pass IIP labels where the SAR is valid. Detections within 5 km of pack ice dropped. One-to-one matching at 500 m.
 - Precision isn't measurable without AIS: compare **recall at matched detection counts**, interpolated in log(detections) between PFA points.
@@ -29,7 +29,9 @@ Same scoring as 5d (`thor-compare`), so the 40 m curves sit next to 5d's 10 m on
 | my CA-CFAR, HV, with length rule | 0.64 | 0.83 | 0.87 | 51-1705 | 11 |
 | my CA-CFAR, HV, no length rule, own windows | 0.64 | 0.86 | 0.92 | 69-1757 | 11 |
 | my CA-CFAR, HV, with length rule, own windows | 0.63 | 0.84 | 0.84 | 65-1631 | 11 |
+| my CA-CFAR, HH AND HV, no length rule | 0.66 | 0.86 | 0.92 | 190-398332 | 11 |
 | my CA-CFAR 10 m, no length rule | 0.58 | 0.83 | 0.92 | 173-1568 | 5d |
+| my CA-CFAR 10 m, HH AND HV, no length rule |  | 0.84 | 0.92 | 294-53670 | 9 |
 | my CA-CFAR 10 m, with length rule (old 5d) | 0.53 | 0.75 | 0.82 | 151-1513 | 5d |
 | THOR linear 10 m (5d) | 0.66 | 0.90 | 0.95 | 0-3561 | 5d |
 
@@ -49,7 +51,9 @@ Blank: the curve doesn't reach that count. 10 m rows (own windows): the CA-CFAR 
 | my CA-CFAR, HV, with length rule | 1e-05 | 462 | 17/31 | 200/232 | 3/4 |
 | my CA-CFAR, HV, no length rule, own windows | 1e-05 | 502 | 18/31 | 208/232 | 4/4 |
 | my CA-CFAR, HV, with length rule, own windows | 1e-05 | 476 | 18/31 | 204/232 | 1/4 |
+| my CA-CFAR, HH AND HV, no length rule | 1e-09 | 508 | 19/31 | 207/232 | 4/4 |
 | my CA-CFAR 10 m, no length rule | 1e-06 | 508 | 20/31 | 198/232 | 4/4 |
+| my CA-CFAR 10 m, HH AND HV, no length rule | 1e-12 | 465 | 20/31 | 195/232 | 4/4 |
 | my CA-CFAR 10 m, with length rule (old 5d) |  |  | 20/31 | 177/232 | 0/4 |
 | THOR linear 10 m (5d) |  |  | 22/31 | 211/232 | 4/4 |
 
@@ -75,7 +79,9 @@ Figure (local, gitignored): `data/benchmark/iw40/S1A_IW_20190429T094108_DHP_RTC1
 | my CA-CFAR, HV, with length rule |  |  |  | 11-80 | 11 |
 | my CA-CFAR, HV, no length rule, own windows |  |  |  | 12-90 | 11 |
 | my CA-CFAR, HV, with length rule, own windows |  |  |  | 11-78 | 11 |
+| my CA-CFAR, HH AND HV, no length rule | 0.98 | 0.98 | 0.99 | 29-117691 | 11 |
 | my CA-CFAR 10 m, no length rule |  |  |  | 21-103 | 5d |
+| my CA-CFAR 10 m, HH AND HV, no length rule | 0.99 | 0.99 | 1.00 | 30-15860 | 9 |
 | my CA-CFAR 10 m, with length rule (old 5d) |  |  |  | 18-100 | 5d |
 | THOR linear 10 m (5d) | 0.98 | 1.00 |  | 0-594 | 5d |
 
@@ -95,7 +101,9 @@ Blank: the curve doesn't reach that count. 10 m rows (own windows): the CA-CFAR 
 | my CA-CFAR, HV, with length rule | 1e-01 | 80 | 14/15 | 26/31 | 2/3 |
 | my CA-CFAR, HV, no length rule, own windows | 1e-01 | 90 | 15/15 | 31/31 | 3/3 |
 | my CA-CFAR, HV, with length rule, own windows | 1e-01 | 78 | 15/15 | 23/31 | 1/3 |
+| my CA-CFAR, HH AND HV, no length rule | 1e-03 | 192 | 15/15 | 30/31 | 3/3 |
 | my CA-CFAR 10 m, no length rule | 1e-03 | 103 | 14/15 | 30/31 | 3/3 |
+| my CA-CFAR 10 m, HH AND HV, no length rule | 1e-04 | 923 | 15/15 | 31/31 | 3/3 |
 | my CA-CFAR 10 m, with length rule (old 5d) |  |  | 10/15 | 26/31 | 1/3 |
 | THOR linear 10 m (5d) |  |  | 11/15 | 28/31 | 1/3 |
 
@@ -121,7 +129,9 @@ Figure (local, gitignored): `data/benchmark/iw40/S1A_IW_20190424T093305_DHP_RTC1
 | my CA-CFAR, HV, with length rule | 0.77 | 0.83 | 0.83 | 35-1027 | 11 |
 | my CA-CFAR, HV, no length rule, own windows | 0.78 | 0.84 | 0.86 | 47-1018 | 11 |
 | my CA-CFAR, HV, with length rule, own windows | 0.77 | 0.82 |  | 47-997 | 11 |
+| my CA-CFAR, HH AND HV, no length rule | 0.80 | 0.85 | 0.86 | 124-336510 | 11 |
 | my CA-CFAR 10 m, no length rule | 0.78 | 0.85 | 0.85 | 87-1160 | 5d |
+| my CA-CFAR 10 m, HH AND HV, no length rule | 0.79 | 0.85 | 0.86 | 182-53830 | 9 |
 | my CA-CFAR 10 m, with length rule (old 5d) | 0.77 | 0.82 | 0.83 | 87-1150 | 5d |
 | THOR linear 10 m (5d) | 0.80 | 0.86 | 0.86 | 0-1827 | 5d |
 
@@ -141,7 +151,9 @@ Blank: the curve doesn't reach that count. 10 m rows (own windows): the CA-CFAR 
 | my CA-CFAR, HV, with length rule | 1e-03 | 383 | 22/24 | 98/119 | 4/7 |
 | my CA-CFAR, HV, no length rule, own windows | 1e-03 | 378 | 20/24 | 99/119 | 6/7 |
 | my CA-CFAR, HV, with length rule, own windows | 1e-03 | 370 | 20/24 | 98/119 | 4/7 |
+| my CA-CFAR, HH AND HV, no length rule | 1e-05 | 419 | 22/24 | 100/119 | 6/7 |
 | my CA-CFAR 10 m, no length rule | 1e-04 | 473 | 22/24 | 99/119 | 6/7 |
+| my CA-CFAR 10 m, HH AND HV, no length rule | 1e-06 | 564 | 22/24 | 100/119 | 6/7 |
 | my CA-CFAR 10 m, with length rule (old 5d) |  |  | 21/24 | 94/119 | 3/7 |
 | THOR linear 10 m (5d) |  |  | 18/24 | 99/119 | 6/7 |
 
@@ -167,7 +179,9 @@ Figure (local, gitignored): `data/benchmark/iw40/S1B_IW_20190423T094026_DHP_RTC1
 | my CA-CFAR, HV, with length rule | 0.77 |  |  | 7-376 | 11 |
 | my CA-CFAR, HV, no length rule, own windows | 0.78 | 0.84 |  | 13-528 | 11 |
 | my CA-CFAR, HV, with length rule, own windows | 0.76 |  |  | 12-355 | 11 |
+| my CA-CFAR, HH AND HV, no length rule | 0.80 | 0.85 | 0.85 | 41-284366 | 11 |
 | my CA-CFAR 10 m, no length rule | 0.81 | 0.83 | 0.84 | 38-2092 | 5d |
+| my CA-CFAR 10 m, HH AND HV, no length rule | 0.82 | 0.84 | 0.85 | 67-70161 | 9 |
 | my CA-CFAR 10 m, with length rule (old 5d) | 0.67 | 0.67 | 0.68 | 30-2035 | 5d |
 | THOR linear 10 m (5d) | 0.80 | 0.85 | 0.85 | 0-4162 | 5d |
 
@@ -187,7 +201,9 @@ Blank: the curve doesn't reach that count. 10 m rows (own windows): the CA-CFAR 
 | my CA-CFAR, HV, with length rule | 1e-01 | 376 | 2/3 | 22/43 |
 | my CA-CFAR, HV, no length rule, own windows | 1e-01 | 528 | 3/3 | 36/43 |
 | my CA-CFAR, HV, with length rule, own windows | 1e-01 | 355 | 2/3 | 14/43 |
+| my CA-CFAR, HH AND HV, no length rule | 1e-05 | 417 | 3/3 | 36/43 |
 | my CA-CFAR 10 m, no length rule | 1e-04 | 591 | 2/3 | 36/43 |
+| my CA-CFAR 10 m, HH AND HV, no length rule | 1e-08 | 306 | 2/3 | 36/43 |
 | my CA-CFAR 10 m, with length rule (old 5d) |  |  | 1/3 | 27/43 |
 | THOR linear 10 m (5d) |  |  | 1/3 | 30/43 |
 
@@ -215,7 +231,9 @@ Each curve read at 2 detections per label of that frame (pooled: 1024), since th
 | my CA-CFAR, HV, with length rule | 0.63 | 0.80 |  | 0.84 | 0.81 |
 | my CA-CFAR, HV, no length rule, own windows | 0.58 | 0.81 |  | 0.87 | 0.83 |
 | my CA-CFAR, HV, with length rule, own windows | 0.63 | 0.79 |  | 0.84 | 0.81 |
+| my CA-CFAR, HH AND HV, no length rule | 0.52 | 0.82 | 0.97 | 0.87 | 0.83 |
 | my CA-CFAR 10 m, no length rule | 0.64 | 0.82 | 0.95 | 0.84 | 0.82 |
+| my CA-CFAR 10 m, HH AND HV, no length rule | 0.63 | 0.82 | 0.97 | 0.86 | 0.83 |
 | my CA-CFAR 10 m, with length rule (old 5d) | 0.53 | 0.79 | 0.90 | 0.77 | 0.76 |
 | THOR linear 10 m (5d) | 0.61 | 0.85 | 0.98 | 0.91 | 0.86 |
 | my CA-CFAR 10 m, current 5d (length rule in icy frames) | 0.53 | 0.79 | 0.95 | 0.84 | 0.81 |
@@ -236,7 +254,9 @@ Blank: the curve doesn't reach that count in that frame (pooled: in every frame 
 | my CA-CFAR, HV, with length rule | 0.63 | 0.81 | 0.84 | 104-3188 |
 | my CA-CFAR, HV, no length rule, own windows | 0.63 | 0.83 | 0.89 | 141-3393 |
 | my CA-CFAR, HV, with length rule, own windows | 0.63 | 0.81 | 0.81 | 135-3061 |
+| my CA-CFAR, HH AND HV, no length rule | 0.64 | 0.83 | 0.90 | 384-1136899 |
 | my CA-CFAR 10 m, no length rule | 0.58 | 0.82 | 0.88 | 319-4923 |
+| my CA-CFAR 10 m, HH AND HV, no length rule |  | 0.83 | 0.89 | 573-193521 |
 | my CA-CFAR 10 m, with length rule (old 5d) | 0.55 | 0.75 | 0.81 | 286-4798 |
 | THOR linear 10 m (5d) | 0.62 | 0.86 | 0.91 | 0-10144 |
 | my CA-CFAR 10 m, current 5d (length rule in icy frames) | 0.58 | 0.80 | 0.86 | 311-4856 |
@@ -255,7 +275,9 @@ Blank: the curve doesn't reach that count in that frame (pooled: in every frame 
 | my CA-CFAR, HV, with length rule | 1e-05 | 914 | 45/73 | 354/425 | 10/14 |
 | my CA-CFAR, HV, no length rule, own windows | 1e-05 | 999 | 46/73 | 364/425 | 13/14 |
 | my CA-CFAR, HV, with length rule, own windows | 1e-05 | 935 | 46/73 | 358/425 | 7/14 |
+| my CA-CFAR, HH AND HV, no length rule | 1e-09 | 1020 | 47/73 | 367/425 | 13/14 |
 | my CA-CFAR 10 m, no length rule | 1e-06 | 1008 | 53/73 | 353/425 | 13/14 |
+| my CA-CFAR 10 m, HH AND HV, no length rule | 1e-10 | 1152 | 57/73 | 370/425 | 13/14 |
 | my CA-CFAR 10 m, with length rule (old 5d) |  |  | 52/73 | 324/425 | 4/14 |
 | my CA-CFAR 10 m, current 5d (length rule in icy frames) |  |  | 52/73 | 346/425 | 10/14 |
 | THOR linear 10 m (5d) |  |  | 52/73 | 372/425 | 11/14 |
@@ -265,6 +287,10 @@ Blank: the curve doesn't reach that count in that frame (pooled: in every frame 
 ![Pooled recall vs detections](../docs/img/m2b_recall_pooled.png)
 
 Figure: `docs/img/m2b_recall_pooled.png`. Tables: `pooled_sweep.csv`, `summary_recall.csv`, `pooled_size_breakdown.csv` in `data/benchmark/iw40`.
+
+### 10 m: HH AND HV vs the 6 dB check, with THOR
+
+![10 m recall vs detections](../docs/img/m2b_recall_10m_and.png)
 
 <!-- hand-written notes below; kept when bench-iw-compare re-runs -->
 ## Observations: all four frames (2026-10-29)
@@ -316,6 +342,12 @@ Four held-out April 2019 frames, 512 same-pass IIP labels (04-17: 46, 04-23: 150
   04-29 with other apps open), NIS 4-5, gamma 3-4, Wishart 2-4, my CA-CFAR 1.5-5 per variant;
   10 m CA-CFAR (8 PFAs, one pass) 7-24 min. NIS on 04-17 logged 22.8 h, a stall (the machine
   slept or was busy), not its normal speed.
+
+- **HH AND HV instead of the 6 dB check (2c, 2026-10-30;** `cacfar-nolength-and`, paper
+  windows, both bands at sqrt(PFA), own ENL per band). Pooled at 1,024 detections: 0.83, gamma
+  0.83, the HV-only version 0.82; 500 / 1,000 / 2,000 detections: 0.64 / 0.83 / 0.90. Large
+  bergs: 13 of 14. Unlike the HV-only curve it reaches 2 per label on 04-24 (0.97). On 04-17 it
+  is lower (0.52 vs 0.61, ~4 of 46 labels). Summary: `docs/cacfar-validation.md`.
 
 ### 04-29 in detail (2026-10-23, updated 2026-10-28)
 

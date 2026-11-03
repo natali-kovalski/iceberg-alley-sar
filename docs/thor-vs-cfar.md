@@ -3,6 +3,12 @@
 Frozen THOR encoder (FM4CS, Apache 2.0) + a small trained head, compared with the CA-CFAR
 on the same HH/HV scenes and IIP labels. Reference: Forgaard et al., IGARSS 2026.
 
+> **Update 2026-11-02:** the CFAR now uses HH AND HV per pixel instead of the 6 dB HH check
+> (`detections.copol_test: and`, `cfar.pfa` 1e-11, set by detection count). 5d re-run: pooled
+> THOR 0.86 (438) vs CFAR 0.81 (414) at 975 detections (was 0.85 vs 0.80 at 961); medium 0.88
+> vs 0.82, small 0.73 vs 0.75, large 11 vs 10. The 5d numbers below are the 6 dB run (tables in
+> `data/outputs/thor/5d_6db_check/`). Comparison: [cacfar-validation.md](cacfar-validation.md).
+
 ## 5a: Smoke test (frozen encoder, no training)
 
 `python -m iceberg_sar.cli thor-smoke [PRODUCT_DIR] [--row R --col C]` embeds one 512×512

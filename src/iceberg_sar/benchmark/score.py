@@ -42,7 +42,10 @@ from iceberg_sar.config import Config
 PAPER_NAMES = {"Gamma": "gamma", "iDPolRAD": "idpolrad", "K": "k", "Log-normal": "lognorm",
                "NIS": "nis", "Wishart": "wishart"}
 # 2a: my CA-CFAR (`sweep.cacfar_tag`), scored with the rest; no paper value to compare with
-MINE = {"cacfar": "My CA-CFAR", "cacfar-nolength": "My CA-CFAR, no length rule"}
+MINE = {"cacfar": "My CA-CFAR", "cacfar-nolength": "My CA-CFAR, no length rule",
+        # 2c: HH AND HV CA-CFAR instead of the 6 dB co-pol check
+        "cacfar-and": "My CA-CFAR, HH AND HV",
+        "cacfar-nolength-and": "My CA-CFAR, HH AND HV, no length rule"}
 DISPLAY = {v: k for k, v in PAPER_NAMES.items()} | MINE
 _PFA = re.compile(r"1\s*×\s*10\s*[-−–]\s*(\d+)")
 
@@ -340,7 +343,8 @@ def f_figure(scores: pd.DataFrame, ref: dict[str, Any], fig6: pd.DataFrame | Non
 FIG6_STYLE = {"lognorm": ("#3e6fa8", "1"), "gamma": ("#5ec8ec", "2"), "k": ("#2e9a3c", "3"),
               "idpolrad": ("#dcc23a", "4"), "nis": ("#ec6470", "+"), "wishart": ("#a3336f", "x"),
               # 2a, not in the paper: black, so they read as the extra series
-              "cacfar": ("#1f1f1e", "o"), "cacfar-nolength": ("#1f1f1e", "s")}
+              "cacfar": ("#1f1f1e", "o"), "cacfar-nolength": ("#1f1f1e", "s"),
+              "cacfar-and": ("#eb6834", "o"), "cacfar-nolength-and": ("#eb6834", "s")}
 
 
 def fig6_style_figure(scores: pd.DataFrame, detectors: list[str], out: Path, subtitle: str,
@@ -359,7 +363,8 @@ def fig6_style_figure(scores: pd.DataFrame, detectors: list[str], out: Path, sub
         color, marker = FIG6_STYLE[det]
         mine = det in MINE
         ax.plot(d.pfa, d.f, color=color, marker=marker, ms=6 if mine else 9, mew=1.5, lw=2,
-                ls="--" if det == "cacfar-nolength" else "-", mfc="none" if mine else color,
+                ls="--" if det.startswith("cacfar-nolength") else "-",
+                mfc="none" if mine else color,
                 label=DISPLAY[det].replace("iDPolRAD", "iDPolRad"))
     ax.set_xscale("log")
     ax.set_xlim(10 ** -22.5, 10 ** -0.4)

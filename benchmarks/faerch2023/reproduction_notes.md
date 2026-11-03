@@ -147,3 +147,12 @@ to the inputs it learned on, so the medium-berg gap is not a normalisation offse
 
 **Calibration.** Scores are compressed: the best threshold is 0.12 (no TNR) or 0.25 (TNR),
 against 0.35 in the viewer, so a THOR operating point does not transfer between products.
+
+**HH AND HV instead of the 6 dB check (2c, 2026-10-30).** Tags `cacfar-and` / `cacfar-nolength-and`:
+a CA-CFAR on HH as well, per pixel, both bands at sqrt(PFA) (the AND merge of sec. 2.1.1), each with
+its own measured ENL (HV 13.4, HH 12.7). Best F without TNR: 0.639 at 1e-7 without the length rule
+(TP / FP 251 / 42, precision 0.86; small / medium / large 9.4 / 63.4 / 90.4 %), 0.627 with it.
+That equals gamma (0.636) and is within 0.015 of Wishart and NIS. With TNR: 0.495 / 0.466, the
+same as the HV-only runs, so it keeps the robustness of the measured ENL. The curve now
+follows gamma's shape, about a decade further left (higher ENL). Summary:
+`docs/cacfar-validation.md`.
