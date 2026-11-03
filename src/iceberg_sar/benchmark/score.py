@@ -547,6 +547,8 @@ def compare_table(scores: pd.DataFrame, ref: dict[str, Any], tol: float,
             a = optimum(alt)
             row["f_alt"] = a.loc[det].f if det in a.index else np.nan
             row["pfa_alt"] = a.loc[det].pfa if det in a.index else np.nan
+            for k in ("TP", "FP", "FN"):
+                row[f"{k}_alt"] = int(a.loc[det][k]) if det in a.index else None
         rows.append(row)
     for det in [d for d in MINE if d in best.index]:
         b = best.loc[det]
@@ -561,6 +563,8 @@ def compare_table(scores: pd.DataFrame, ref: dict[str, Any], tol: float,
             a = optimum(alt)
             row["f_alt"] = a.loc[det].f if det in a.index else np.nan
             row["pfa_alt"] = a.loc[det].pfa if det in a.index else np.nan
+            for k in ("TP", "FP", "FN"):
+                row[f"{k}_alt"] = int(a.loc[det][k]) if det in a.index else None
         rows.append(row)
     return pd.DataFrame(rows)
 
@@ -629,9 +633,10 @@ def report(cfg: Config, source: str, ref: dict[str, Any], cmp: pd.DataFrame, siz
         "(9 / 13 px), iDPolRAD 3 / 57 px cropped to the library's 41 px, objects 2-500 px.",
         *_mine_setup(sp.out_dir, cfg),
         "- Thermal noise removal: " + ("on, as the paper describes." if tnr else
-            "**off** (decided 2026-10-26). SNAP 14's noise removal clips negatives to -115 dB "
-            "and gives HV an ENL of ~1, which breaks the paper's ENL; the run with it is the "
-            "grey curve and the last table column."),
+            "**off** (decided 2026-10-26). After SNAP 14's noise subtraction, negatives are "
+            "clipped to -115 dB and HV's ENL drops to ~1; every detector degrades. Floored at "
+            "the noise level instead, gamma keeps its F (`docs/revision-tnr-ablation.md`). "
+            "The run with SNAP's removal is the grey curve and the last table column."),
         f"- ENL {sp.enl:g} for both bands (Table 1). Measured on this stack (median 2 km "
         f"open-water box): HH {enl.get('HH', float('nan')):g}, HV {enl.get('HV', float('nan')):g}.",
         f"- PFA: {len(sp.pfas)} levels, {_e(sp.pfas[0])} .. {_e(sp.pfas[-1])} total; a detector "
@@ -648,10 +653,12 @@ def report(cfg: Config, source: str, ref: dict[str, Any], cmp: pd.DataFrame, siz
         "- Numerically unreliable runs (iDPolRAD below ~1e-16, where `1 - pfa` rounds to 1.0) "
         "are flagged and left out of every optimum.",
         "",
-        f"## F at the optimum PFA (tolerance {tol})",
+        f"## Partial agreement: F at the optimum PFA (tolerance {tol})",
         "",
         "Paper F is derived from Table 3 (TP, FP, FN). My optimum is the PFA with the highest",
-        "all-labels F.",
+        "all-labels F. Preprocessing differs from the paper's description: the main rows are "
+        f"{'with' if tnr else 'without'} thermal noise removal; the table after this one has "
+        f"the {'without' if tnr else 'with'}-removal rows next to the paper.",
         "",
         "| Detector | Paper PFA | My PFA | Paper TP / FP / FN | Mine TP / FP / FN | Paper F |"
         " My F |"
@@ -678,6 +685,27 @@ def report(cfg: Config, source: str, ref: dict[str, Any], cmp: pd.DataFrame, siz
             + (f" {r.f_sens:.3f} |" if "f_sens" in cmp else "")
             + ((f" {r.f_alt:.3f} ({_e(r.pfa_alt)}) |" if np.isfinite(r.f_alt) else " none |")
                if "f_alt" in cmp else ""))
+    if "f_alt" in cmp:   # revision T1: the other preprocessing, next to the paper
+        other = "with thermal noise removal (as described)" if not tnr else \
+            "without thermal noise removal"
+        lines += ["", f"Same detectors, {other}:", "",
+                  "| Detector | Preprocessing | Paper PFA | My PFA | Paper TP / FP / FN | "
+                  "Mine TP / FP / FN | Paper F | My F | Diff |",
+                  "|---|---|---|---|---|---|---|---|---|"]
+        for r in cmp.itertuples():
+            ours = r.detector in MINE
+            ran = np.isfinite(r.f_alt)
+            cells = [
+                DISPLAY[r.detector], "TNR" if not tnr else "no TNR",
+                "–" if ours else _e(r.paper_pfa),
+                _e(r.pfa_alt) if ran else "–",
+                "–" if ours else f"{r.paper_TP:.0f} / {r.paper_FP:.0f} / {r.paper_FN:.0f}",
+                f"{int(r.TP_alt)} / {int(r.FP_alt)} / {int(r.FN_alt)}" if ran
+                else "over the object cap",
+                "–" if ours else f"{r.paper_f:.3f}",
+                f"{r.f_alt:.3f}" if ran else "–",
+                f"{r.f_alt - r.paper_f:+.3f}" if ran and not ours else "–"]
+            lines.append("| " + " | ".join(cells) + " |")
     fig_rel = Path(os.path.relpath(fig, (cfg.root / sc["report"]).parent)).as_posix()
     lines += ["", f"![F vs PFA]({fig_rel})", ""]
     if not fig6:

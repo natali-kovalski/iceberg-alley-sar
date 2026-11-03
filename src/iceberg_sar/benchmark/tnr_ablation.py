@@ -172,4 +172,21 @@ def report(t: pd.DataFrame, info: dict[str, Any]) -> str:
                  f"{100 * s['filled_share']:.1f} %; below the noise level after subtraction "
                  f"{100 * s['below_noise_share']:.1f} %.")
     L += ["", "The library's detectors take dB input, so they can't run on `negatives kept`.", ""]
+    f = t.set_index(["variant", "detector"]).f
+    if {("none", "gamma"), ("clip", "gamma"), ("floor", "gamma")} <= set(f.index):
+        L += ["## Reading", "",
+              f"Gamma with Table 1's ENL: F {f['none', 'gamma']:.3f} without subtraction, "
+              f"{f['clip', 'gamma']:.3f} with SNAP's clipped subtraction, "
+              f"{f['floor', 'gamma']:.3f} with the same subtraction floored at the noise "
+              "level. On this scene the drop after SNAP 14 thermal noise removal comes from "
+              "how the pixels below the noise floor are handled (set to ~3.7e-12, i.e. "
+              "-115 dB), not from subtracting the noise. Kept negative, they break the "
+              "speckle statistics outright. This is a finding about one scene and one SNAP "
+              "version, not a claim of a software defect; which handling the paper's SNAP "
+              "used is open (question to the authors).", "",
+              "Caveats: where SNAP clipped (23.6 % of HV pixels), the floor value is the "
+              "smoothed noise field, not SNAP's own. On the floored stack, HV open water sits "
+              "mostly at the floor, so its measured ENL is meaningless (very high); that "
+              "lowers my CA-CFAR's HV threshold, which measures its ENL on the scene, and is "
+              "why it does worse there than gamma with a fixed ENL.", ""]
     return "\n".join(L)

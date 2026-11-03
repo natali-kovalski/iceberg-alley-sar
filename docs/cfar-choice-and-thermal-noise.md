@@ -6,7 +6,20 @@ paper's code) and my CA-CFAR, each swept over 21 PFAs (1e-21 to 1e-1), scored wi
 matching radii and scoring area. Full setup and tables: [faerch2023-reproduction.md](faerch2023-reproduction.md).
 
 The same scene was processed twice in SNAP 14, once with thermal noise removal (TNR, as the
-paper describes) and once without (the stack that reproduces the paper's F).
+paper describes) and once without (the stack whose F agrees with the paper's, partially: under
+modified preprocessing, with optimum PFAs up to 15 decades away for gamma and Wishart).
+
+> **Revision 2026-11-02 (after external review).** Scores below are from 2026-10-27 (492
+> labels). With the shared evaluation mask (487 labels) every best F rises by about 0.004; the
+> ranking is unchanged. "Tied" means not distinguishable with this sample: the 95% bootstrap
+> interval of F is about ±0.04, of paired differences about ±0.02
+> ([revision-robustness.md](revision-robustness.md)). **Thermal noise:** a new ablation
+> ([revision-tnr-ablation.md](revision-tnr-ablation.md)) subtracts the same noise field three
+> ways. Gamma with Table 1's ENL: F 0.640 without subtraction, 0.430 with SNAP 14's clipped
+> subtraction, **0.640 with the subtraction floored at the noise level**. On this scene the
+> damage comes from how pixels below the noise floor are handled (clipped to ~-115 dB), not
+> from the subtraction. That is a finding about one scene and one SNAP version, not a claim of
+> a software defect.
 
 ## Short answer
 
@@ -17,14 +30,16 @@ paper describes) and once without (the stack that reproduces the paper's F).
   K and my CA-CFAR, which adapt to the scene's clutter statistics, keep most of their F.
 - **The lesson is about where the speckle statistics come from**, not which detector family is
   best: trusting a nominal ENL gives the best F on clean data and fragility on anything else.
+  Flooring the below-noise pixels at the noise level instead of clipping them restores gamma's
+  F (revision C12).
 
 ## Background in two lines
 
 - **ENL** (equivalent number of looks) measures how smooth the speckle is: high ENL, little
   fluctuation. A CFAR sets its threshold from the ENL, so a wrong ENL means a wrong false-alarm rate.
-- **Thermal noise removal** subtracts the sensor's noise floor. SNAP 14 clips the negative results
-  to -115 dB instead of 0: 23.7 % of open-water HV pixels end up there, and the HV ENL drops from
-  11.5 to ~1.
+- **Thermal noise removal** subtracts the sensor's noise floor. After SNAP 14's subtraction the
+  negative results are clipped to -115 dB: 23.7 % of open-water HV pixels end up there, and the
+  HV ENL drops from 11.5 to ~1.
 
 ## Results
 
@@ -76,12 +91,13 @@ How wide the optimum is on the clean stack (PFAs within 0.03 F of the best, of 2
 
 ## Caveats
 
-- One scene, one date, one set of labels. Differences under ~0.02 F are ties.
+- One scene, one date, one set of labels. Differences under ~0.02 F are not distinguishable
+  with this sample (bootstrap, [revision-robustness.md](revision-robustness.md)).
 - Gamma, NIS and iDPolRAD peak at 1e-21 on the TNR stack, the end of the sweep. Their TNR optimum
   may lie at even lower PFAs, so their TNR F may be slightly underestimated.
-- The TNR damage is specific to SNAP 14's clipping. Another processor that removes the noise
-  floor differently might hurt the fixed-ENL detectors less. Which SNAP version the paper used is
-  an open question for the authors.
+- The TNR damage follows SNAP 14's handling of below-noise pixels: floored at the noise level
+  instead, gamma keeps its F (0.640). Which SNAP version and settings the paper used is an open
+  question for the authors.
 - PFA values are not a common scale between detectors (different ENLs, AND merge vs one channel).
   Compare F levels and curve shapes, not PFAs.
 
@@ -91,7 +107,10 @@ The measured ENL is my CA-CFAR's strength; the fixed 6 dB HH check is its weakne
 the check with an HH CFAR test at the same per-channel PFA (HH AND HV, like gamma), while keeping
 the measured ENL, should land near gamma on clean data and keep the robustness with TNR.
 Tested in Milestone 2c ([cacfar-validation.md](cacfar-validation.md)): it does. Without the
-length rule, F is 0.639 without TNR (gamma 0.636) and 0.495 with TNR (gamma 0.428).
+length rule, F is 0.644 without TNR (gamma 0.640; paired difference +0.004 [-0.012, +0.018],
+not distinguishable) and 0.498 with TNR (gamma 0.430). On the floored stack it measures a
+meaningless HV ENL (the water sits at the floor) and drops to 0.616, below gamma's 0.640: the
+measured ENL is robust to clipping but not to a flat floor.
 
 ## Reproduce
 

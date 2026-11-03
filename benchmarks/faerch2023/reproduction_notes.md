@@ -12,8 +12,11 @@ range of PFA levels." Fig. 6 is not digitized, so the comparison of shapes is by
 **Deviation: no thermal noise removal.** The paper lists thermal noise removal among its SNAP
 steps. After SNAP 14 thermal noise removal (subtraction, then clipping of negatives) all
 detectors degrade (grey curves, last table column: every detector stays at F 0.54 or below,
-Wishart produces >20,000 objects even at 1e-21); the cause is under investigation (revision
-C12, below). No software defect is claimed:
+Wishart produces >20,000 objects even at 1e-21). Revision C12 (`docs/revision-tnr-ablation.md`)
+subtracts the same noise field three ways: gamma with Table 1's ENL gets F 0.640 without
+subtraction, 0.430 with SNAP's clipped subtraction, and 0.640 with the subtraction floored at the
+noise level. On this scene the drop comes from how the pixels below the noise floor are handled,
+not from the subtraction; no software defect is claimed:
 
 | ENL on the 40 m GRDM stack | HH | HV |
 |---|---|---|
