@@ -338,7 +338,14 @@ def detections_xy(path: Path, crs: str, domain: EvalDomain, unknown: np.ndarray,
     gdf = gpd.read_file(path)
     if gdf.empty:
         return np.empty((0, 2)), 0
-    gdf = gdf.to_crs(crs)
+    return detections_xy_from(gdf.to_crs(crs), domain, unknown, ignore_m)
+
+
+def detections_xy_from(gdf: gpd.GeoDataFrame, domain: EvalDomain, unknown: np.ndarray,
+                       ignore_m: float) -> tuple[np.ndarray, int]:
+    """`detections_xy` for detections already loaded in the scoring CRS."""
+    if gdf.empty:
+        return np.empty((0, 2)), 0
     xy = np.column_stack([gdf.geometry.x, gdf.geometry.y])
     xy = xy[domain.keep(xy)]
     if len(unknown) and len(xy):

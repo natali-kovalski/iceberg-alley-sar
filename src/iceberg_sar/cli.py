@@ -872,6 +872,17 @@ def bench_iw_compare(config: ConfigOption = DEFAULT_CONFIG) -> None:
         typer.echo(f"ok  {key}: {path}")
 
 
+@app.command("bench-robustness")
+def bench_robustness(config: ConfigOption = DEFAULT_CONFIG) -> None:
+    """Revision phase 3: matching sensitivity, chance matches and bootstrap intervals on the
+    detections already on disk (Færch EW scene and the 5d / 2b IW frames)."""
+    from iceberg_sar.benchmark.robustness import run_robustness
+
+    cfg = load_config(config)
+    for key, path in run_robustness(cfg, log=lambda m: typer.echo(m)).items():
+        typer.echo(f"ok  {key}: {path}")
+
+
 @app.command("bench-scenes")
 def bench_scenes(
     write_config: Annotated[bool, typer.Option(

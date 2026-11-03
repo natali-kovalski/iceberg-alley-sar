@@ -10,6 +10,22 @@ benchmark:
   cfar_runner: external/cfar_runner/run_cfar.py
   out_dir: data/benchmark
   window_limit_px: 41       # library stencil is +-20 px; wider windows are silently cropped
+  robustness:               # revision phase 3 (`bench-robustness`): N1, N2, C10 on detections on disk
+    out_dir: data/benchmark/robustness
+    report: docs/revision-robustness.md
+    n_boot: 2000
+    seed: 0
+    shift_m: 5000           # chance test: every detection moved this far, random direction
+    n_shifts: 50
+    ew_reference: gamma     # paired differences on the Færch scene are against this detector
+    iw_reference: thor-pipeline-linear-10m
+    thor_ew: {stack: noTNR, series: upsample}   # THOR run scored on the Færch scene
+    matching_variants:      # N1; the first is the default protocol
+      - {matcher: greedy, radius_units: metres, radius_interpolated_m: null}
+      - {matcher: optimal, radius_units: metres, radius_interpolated_m: null}
+      - {matcher: greedy, radius_units: epsg5938, radius_interpolated_m: null}
+      - {matcher: greedy, radius_units: metres, radius_interpolated_m: 1000}
+      - {matcher: greedy, radius_units: metres, radius_interpolated_m: 500}
   merge: AND                # HH/HV merge for gamma, lognorm, k (paper sec. 3.3)
   minsize_px: 2             # library drops objects smaller than this (paper: no 1-px objects)
   max_object_px: 500        # paper sec. 3.3: larger objects dropped as processing errors
