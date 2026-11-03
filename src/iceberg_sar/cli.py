@@ -893,6 +893,43 @@ def bench_near_ice(config: ConfigOption = DEFAULT_CONFIG) -> None:
         typer.echo(f"ok  {key}: {path}")
 
 
+@app.command("bench-ablation")
+def bench_ablation(config: ConfigOption = DEFAULT_CONFIG) -> None:
+    """Revision C11b: my CA-CFAR stepped towards gamma one change at a time (Færch scene)."""
+    from iceberg_sar.benchmark.ablation import run_ablation
+
+    cfg = load_config(config)
+    for key, path in run_ablation(cfg, log=lambda m: typer.echo(m)).items():
+        typer.echo(f"ok  {key}: {path}")
+
+
+@app.command("bench-tnr-ablation")
+def bench_tnr_ablation(
+    sweep: Annotated[bool, typer.Option(help="Run the detector sweeps on the new stacks.")] = True,
+    config: ConfigOption = DEFAULT_CONFIG,
+) -> None:
+    """Revision C12: thermal-noise ablation on the Færch scene (no subtraction, SNAP's clipped
+    subtraction, subtraction floored at the noise level, subtraction with negatives kept)."""
+    from iceberg_sar.benchmark.tnr_ablation import run_tnr_ablation
+
+    cfg = load_config(config)
+    for key, path in run_tnr_ablation(cfg, sweep, log=lambda m: typer.echo(m)).items():
+        typer.echo(f"ok  {key}: {path}")
+
+
+@app.command("bench-thor-iw40")
+def bench_thor_iw40(
+    force: Annotated[bool, typer.Option(help="Re-run detection even if cached.")] = False,
+    config: ConfigOption = DEFAULT_CONFIG,
+) -> None:
+    """Revision C11a: the THOR pipeline on the same 40 m IW frames as the 2b CFARs (GPU)."""
+    from iceberg_sar.benchmark.thor_iw40 import run_thor_iw40
+
+    cfg = load_config(config)
+    for key, path in run_thor_iw40(cfg, force=force, log=lambda m: typer.echo(m)).items():
+        typer.echo(f"ok  {key}: {path}")
+
+
 @app.command("bench-scenes")
 def bench_scenes(
     write_config: Annotated[bool, typer.Option(

@@ -66,3 +66,17 @@ def test_threshold_factor_finite_and_exact_at_tiny_pfa() -> None:
         assert np.isfinite(a)
         assert special.betainc(d2 / 2, d1 / 2, d2 / (d2 + d1 * a)) == pytest.approx(pfa, rel=1e-6)
     assert threshold_factor(1e-21, 13.4, 88) > threshold_factor(1e-16, 13.4, 88)
+
+
+def test_circular_ring_matches_the_library_stencil() -> None:
+    """Revision C11b: 4 <= r <= 6 px gives the Færch library's 68 clutter pixels."""
+    import numpy as np
+
+    from iceberg_sar.cfar import CfarParams, ring_kernel, ring_mean
+
+    assert int(ring_kernel(4, 6).sum()) == 68
+    p = CfarParams(guard_px=4, background_px=6, pfa=1e-6, enl=10, ring_shape="circle")
+    assert p.ring_pixels == 68
+    x = np.ones((30, 30), np.float32)
+    m, n = ring_mean(x, 4, 6, "circle")
+    assert n[15, 15] == 68 and m[15, 15] == 1.0

@@ -33,6 +33,9 @@ class CfarParams:
     pfa: float
     enl: float
     min_background_fraction: float = 0.5  # of the full ring; fewer valid pixels -> no decision
+    # square: box ring (default); circle: the Færch library's ring, offsets with
+    # guard_px <= r <= background_px (revision C11, 68 px at 4 / 6 instead of 88)
+    ring_shape: str = "square"
 
     def __post_init__(self) -> None:
         if not 0 <= self.guard_px < self.background_px:
@@ -41,9 +44,13 @@ class CfarParams:
             raise ValueError("pfa must be in (0, 1)")
         if self.enl <= 0:
             raise ValueError("enl must be > 0")
+        if self.ring_shape not in ("square", "circle"):
+            raise ValueError("ring_shape must be square or circle")
 
     @property
     def ring_pixels(self) -> int:
+        if self.ring_shape == "circle":
+            return int(ring_kernel(self.guard_px, self.background_px).sum())
         return (2 * self.background_px + 1) ** 2 - (2 * self.guard_px + 1) ** 2
 
     @property
@@ -68,8 +75,15 @@ def _box_sum(a: np.ndarray, half: int) -> np.ndarray:
     return ndimage.uniform_filter(a, size=size, mode="constant", cval=0.0) * (size * size)
 
 
+def ring_kernel(guard_px: int, background_px: int) -> np.ndarray:
+    """Circular ring as the Færch library's stencil: offsets with guard <= r <= background."""
+    o = np.arange(-background_px, background_px + 1)
+    r = np.hypot(*np.meshgrid(o, o))
+    return ((r >= guard_px) & (r <= background_px)).astype(np.float64)
+
+
 def ring_mean(
-    intensity: np.ndarray, guard_px: int, background_px: int
+    intensity: np.ndarray, guard_px: int, background_px: int, shape: str = "square"
 ) -> tuple[np.ndarray, np.ndarray]:
     """Mean of valid (finite) pixels in the background ring, and the valid-pixel count.
 
@@ -78,8 +92,13 @@ def ring_mean(
     valid = np.isfinite(intensity)
     vals = np.where(valid, intensity, 0.0).astype(np.float64)
     ones = valid.astype(np.float64)
-    s = _box_sum(vals, background_px) - _box_sum(vals, guard_px)
-    n = _box_sum(ones, background_px) - _box_sum(ones, guard_px)
+    if shape == "circle":
+        k = ring_kernel(guard_px, background_px)
+        s = ndimage.correlate(vals, k, mode="constant", cval=0.0)
+        n = ndimage.correlate(ones, k, mode="constant", cval=0.0)
+    else:
+        s = _box_sum(vals, background_px) - _box_sum(vals, guard_px)
+        n = _box_sum(ones, background_px) - _box_sum(ones, guard_px)
     n = np.rint(n)  # box filters leave tiny float residue on integer counts
     with np.errstate(invalid="ignore", divide="ignore"):
         mean = np.where(n > 0, s / n, np.nan)
@@ -88,7 +107,7 @@ def ring_mean(
 
 def ca_cfar(intensity: np.ndarray, params: CfarParams) -> tuple[np.ndarray, np.ndarray]:
     """Detection mask and background mean (linear) for a linear-intensity array (NaN = masked)."""
-    bg, n = ring_mean(intensity, params.guard_px, params.background_px)
+    bg, n = ring_mean(intensity, params.guard_px, params.background_px, params.ring_shape)
     enough = n >= params.min_background_fraction * params.ring_pixels
     with np.errstate(invalid="ignore"):
         det = np.isfinite(intensity) & enough & (intensity > params.alpha * bg)

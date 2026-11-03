@@ -42,6 +42,7 @@ class DetectionParams:
     max_structure_px: int = 15  # reject targets on bright structures longer than this
     copol_min_contrast_db: float | None = None  # co-pol peak over co-pol background; None = off
     merge_by_structure: bool = True  # CFAR cores in one grown blob = one target
+    connectivity: int = 8  # target labelling without merge_by_structure (Færch library: 4)
     block_rows: int = 1024
 
 
@@ -156,7 +157,8 @@ def component_table(
         labels = np.zeros(det.shape, dtype=np.int32)
         labels[det] = np.searchsorted(blob_ids, grown[det]) + 1
     else:
-        labels, n = ndimage.label(det, structure=EIGHT_CONNECTED)
+        labels, n = ndimage.label(det, structure=EIGHT_CONNECTED if p.connectivity == 8
+                                  else ndimage.generate_binary_structure(2, 1))
     if n == 0:
         return pd.DataFrame()
     slices = ndimage.find_objects(labels)
@@ -237,8 +239,8 @@ def detect_raster_multi(
     per pixel as in the Færch 2023 gamma detector. Pass each test's per-channel PFA and band ENL.
     """
     cfar = cfars[0]
-    if any((c.guard_px, c.background_px, c.min_background_fraction)
-           != (cfar.guard_px, cfar.background_px, cfar.min_background_fraction)
+    if any((c.guard_px, c.background_px, c.min_background_fraction, c.ring_shape)
+           != (cfar.guard_px, cfar.background_px, cfar.min_background_fraction, cfar.ring_shape)
            for c in [*cfars, *(copol_cfars or [])]):
         raise ValueError("All CFAR settings must share the windows and background fraction")
     if copol_cfars is not None and len(copol_cfars) != len(cfars):
@@ -264,14 +266,15 @@ def detect_raster_multi(
             x = bands[cfar_band]
             if not np.isfinite(x).any():
                 continue
-            bg, n = ring_mean(x, cfar.guard_px, cfar.background_px)
+            bg, n = ring_mean(x, cfar.guard_px, cfar.background_px, cfar.ring_shape)
             candidate = np.isfinite(x) & (n >= cfar.min_background_fraction * cfar.ring_pixels)
             edge = near_invalid(np.isfinite(x), p.edge_buffer_px)
             grown = bright_structures(x, bg, p.grow_db)
             trusted_stop = h if w1 == h else w1 - trusted_margin
             copol = None
             if copol_cfars is not None:
-                copol_bg, _ = ring_mean(bands[copol_band], cfar.guard_px, cfar.background_px)
+                copol_bg, _ = ring_mean(bands[copol_band], cfar.guard_px, cfar.background_px,
+                                        cfar.ring_shape)
                 copol = (copol_band, copol_bg)
             for i, c in enumerate(cfars):
                 with np.errstate(invalid="ignore"):
@@ -279,7 +282,8 @@ def detect_raster_multi(
                     if copol_cfars is not None:
                         det &= bands[copol_band] > copol_cfars[i].alpha * copol[1]
                 if copol is None and copol_band in bands and det.any():
-                    copol_bg, _ = ring_mean(bands[copol_band], cfar.guard_px, cfar.background_px)
+                    copol_bg, _ = ring_mean(bands[copol_band], cfar.guard_px, cfar.background_px,
+                                            cfar.ring_shape)
                     copol = (copol_band, copol_bg)
                 t = component_table(det, bands, cfar_band, bg, edge, grown, w0, (r0, r1),
                                     trusted_stop, p, copol)

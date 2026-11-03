@@ -422,6 +422,8 @@ def sweep_dir(cfg: Config) -> Path:
     """`sweep.out_dir`, plus `_noTNR` for the stack without thermal noise removal."""
     fc = cfg.section("benchmark")["faerch2023"]
     tnr = fc["snap"].get("remove_thermal_noise", True)
+    if fc["snap"].get("tnr_variant"):   # revision C12 derived stacks
+        return cfg.root / (fc["sweep"]["out_dir"] + f"_TNR{fc['snap']['tnr_variant']}")
     return cfg.root / (fc["sweep"]["out_dir"] + ("" if tnr else "_noTNR"))
 
 

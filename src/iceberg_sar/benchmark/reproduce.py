@@ -62,6 +62,9 @@ def scene_paths(cfg: Config, s1_format: str | None = None) -> ScenePaths:
     i = base / "interim"
     # Diagnostic variant without thermal noise removal: own files, so the main stack stays
     st = s1 if fc["snap"].get("remove_thermal_noise", True) else f"{s1}_noTNR"
+    # Revision C12: stacks derived from the two SNAP runs (`tnr_ablation`), own files too
+    if fc["snap"].get("tnr_variant"):
+        st = f"{s1}_TNR{fc['snap']['tnr_variant']}"
     return ScenePaths(
         product=s1, stem=st, raw_zip=base / "raw" / f"{s1}.zip", snap=i / f"{st}_snap_{res}.tif",
         stack=i / f"{st}_{res}_HHHV.tif", inc=i / f"{st}_{res}_inc.tif",

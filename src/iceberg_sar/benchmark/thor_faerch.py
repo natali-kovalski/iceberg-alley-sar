@@ -451,12 +451,14 @@ def aoi_window(transform: rasterio.Affine, shape: tuple[int, int], aoi: Any, tok
 def scene_peaks(sp: Any, v: Variant, encoder: Any, head: Any, cfg: Config, aoi: Any,
                 device: str, log: Callable[[str], None],
                 norm: dict[str, tuple[float, float]] | None = None,
+                radiometry: str = "sigma0", inc: Path | None = None,
                 ) -> tuple[pd.DataFrame, np.ndarray, rasterio.Affine]:
     """Sliding-window heatmap over the scoring area's bounding box -> peaks >= score_min.
 
     As `thor.infer.heatmap_scene`: windows on the token grid, each token from the nearest
     window centre, peak moved to the brightest HH pixel of its token. Returns peaks (row, col
-    in stack pixels, score), the token heatmap and its transform.
+    in stack pixels, score), the token heatmap and its transform. `radiometry` "gamma0" (HyP3
+    IW, revision C11a) is converted to sigma0 with `inc` (incidence, degrees, on the stack grid).
     """
     import torch
     from shapely.prepared import prep
@@ -515,6 +517,7 @@ def scene_peaks(sp: Any, v: Variant, encoder: Any, head: Any, cfg: Config, aoi: 
             peak_c[dst] = ac[sl] + cs[j] + C0
         pending.clear()
 
+    inc_src = rasterio.open(inc) if inc is not None else None
     with rasterio.open(sp.stack) as stk, rasterio.open(sp.valid) as vld:
         for n, (i, j) in enumerate(jobs):
             win = Window(C0 + cs[j], R0 + rs[i], crop_px, crop_px)
@@ -525,7 +528,8 @@ def scene_peaks(sp: Any, v: Variant, encoder: Any, head: Any, cfg: Config, aoi: 
                      for k, d in enumerate(names)}
             for b in bands.values():
                 b[~sea | ~np.isfinite(b)] = np.nan
-            x = to_model_input(bands, None, tp, radiometry="sigma0")
+            inc_deg = None if inc_src is None else inc_src.read(1, window=win).astype(np.float32)
+            x = to_model_input(bands, inc_deg, tp, radiometry=radiometry)
             tok_valid = pool(sea.astype(float), tok_px) >= p.token_min_valid
             pending.append((i, j, x, tok_valid, token_argmax(bands[tp.bands[hh]], tok_px)))
             if len(pending) == ip.batch:
@@ -533,6 +537,8 @@ def scene_peaks(sp: Any, v: Variant, encoder: Any, head: Any, cfg: Config, aoi: 
             if (n + 1) % 1000 == 0:
                 log(f"  {n + 1} / {len(jobs)} windows")
         flush()
+    if inc_src is not None:
+        inc_src.close()
 
     ij, scores = extract_peaks(prob, rp.score_min, valid)
     peaks = pd.DataFrame({"row": peak_r[ij[:, 0], ij[:, 1]], "col": peak_c[ij[:, 0], ij[:, 1]],

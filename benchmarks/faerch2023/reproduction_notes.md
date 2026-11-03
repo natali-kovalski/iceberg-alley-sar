@@ -1,13 +1,19 @@
-**Verdict (2026-10-27).** With the paper's own labels (Path A), five of six detectors reproduce
-the paper's best F within 0.05: gamma +0.011, Wishart -0.006, NIS -0.008, log-normal -0.017,
-K -0.019. iDPolRAD is 0.061 below. The shapes agree with the paper's sec. 4: "The K detector and
+**Verdict: partial agreement under modified preprocessing (revised 2026-11-02).** With the
+paper's own labels (Path A) and **without** thermal noise removal (the paper describes it on),
+five of six detectors come within 0.05 of the paper's best F: gamma +0.015, Wishart -0.002,
+NIS -0.004, log-normal -0.013, K -0.015 (shared evaluation mask, 487 labels in the scoring
+area; 2026-10-27 over all 492: +0.011 / -0.006 / -0.008 / -0.017 / -0.019). iDPolRAD is 0.058
+below. Gamma and Wishart reach their F 13-15 decades of PFA away from the paper's optimum, so
+this is agreement in F level, not a full reproduction. The shapes agree with the paper's sec. 4: "The K detector and
 the log-normal detector achieve their maximum accuracy at a very narrow interval of PFA levels,
 whereas the gamma, iDPolRAD, NIS, and Wishart generally exhibit higher F score across a wide
 range of PFA levels." Fig. 6 is not digitized, so the comparison of shapes is by eye.
 
 **Deviation: no thermal noise removal.** The paper lists thermal noise removal among its SNAP
-steps. With SNAP 14 that step breaks the detectors' assumptions (grey curves, last table column:
-every detector stays at F 0.53 or below, Wishart produces >20,000 objects even at 1e-21):
+steps. After SNAP 14 thermal noise removal (subtraction, then clipping of negatives) all
+detectors degrade (grey curves, last table column: every detector stays at F 0.54 or below,
+Wishart produces >20,000 objects even at 1e-21); the cause is under investigation (revision
+C12, below). No software defect is claimed:
 
 | ENL on the 40 m GRDM stack | HH | HV |
 |---|---|---|
@@ -32,21 +38,32 @@ look-up table also uses it, but K matches). A different effective ENL in the pap
 Wishart runs would shift the PFA axis without changing the F level; not checked. Tables 3 and 5
 also disagree on gamma's optimum PFA (1e-19 vs 1e-9) while describing the same detections.
 
-**iDPolRAD (outside tolerance, -0.061).** Same number of false positives as the paper (70 vs 74),
+**iDPolRAD (outside tolerance, -0.058).** Same number of false positives as the paper (70 vs 74),
 fewer true positives (162 vs 193), mostly medium bergs (31 % vs 41 %). iDPolRAD's threshold
 comes from one generalized-gamma fit over the whole image (10,000 random pixels, `cfar_api_notes.md`),
 so it depends on what the image contains: our land mask (OSM coastline + 500 m), swath and
 noise-floor handling differ from the paper's. Its 57 px training window is cropped to the
 library's 41 px, as it must have been in the paper. The flat start of the curve (1e-21 to 1e-17,
-identical detections) is the global threshold saturating.
+identical detections) is numerical: the library computes `1 - pfa`, which is exactly 1.0 in
+float64 for PFA <= 1e-17. Those runs are flagged and left out of every optimum (revision C2).
 
 **What else holds.**
 - Labels are not the issue: Path A reproduces Table 2 exactly (181 / 175 / 136) and the mean
   verified drift (3954 vs 3953 m).
 - Scoring area: the cloud-free Path B area changes F by at most 0.011.
-- Verified-only F is 0.81-0.87 at each optimum: most misses are interpolated (1789 m) labels,
-  i.e. small bergs whose position is uncertain.
+- Verified-only recall (revision C5; the old verified-only F mixed a different label set with
+  its own false-positive accounting) is 0.70-0.91 at each detector's optimum (iDPolRAD 0.56),
+  against all-labels recall 0.41-0.55 (iDPolRAD 0.33): most misses are interpolated labels.
+  Hits on interpolated labels are at chance level: shifting every detection 5 km in a random
+  direction still matches 11-20 of them on average, more than the real runs do (3-14;
+  `docs/revision-robustness.md`).
 - Size breakdown at my optimum follows Table 5 (large 87-93 %, small 4-10 %), except iDPolRAD.
+  The "at the paper's PFA" column was wrong until 2026-11-02 (revision C1): the lookup matched
+  every PFA below 1e-8 to the 1e-21 run.
+- Matching (revision C4): greedy vs optimal one-to-one, true vs EPSG:5938-metre radii, and an
+  interpolated radius of 1000 or 500 m change best F by at most 0.03 and swap at most adjacent
+  ranks. Differences under ~0.02 F between detectors are not distinguishable with this sample:
+  the 95% bootstrap interval of F is about ±0.04, of paired differences about ±0.02.
 - GRDH instead of GRDM (gamma 1e-19): more false positives (575 vs 341) and higher recall, so
   the paper's 40 m, ENL 10.7 product is GRDM; Table 1's "GRDH" is a typo.
 - Sweep coverage (1e-1 to 1e-21): 117 of 126 (detector, PFA) runs scored; the other 9 are above
@@ -122,14 +139,21 @@ July, and nothing tuned here except the score threshold, which is swept like the
 declares the bands 10 m and THOR resizes the crop to 512 px; `native` declares them 40 m and
 cuts 2 x 2 px patches. This is the first precision number for THOR: the IIP frames have none.
 
-**Result.** Best F (verified only): no TNR, upsample 0.568 (0.770) at threshold 0.12, P 0.83
-R 0.43, level with my CA-CFAR (0.567 / 0.587 without the length rule) and below Wishart 0.653,
-NIS 0.650 and gamma 0.636. With TNR, upsample 0.516, behind K (0.533) and ahead of my CA-CFAR
-(0.494) and gamma (0.428). The IW headline (THOR 0.85 vs CFAR 0.80 recall at matched counts)
-does not carry over to this scene: here THOR ties my baseline.
+**Result (revised 2026-11-02, shared evaluation mask).** Best F of the THOR pipeline (frozen
+encoder + IW-trained head) without TNR, upsample: 0.572 at threshold 0.12, precision 0.83,
+recall 0.44, verified-only recall 0.72. Like with like: my CA-CFAR with the length rule has
+0.571 at precision 0.94, without it 0.591 at precision 0.85; Wishart 0.657, NIS 0.654 and gamma
+0.640 are higher. On F the pipeline and my 6 dB CA-CFAR are not distinguishable (paired with
+gamma: -0.068 [-0.097, -0.041] vs -0.069 [-0.097, -0.045]). With TNR, upsample 0.520, behind K
+(0.537) and ahead of my CA-CFAR (0.497) and gamma (0.430). The current pipeline does not
+transfer to EW: THOR itself was pretrained on IW and EW, but the head was trained on 10 m IW
+only, and a head trained or adapted for EW is untested.
 
-**Where it loses: medium bergs.** Recall at the optimum, small / medium / large: THOR 0.06 /
-0.49 / 0.86, gamma 0.10 / 0.65 / 0.91, Wishart 0.09 / 0.72 / 0.93. Precision is as good as the
+**Where it loses: medium bergs.** Recall at the optimum, small / medium / large: THOR pipeline
+0.06 / 0.49 / 0.86, gamma 0.10 / 0.65 / 0.91, Wishart 0.09 / 0.72 / 0.93. The best run misses
+47 of the 128 verified medium bergs in the scoring area; other runs (TNR, native, EW
+normalisation) recover 13 of them, mostly the brighter ones (by HH contrast: < 4 dB 0 of 4,
+4-8 dB 0.50 → 0.57 with any run, > 8 dB 0.73 → 0.85; `medium_contrast.csv`). Precision is as good as the
 CFARs'. Small bergs are lost by everyone at 40 m.
 
 **Upsample beats native** on both stacks (0.568 vs 0.512, 0.516 vs 0.482), mostly through

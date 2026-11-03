@@ -10,6 +10,21 @@ benchmark:
   cfar_runner: external/cfar_runner/run_cfar.py
   out_dir: data/benchmark
   window_limit_px: 41       # library stencil is +-20 px; wider windows are silently cropped
+  tnr_ablation:             # revision C12 (`bench-tnr-ablation`): what thermal noise removal does below the floor
+    clip_level: 1.0e-11     # SNAP 14 clips negatives to ~3.7e-12; TNR values at or below this = clipped
+    fill_sigma_px: 10       # Gaussian (px) for N where SNAP clipped (N varies over km)
+    detectors:              # swept per derived stack; the library can't take negative intensities
+      floor: [gamma, cacfar-nolength-and]
+      noclip: [cacfar-nolength-and]
+    report_detectors: [gamma, cacfar-nolength-and]
+    out_dir: data/benchmark/faerch2023/tnr_ablation
+    report: docs/revision-tnr-ablation.md
+  thor_iw40:                # revision C11a (`bench-thor-iw40`): the THOR pipeline on 2b's 40 m IW frames
+    variant: upsample       # as on the Færch scene (best there): bands declared 10 m, resized to 512 px
+    report: docs/revision-thor-iw40.md
+  ablation:                 # revision C11b (`bench-ablation`): my CA-CFAR stepped towards gamma, Færch scene
+    out_dir: data/benchmark/faerch2023/ablation
+    report: docs/revision-ablation.md
   near_ice:                 # revision C8 (`bench-near-ice`): the labels within 5 km of pack ice on their own
     rule_always_dir: data/outputs/thor/5d_rule_always   # archived 5d: 6 dB check, length rule always on
     rule_always_pfas: [1.0e-3, 1.0e-4, 1.0e-5, 1.0e-6, 1.0e-7, 1.0e-8, 1.0e-10, 1.0e-12]

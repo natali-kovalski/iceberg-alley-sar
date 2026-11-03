@@ -787,8 +787,10 @@ def run_score(cfg: Config, source: str | None = None, log: Callable[[str], None]
 
 
 def _variant(cfg: Config) -> str:
-    tnr = cfg.section("benchmark")["faerch2023"]["snap"].get("remove_thermal_noise", True)
-    return "TNR" if tnr else "noTNR"
+    snap = cfg.section("benchmark")["faerch2023"]["snap"]
+    if snap.get("tnr_variant"):
+        return f"TNR{snap['tnr_variant']}"
+    return "TNR" if snap.get("remove_thermal_noise", True) else "noTNR"
 
 
 def _other_variant(cfg: Config) -> Config:
