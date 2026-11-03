@@ -55,6 +55,9 @@ class BergsParams:
     multilook: int
     match_m: float
     figure: Path
+    contrast_peak_m: float = 80.0
+    contrast_ring_m: tuple[float, float] = (500.0, 1000.0)
+    contrast_bins_db: tuple[float, ...] = (4.0, 8.0)
 
     @classmethod
     def from_config(cls, cfg: Config) -> BergsParams:
@@ -64,7 +67,10 @@ class BergsParams:
                    n_hits=int(b["n_hits"]), n_misses=int(b["n_misses"]),
                    train_size=str(b["train_size"]), n_train=int(b["n_train"]),
                    multilook=int(b["multilook"]), match_m=float(b["match_m"]),
-                   figure=cfg.root / b["figure"])
+                   figure=cfg.root / b["figure"],
+                   contrast_peak_m=float(b.get("contrast_peak_m", 80)),
+                   contrast_ring_m=tuple(float(v) for v in b.get("contrast_ring_m", (500, 1000))),
+                   contrast_bins_db=tuple(float(v) for v in b.get("contrast_bins_db", (4, 8))))
 
 
 def spread_pick(values: np.ndarray, n: int) -> np.ndarray:
@@ -162,6 +168,7 @@ def faerch_rows(cfg: Config, bp: BergsParams, log: Callable[[str], None]) -> lis
     hit_all = {r.tag: hits(r.tag) for r in runs}
 
     stacks = {_variant(c): scene_paths(c) for c in (cfg, _other_variant(cfg))}
+    contrast_table(stacks[ref.stack].stack, med, xy, ref_hit, hit_all, bp, rp.out_dir, log)
     rows = []
     for i in pick:
         row: dict[str, Any] = {"label_id": int(med.label_id[i]), "length_m": float(length[i]),
@@ -193,6 +200,57 @@ def faerch_rows(cfg: Config, bp: BergsParams, log: Callable[[str], None]) -> lis
             }
         rows.append(row)
     return rows
+
+
+def hh_contrast_db(stack: Path, xy: np.ndarray, peak_m: float, ring_m: tuple[float, float]
+                   ) -> np.ndarray:
+    """HH contrast per point (dB): the brightest HH pixel within `peak_m` over the median HH of
+    the ring `ring_m` (inner, outer) around it, both in linear intensity."""
+    with rasterio.open(stack) as src:
+        band = [d.upper() for d in src.descriptions].index("HH") + 1
+        px = abs(src.transform.a)
+        half = int(np.ceil(ring_m[1] / px))
+        yy, xx = np.mgrid[-half:half + 1, -half:half + 1] * px
+        r = np.hypot(yy, xx)
+        out = np.full(len(xy), np.nan)
+        for i, (x, y) in enumerate(xy):
+            col, row = ~src.transform * (x, y)
+            win = Window(int(col) - half, int(row) - half, 2 * half + 1, 2 * half + 1)
+            a = src.read(band, window=win, boundless=True, fill_value=np.nan)
+            peak = np.nanmax(np.where(r <= peak_m, a, np.nan))
+            sea = np.nanmedian(np.where((r >= ring_m[0]) & (r <= ring_m[1]), a, np.nan))
+            if peak > 0 and sea > 0:
+                out[i] = 10 * np.log10(peak / sea)
+    return out
+
+
+def contrast_table(stack: Path, med: pd.DataFrame, xy: np.ndarray, ref_hit: np.ndarray,
+                   hit_all: dict[str, np.ndarray], bp: BergsParams, out_dir: Path,
+                   log: Callable[[str], None]) -> pd.DataFrame:
+    """Verified medium bergs by HH contrast: recall of the reference run at its best-F
+    threshold, and the share any run finds at its own best-F threshold (revision T8)."""
+    c = hh_contrast_db(stack, xy, bp.contrast_peak_m, bp.contrast_ring_m)
+    anyhit = np.any(np.column_stack(list(hit_all.values())), axis=1)
+    per = pd.DataFrame({"label_id": med.label_id, "hh_contrast_db": np.round(c, 2),
+                        "hit_reference": ref_hit, "hit_any_run": anyhit,
+                        **{f"hit_{k}": v for k, v in hit_all.items()}})
+    per.to_csv(out_dir / "medium_contrast_per_berg.csv", index=False)
+    edges = [-np.inf, *bp.contrast_bins_db, np.inf]
+    names = ([f"< {edges[1]:g} dB"] + [f"{a:g}-{b:g} dB" for a, b in zip(edges[1:-2], edges[2:-1],
+                                                                        strict=True)]
+             + [f"> {edges[-2]:g} dB"])
+    per["bin"] = pd.cut(per.hh_contrast_db, edges, labels=names, right=False)
+    t = per.groupby("bin", observed=False).agg(
+        bergs=("label_id", "size"), recall_reference=("hit_reference", "mean"),
+        recall_any_run=("hit_any_run", "mean"), recovered_by_other_runs=(
+            "hit_any_run", "sum")).reset_index()
+    t["recovered_by_other_runs"] -= per.groupby("bin", observed=False).hit_reference.sum().values
+    t.to_csv(out_dir / "medium_contrast.csv", index=False)
+    log(f"HH contrast (median): hits {np.nanmedian(c[ref_hit]):.1f} dB, misses "
+        f"{np.nanmedian(c[~ref_hit]):.1f} dB; misses found by some other run: "
+        f"{int((anyhit & ~ref_hit).sum())} of {int((~ref_hit).sum())}")
+    log(t.round(2).to_string(index=False))
+    return t
 
 
 # --- training chips ------------------------------------------------------------------------------

@@ -9,53 +9,54 @@ Same scoring as 5d (`thor-compare`), so the 40 m curves sit next to 5d's 10 m on
 - Reference detectors: the library through `external/cfar_runner`, paper windows (360 / 520 m), HH AND HV merge, per-band ENL for gamma / K, objects of 2-500 px.
 - My CA-CFAR: HV, co-pol check, ENL estimated on the 40 m HV. Variants: **without the length rule, paper windows**, **with the length rule, paper windows**, **without the length rule, own windows**, **with the length rule, own windows**, **without the length rule, paper windows**. Paper windows = the reference detectors' (360 / 520 m), so paper windows without the length rule is the like-for-like run (the reference detectors have no such rule). Own windows = `cfar.guard_m` / `background_m`, as at 10 m. Unlabelled CA-CFAR rows below use the paper windows.
 - Total PFA: 1e-21, 1e-19, 1e-17, 1e-15, 1e-13, 1e-11, 1e-09, 1e-07, 1e-05, 1e-03, 1e-01; a detector stops after the first PFA with more than 5000 objects.
-- Truth: same-pass IIP labels where the SAR is valid. Detections within 5 km of pack ice dropped. One-to-one matching at 500 m.
-- Precision isn't measurable without AIS: compare **recall at matched detection counts**, interpolated in log(detections) between PFA points.
+- Truth: same-pass IIP labels where the SAR is valid. Scoring domain (labels and detections alike): at least 5 km from pack ice. One-to-one matching at 500 m.
+- Precision isn't measurable without AIS: compare **recall at a fixed detection budget**, read from real runs only (no interpolation). This compares review workload, not false-alarm rate or precision.
 ## S1A_IW_20190429T094108_DHP_RTC10_G_gpuned_671B
 
-- Labels compared: 267. ENL at 40 m (open-water box): HH 5.964, HV 1.823. My CA-CFAR: ENL 1.884, guard / background half-widths (px): paper 4 / 6, own 2 / 10.
+- Labels compared: 256. ENL at 40 m (open-water box): HH 5.964, HV 1.823. My CA-CFAR: ENL 1.884, guard / background half-widths (px): paper 4 / 6, own 2 / 10.
 
 ### Recall at matched detection counts
 
 | Detector | @250 | @500 | @1000 | Detections covered | PFAs run |
 |---|---|---|---|---|---|
-| gamma (HH AND HV) | 0.64 | 0.87 | 0.93 | 189-336381 | 11 |
-| log-normal (HH AND HV) | 0.60 | 0.85 | 0.93 | 1-413932 | 11 |
-| K (HH AND HV) | 0.65 | 0.84 | 0.92 | 4-495796 | 11 |
-| Wishart |  |  |  | 13-92 | 11 |
-| NIS |  |  | 0.96 | 597-9957 | 10 |
-| iDPolRAD (window cropped to 41 px) | 0.62 | 0.87 | 0.92 | 134-5943 | 10 |
-| my CA-CFAR, HV, no length rule | 0.65 | 0.84 | 0.91 | 53-1793 | 11 |
-| my CA-CFAR, HV, with length rule | 0.64 | 0.83 | 0.87 | 51-1705 | 11 |
-| my CA-CFAR, HV, no length rule, own windows | 0.64 | 0.86 | 0.92 | 69-1757 | 11 |
-| my CA-CFAR, HV, with length rule, own windows | 0.63 | 0.84 | 0.84 | 65-1631 | 11 |
-| my CA-CFAR, HH AND HV, no length rule | 0.66 | 0.86 | 0.92 | 190-398332 | 11 |
-| my CA-CFAR 10 m, no length rule | 0.58 | 0.83 | 0.92 | 173-1568 | 5d |
-| my CA-CFAR 10 m, HH AND HV, no length rule |  | 0.84 | 0.92 | 294-53670 | 9 |
-| my CA-CFAR 10 m, with length rule (old 5d) | 0.53 | 0.75 | 0.82 | 151-1513 | 5d |
-| THOR linear 10 m (5d) | 0.66 | 0.90 | 0.95 | 0-3561 | 5d |
+| gamma (HH AND HV) | 0.65 (240) | 0.91 (492) | 0.96 (902) | 189-336381 | 11 |
+| log-normal (HH AND HV) | 0.60 (235) | 0.88 (466) | 0.88 (466)† | 1-413932 | 11 |
+| K (HH AND HV) | 0.62 (213) | 0.82 (371)† | 0.96 (839) | 4-495796 | 11 |
+| Wishart | 0.30 (92)† | 0.30 (92)† | 0.30 (92)† | 13-92 | 11 |
+| NIS | none | none | 1.00 (941) | 597-9957 | 10 |
+| iDPolRAD (window cropped to 41 px) | 0.58 (212) | 0.91 (495) | 0.96 (883) | 134-5943 | 10 |
+| my CA-CFAR, HV, no length rule | 0.67 (244) | 0.88 (480) | 0.94 (799)† | 53-1793 | 11 |
+| my CA-CFAR, HV, with length rule | 0.65 (239) | 0.86 (462) | 0.93 (775)† | 51-1705 | 11 |
+| my CA-CFAR, HV, no length rule, own windows | 0.59 (200) | 0.81 (358)† | 0.94 (810) | 69-1757 | 11 |
+| my CA-CFAR, HV, with length rule, own windows | 0.66 (247) | 0.87 (476) | 0.91 (779)† | 65-1631 | 11 |
+| my CA-CFAR, HH AND HV, no length rule | 0.65 (221) | 0.85 (421) | 0.95 (883) | 190-398332 | 11 |
+| my CA-CFAR 10 m, no length rule | 0.58 (240) | 0.78 (407) | 0.95 (875) | 173-1568 | 5d |
+| my CA-CFAR 10 m, HH AND HV, no length rule | none | 0.85 (465) | 0.95 (797)† | 294-53670 | 9 |
+| my CA-CFAR 10 m, with length rule (old 5d) | 0.49 (213) | 0.77 (476) | 0.85 (824) | 151-1513 | 5d |
+| THOR pipeline, linear head, 10 m (5d) | 0.68 (245) | 0.94 (491) | 0.99 (980) | 0-3561 | 5d |
 
-Blank: the curve doesn't reach that count. 10 m rows (own windows): the CA-CFAR without the length rule is this sweep's `cacfar-nolength-10m` (current 5d's curve on open-water frames); with the rule, the old 5d run with the rule always on (`ref_5d_dir`; current 5d's curve on icy frames); THOR, 5d's score sweep.
+Each cell: recall of the real run with the most detections at or below the budget, with its detection count (no interpolation). †: that run has fewer than 0.8 x the budget. `none`: the detector has no run at or below the budget.
 
-### Recall by IIP size, near 500 detections
+10 m rows (own windows): the CA-CFAR without the length rule is this sweep's `cacfar-nolength-10m` (current 5d's curve on open-water frames); with the rule, the old 5d run with the rule always on (`ref_5d_dir`; current 5d's curve on icy frames); THOR, 5d's score sweep.
 
-| Detector | PFA | Detections | small 15-60 m (n=31) | medium 61-120 m (n=232) | large >120 m (n=4) |
+### Recall by IIP size, at most 500 detections (real runs)
+
+| Detector | PFA | Detections | small 15-60 m (n=31) | medium 61-120 m (n=221) | large >120 m (n=4) |
 |---|---|---|---|---|---|
-| gamma (HH AND HV) | 1e-09 | 492 | 19/31 | 209/232 | 4/4 |
-| log-normal (HH AND HV) | 1e-05 | 466 | 19/31 | 201/232 | 4/4 |
-| K (HH AND HV) | 1e-05 | 371 | 15/31 | 192/232 | 4/4 |
-| Wishart | 1e-01 | 92 | 4/31 | 72/232 | 2/4 |
-| NIS | 1e-21 | 597 | 29/31 | 218/232 | 4/4 |
-| iDPolRAD (window cropped to 41 px) | 1e-07 | 495 | 22/31 | 207/232 | 4/4 |
-| my CA-CFAR, HV, no length rule | 1e-05 | 480 | 17/31 | 203/232 | 4/4 |
-| my CA-CFAR, HV, with length rule | 1e-05 | 462 | 17/31 | 200/232 | 3/4 |
-| my CA-CFAR, HV, no length rule, own windows | 1e-05 | 502 | 18/31 | 208/232 | 4/4 |
-| my CA-CFAR, HV, with length rule, own windows | 1e-05 | 476 | 18/31 | 204/232 | 1/4 |
-| my CA-CFAR, HH AND HV, no length rule | 1e-09 | 508 | 19/31 | 207/232 | 4/4 |
-| my CA-CFAR 10 m, no length rule | 1e-06 | 508 | 20/31 | 198/232 | 4/4 |
-| my CA-CFAR 10 m, HH AND HV, no length rule | 1e-12 | 465 | 20/31 | 195/232 | 4/4 |
-| my CA-CFAR 10 m, with length rule (old 5d) |  |  | 20/31 | 177/232 | 0/4 |
-| THOR linear 10 m (5d) |  |  | 22/31 | 211/232 | 4/4 |
+| gamma (HH AND HV) | 1e-09 | 492 | 19/31 | 209/221 | 4/4 |
+| log-normal (HH AND HV) | 1e-05 | 466 | 19/31 | 201/221 | 4/4 |
+| K (HH AND HV) | 1e-05 | 371 | 15/31 | 192/221 | 4/4 |
+| Wishart | 1e-01 | 92 | 4/31 | 72/221 | 2/4 |
+| iDPolRAD (window cropped to 41 px) | 1e-07 | 495 | 22/31 | 207/221 | 4/4 |
+| my CA-CFAR, HV, no length rule | 1e-05 | 480 | 17/31 | 203/221 | 4/4 |
+| my CA-CFAR, HV, with length rule | 1e-05 | 462 | 17/31 | 200/221 | 3/4 |
+| my CA-CFAR, HV, no length rule, own windows | 1e-07 | 358 | 13/31 | 189/221 | 4/4 |
+| my CA-CFAR, HV, with length rule, own windows | 1e-05 | 476 | 18/31 | 204/221 | 1/4 |
+| my CA-CFAR, HH AND HV, no length rule | 1e-11 | 421 | 15/31 | 200/221 | 4/4 |
+| my CA-CFAR 10 m, no length rule | 1e-07 | 407 | 15/31 | 181/221 | 4/4 |
+| my CA-CFAR 10 m, HH AND HV, no length rule | 1e-12 | 465 | 20/31 | 195/221 | 4/4 |
+| my CA-CFAR 10 m, with length rule (old 5d) |  |  | 20/31 | 177/221 | 0/4 |
+| THOR pipeline, linear head, 10 m (5d) |  |  | 22/31 | 211/221 | 4/4 |
 
 10 m rows without a PFA: 5d's operating points (CA-CFAR at `cfar.pfa`, THOR at the same detection count).
 
@@ -69,25 +70,27 @@ Figure (local, gitignored): `data/benchmark/iw40/S1A_IW_20190429T094108_DHP_RTC1
 
 | Detector | @250 | @500 | @1000 | Detections covered | PFAs run |
 |---|---|---|---|---|---|
-| gamma (HH AND HV) | 0.98 | 0.98 | 0.99 | 26-100761 | 11 |
-| log-normal (HH AND HV) | 0.95 | 0.95 | 0.96 | 0-116086 | 11 |
-| K (HH AND HV) | 0.93 | 0.94 | 0.95 | 2-127227 | 11 |
-| Wishart |  |  |  | 50-79 | 11 |
-| NIS | 1.00 | 1.00 | 1.00 | 55-118717 | 11 |
-| iDPolRAD (window cropped to 41 px) | 0.96 | 0.97 | 0.98 | 90-7453 | 9 |
-| my CA-CFAR, HV, no length rule |  |  |  | 11-87 | 11 |
-| my CA-CFAR, HV, with length rule |  |  |  | 11-80 | 11 |
-| my CA-CFAR, HV, no length rule, own windows |  |  |  | 12-90 | 11 |
-| my CA-CFAR, HV, with length rule, own windows |  |  |  | 11-78 | 11 |
-| my CA-CFAR, HH AND HV, no length rule | 0.98 | 0.98 | 0.99 | 29-117691 | 11 |
-| my CA-CFAR 10 m, no length rule |  |  |  | 21-103 | 5d |
-| my CA-CFAR 10 m, HH AND HV, no length rule | 0.99 | 0.99 | 1.00 | 30-15860 | 9 |
-| my CA-CFAR 10 m, with length rule (old 5d) |  |  |  | 18-100 | 5d |
-| THOR linear 10 m (5d) | 0.98 | 1.00 |  | 0-594 | 5d |
+| gamma (HH AND HV) | 0.98 (160)† | 0.98 (160)† | 0.98 (160)† | 26-100761 | 11 |
+| log-normal (HH AND HV) | 0.94 (82)† | 0.94 (82)† | 0.94 (82)† | 0-116086 | 11 |
+| K (HH AND HV) | 0.92 (65)† | 0.92 (65)† | 0.92 (65)† | 2-127227 | 11 |
+| Wishart | 1.00 (79)† | 1.00 (79)† | 1.00 (79)† | 50-79 | 11 |
+| NIS | 1.00 (95)† | 1.00 (95)† | 1.00 (967) | 55-118717 | 11 |
+| iDPolRAD (window cropped to 41 px) | 0.96 (238) | 0.96 (422) | 0.98 (756)† | 90-7453 | 9 |
+| my CA-CFAR, HV, no length rule | 1.00 (87)† | 1.00 (87)† | 1.00 (87)† | 11-87 | 11 |
+| my CA-CFAR, HV, with length rule | 0.86 (80)† | 0.86 (80)† | 0.86 (80)† | 11-80 | 11 |
+| my CA-CFAR, HV, no length rule, own windows | 1.00 (90)† | 1.00 (90)† | 1.00 (90)† | 12-90 | 11 |
+| my CA-CFAR, HV, with length rule, own windows | 0.80 (78)† | 0.80 (78)† | 0.80 (78)† | 11-78 | 11 |
+| my CA-CFAR, HH AND HV, no length rule | 0.98 (192)† | 0.98 (192)† | 0.98 (192)† | 29-117691 | 11 |
+| my CA-CFAR 10 m, no length rule | 0.96 (103)† | 0.96 (103)† | 0.96 (103)† | 21-103 | 5d |
+| my CA-CFAR 10 m, HH AND HV, no length rule | 0.98 (129)† | 0.98 (129)† | 1.00 (923) | 30-15860 | 9 |
+| my CA-CFAR 10 m, with length rule (old 5d) | 0.90 (100)† | 0.90 (100)† | 0.90 (100)† | 18-100 | 5d |
+| THOR pipeline, linear head, 10 m (5d) | 0.98 (249) | 1.00 (442) | 1.00 (594)† | 0-594 | 5d |
 
-Blank: the curve doesn't reach that count. 10 m rows (own windows): the CA-CFAR without the length rule is this sweep's `cacfar-nolength-10m` (current 5d's curve on open-water frames); with the rule, the old 5d run with the rule always on (`ref_5d_dir`; current 5d's curve on icy frames); THOR, 5d's score sweep.
+Each cell: recall of the real run with the most detections at or below the budget, with its detection count (no interpolation). †: that run has fewer than 0.8 x the budget. `none`: the detector has no run at or below the budget.
 
-### Recall by IIP size, near 500 detections
+10 m rows (own windows): the CA-CFAR without the length rule is this sweep's `cacfar-nolength-10m` (current 5d's curve on open-water frames); with the rule, the old 5d run with the rule always on (`ref_5d_dir`; current 5d's curve on icy frames); THOR, 5d's score sweep.
+
+### Recall by IIP size, at most 500 detections (real runs)
 
 | Detector | PFA | Detections | small 15-60 m (n=15) | medium 61-120 m (n=31) | large >120 m (n=3) |
 |---|---|---|---|---|---|
@@ -95,7 +98,7 @@ Blank: the curve doesn't reach that count. 10 m rows (own windows): the CA-CFAR 
 | log-normal (HH AND HV) | 1e-03 | 82 | 14/15 | 29/31 | 3/3 |
 | K (HH AND HV) | 1e-03 | 65 | 13/15 | 29/31 | 3/3 |
 | Wishart | 1e-01 | 79 | 15/15 | 31/31 | 3/3 |
-| NIS | 1e-03 | 967 | 15/15 | 31/31 | 3/3 |
+| NIS | 1e-05 | 95 | 15/15 | 31/31 | 3/3 |
 | iDPolRAD (window cropped to 41 px) | 1e-13 | 422 | 14/15 | 30/31 | 3/3 |
 | my CA-CFAR, HV, no length rule | 1e-01 | 87 | 15/15 | 31/31 | 3/3 |
 | my CA-CFAR, HV, with length rule | 1e-01 | 80 | 14/15 | 26/31 | 2/3 |
@@ -103,9 +106,9 @@ Blank: the curve doesn't reach that count. 10 m rows (own windows): the CA-CFAR 
 | my CA-CFAR, HV, with length rule, own windows | 1e-01 | 78 | 15/15 | 23/31 | 1/3 |
 | my CA-CFAR, HH AND HV, no length rule | 1e-03 | 192 | 15/15 | 30/31 | 3/3 |
 | my CA-CFAR 10 m, no length rule | 1e-03 | 103 | 14/15 | 30/31 | 3/3 |
-| my CA-CFAR 10 m, HH AND HV, no length rule | 1e-04 | 923 | 15/15 | 31/31 | 3/3 |
+| my CA-CFAR 10 m, HH AND HV, no length rule | 1e-05 | 129 | 15/15 | 30/31 | 3/3 |
 | my CA-CFAR 10 m, with length rule (old 5d) |  |  | 10/15 | 26/31 | 1/3 |
-| THOR linear 10 m (5d) |  |  | 11/15 | 28/31 | 1/3 |
+| THOR pipeline, linear head, 10 m (5d) |  |  | 11/15 | 28/31 | 1/3 |
 
 10 m rows without a PFA: 5d's operating points (CA-CFAR at `cfar.pfa`, THOR at the same detection count).
 
@@ -113,49 +116,51 @@ Figure (local, gitignored): `data/benchmark/iw40/S1A_IW_20190424T093305_DHP_RTC1
 
 ## S1B_IW_20190423T094026_DHP_RTC10_G_gpuned_A784
 
-- Labels compared: 150. ENL at 40 m (open-water box): HH 4.839, HV 1.457. My CA-CFAR: ENL 1.519, guard / background half-widths (px): paper 4 / 6, own 2 / 10.
+- Labels compared: 130. ENL at 40 m (open-water box): HH 4.839, HV 1.457. My CA-CFAR: ENL 1.519, guard / background half-widths (px): paper 4 / 6, own 2 / 10.
 
 ### Recall at matched detection counts
 
 | Detector | @250 | @500 | @1000 | Detections covered | PFAs run |
 |---|---|---|---|---|---|
-| gamma (HH AND HV) | 0.80 | 0.84 | 0.85 | 134-278897 | 11 |
-| log-normal (HH AND HV) | 0.78 | 0.85 | 0.85 | 0-358430 | 11 |
-| K (HH AND HV) | 0.77 | 0.84 | 0.84 | 2-484034 | 11 |
-| Wishart |  |  |  | 6-71 | 11 |
-| NIS |  | 0.86 | 0.86 | 351-10998 | 10 |
-| iDPolRAD (window cropped to 41 px) | 0.78 | 0.83 | 0.84 | 83-5151 | 10 |
-| my CA-CFAR, HV, no length rule | 0.79 | 0.85 | 0.86 | 35-1048 | 11 |
-| my CA-CFAR, HV, with length rule | 0.77 | 0.83 | 0.83 | 35-1027 | 11 |
-| my CA-CFAR, HV, no length rule, own windows | 0.78 | 0.84 | 0.86 | 47-1018 | 11 |
-| my CA-CFAR, HV, with length rule, own windows | 0.77 | 0.82 |  | 47-997 | 11 |
-| my CA-CFAR, HH AND HV, no length rule | 0.80 | 0.85 | 0.86 | 124-336510 | 11 |
-| my CA-CFAR 10 m, no length rule | 0.78 | 0.85 | 0.85 | 87-1160 | 5d |
-| my CA-CFAR 10 m, HH AND HV, no length rule | 0.79 | 0.85 | 0.86 | 182-53830 | 9 |
-| my CA-CFAR 10 m, with length rule (old 5d) | 0.77 | 0.82 | 0.83 | 87-1150 | 5d |
-| THOR linear 10 m (5d) | 0.80 | 0.86 | 0.86 | 0-1827 | 5d |
+| gamma (HH AND HV) | 0.92 (238) | 0.97 (418) | 0.98 (823) | 134-278897 | 11 |
+| log-normal (HH AND HV) | 0.71 (140)† | 0.98 (497) | 0.98 (497)† | 0-358430 | 11 |
+| K (HH AND HV) | 0.84 (203) | 0.97 (376)† | 0.97 (376)† | 2-484034 | 11 |
+| Wishart | 0.42 (71)† | 0.42 (71)† | 0.42 (71)† | 6-71 | 11 |
+| NIS | none | 0.99 (468) | 1.00 (652)† | 351-10998 | 10 |
+| iDPolRAD (window cropped to 41 px) | 0.89 (228) | 0.95 (435) | 0.95 (435)† | 83-5151 | 10 |
+| my CA-CFAR, HV, no length rule | 0.85 (202) | 0.98 (388)† | 0.98 (388)† | 35-1048 | 11 |
+| my CA-CFAR, HV, with length rule | 0.83 (199)† | 0.95 (383)† | 0.95 (383)† | 35-1027 | 11 |
+| my CA-CFAR, HV, no length rule, own windows | 0.86 (219) | 0.96 (378)† | 0.96 (378)† | 47-1018 | 11 |
+| my CA-CFAR, HV, with length rule, own windows | 0.84 (212) | 0.94 (370)† | 0.95 (997) | 47-997 | 11 |
+| my CA-CFAR, HH AND HV, no length rule | 0.92 (238) | 0.98 (419) | 0.98 (419)† | 124-336510 | 11 |
+| my CA-CFAR 10 m, no length rule | 0.89 (241) | 0.98 (473) | 0.98 (473)† | 87-1160 | 5d |
+| my CA-CFAR 10 m, HH AND HV, no length rule | 0.89 (222) | 0.98 (414) | 0.99 (877) | 182-53830 | 9 |
+| my CA-CFAR 10 m, with length rule (old 5d) | 0.87 (235) | 0.95 (463) | 0.95 (463)† | 87-1150 | 5d |
+| THOR pipeline, linear head, 10 m (5d) | 0.92 (247) | 0.99 (493) | 0.99 (938) | 0-1827 | 5d |
 
-Blank: the curve doesn't reach that count. 10 m rows (own windows): the CA-CFAR without the length rule is this sweep's `cacfar-nolength-10m` (current 5d's curve on open-water frames); with the rule, the old 5d run with the rule always on (`ref_5d_dir`; current 5d's curve on icy frames); THOR, 5d's score sweep.
+Each cell: recall of the real run with the most detections at or below the budget, with its detection count (no interpolation). †: that run has fewer than 0.8 x the budget. `none`: the detector has no run at or below the budget.
 
-### Recall by IIP size, near 500 detections
+10 m rows (own windows): the CA-CFAR without the length rule is this sweep's `cacfar-nolength-10m` (current 5d's curve on open-water frames); with the rule, the old 5d run with the rule always on (`ref_5d_dir`; current 5d's curve on icy frames); THOR, 5d's score sweep.
 
-| Detector | PFA | Detections | small 15-60 m (n=24) | medium 61-120 m (n=119) | large >120 m (n=7) |
+### Recall by IIP size, at most 500 detections (real runs)
+
+| Detector | PFA | Detections | small 15-60 m (n=22) | medium 61-120 m (n=102) | large >120 m (n=6) |
 |---|---|---|---|---|---|
-| gamma (HH AND HV) | 1e-05 | 418 | 22/24 | 98/119 | 6/7 |
-| log-normal (HH AND HV) | 1e-03 | 497 | 22/24 | 100/119 | 6/7 |
-| K (HH AND HV) | 1e-03 | 376 | 22/24 | 98/119 | 6/7 |
-| Wishart | 1e-01 | 71 | 6/24 | 47/119 | 2/7 |
-| NIS | 1e-11 | 510 | 22/24 | 101/119 | 6/7 |
-| iDPolRAD (window cropped to 41 px) | 1e-05 | 435 | 21/24 | 97/119 | 6/7 |
-| my CA-CFAR, HV, no length rule | 1e-03 | 388 | 22/24 | 99/119 | 6/7 |
-| my CA-CFAR, HV, with length rule | 1e-03 | 383 | 22/24 | 98/119 | 4/7 |
-| my CA-CFAR, HV, no length rule, own windows | 1e-03 | 378 | 20/24 | 99/119 | 6/7 |
-| my CA-CFAR, HV, with length rule, own windows | 1e-03 | 370 | 20/24 | 98/119 | 4/7 |
-| my CA-CFAR, HH AND HV, no length rule | 1e-05 | 419 | 22/24 | 100/119 | 6/7 |
-| my CA-CFAR 10 m, no length rule | 1e-04 | 473 | 22/24 | 99/119 | 6/7 |
-| my CA-CFAR 10 m, HH AND HV, no length rule | 1e-06 | 564 | 22/24 | 100/119 | 6/7 |
-| my CA-CFAR 10 m, with length rule (old 5d) |  |  | 21/24 | 94/119 | 3/7 |
-| THOR linear 10 m (5d) |  |  | 18/24 | 99/119 | 6/7 |
+| gamma (HH AND HV) | 1e-05 | 418 | 22/22 | 98/102 | 6/6 |
+| log-normal (HH AND HV) | 1e-03 | 497 | 22/22 | 100/102 | 6/6 |
+| K (HH AND HV) | 1e-03 | 376 | 22/22 | 98/102 | 6/6 |
+| Wishart | 1e-01 | 71 | 6/22 | 47/102 | 2/6 |
+| NIS | 1e-13 | 468 | 22/22 | 101/102 | 6/6 |
+| iDPolRAD (window cropped to 41 px) | 1e-05 | 435 | 21/22 | 97/102 | 6/6 |
+| my CA-CFAR, HV, no length rule | 1e-03 | 388 | 22/22 | 99/102 | 6/6 |
+| my CA-CFAR, HV, with length rule | 1e-03 | 383 | 22/22 | 98/102 | 4/6 |
+| my CA-CFAR, HV, no length rule, own windows | 1e-03 | 378 | 20/22 | 99/102 | 6/6 |
+| my CA-CFAR, HV, with length rule, own windows | 1e-03 | 370 | 20/22 | 98/102 | 4/6 |
+| my CA-CFAR, HH AND HV, no length rule | 1e-05 | 419 | 22/22 | 100/102 | 6/6 |
+| my CA-CFAR 10 m, no length rule | 1e-04 | 473 | 22/22 | 99/102 | 6/6 |
+| my CA-CFAR 10 m, HH AND HV, no length rule | 1e-08 | 414 | 22/22 | 99/102 | 6/6 |
+| my CA-CFAR 10 m, with length rule (old 5d) |  |  | 21/22 | 94/102 | 3/6 |
+| THOR pipeline, linear head, 10 m (5d) |  |  | 18/22 | 99/102 | 6/6 |
 
 10 m rows without a PFA: 5d's operating points (CA-CFAR at `cfar.pfa`, THOR at the same detection count).
 
@@ -163,49 +168,51 @@ Figure (local, gitignored): `data/benchmark/iw40/S1B_IW_20190423T094026_DHP_RTC1
 
 ## S1A_IW_20190417T094107_DHP_RTC10_G_gpuned_EDB4
 
-- Labels compared: 46. ENL at 40 m (open-water box): HH 8.189, HV 3.216. My CA-CFAR: ENL 3.333, guard / background half-widths (px): paper 4 / 6, own 2 / 10.
+- Labels compared: 39. ENL at 40 m (open-water box): HH 8.189, HV 3.216. My CA-CFAR: ENL 3.333, guard / background half-widths (px): paper 4 / 6, own 2 / 10.
 
 ### Recall at matched detection counts
 
 | Detector | @250 | @500 | @1000 | Detections covered | PFAs run |
 |---|---|---|---|---|---|
-| gamma (HH AND HV) | 0.79 | 0.83 | 0.84 | 25-1840 | 10 |
-| log-normal (HH AND HV) | 0.78 | 0.80 | 0.83 | 0-311178 | 11 |
-| K (HH AND HV) | 0.80 | 0.81 | 0.81 | 0-340049 | 11 |
-| Wishart | 0.81 | 0.82 |  | 2-690 | 11 |
-| NIS | 0.80 | 0.83 | 0.83 | 79-6606 | 10 |
-| iDPolRAD (window cropped to 41 px) | 0.80 | 0.83 | 0.84 | 42-107173 | 11 |
-| my CA-CFAR, HV, no length rule | 0.78 | 0.84 |  | 8-534 | 11 |
-| my CA-CFAR, HV, with length rule | 0.77 |  |  | 7-376 | 11 |
-| my CA-CFAR, HV, no length rule, own windows | 0.78 | 0.84 |  | 13-528 | 11 |
-| my CA-CFAR, HV, with length rule, own windows | 0.76 |  |  | 12-355 | 11 |
-| my CA-CFAR, HH AND HV, no length rule | 0.80 | 0.85 | 0.85 | 41-284366 | 11 |
-| my CA-CFAR 10 m, no length rule | 0.81 | 0.83 | 0.84 | 38-2092 | 5d |
-| my CA-CFAR 10 m, HH AND HV, no length rule | 0.82 | 0.84 | 0.85 | 67-70161 | 9 |
-| my CA-CFAR 10 m, with length rule (old 5d) | 0.67 | 0.67 | 0.68 | 30-2035 | 5d |
-| THOR linear 10 m (5d) | 0.80 | 0.85 | 0.85 | 0-4162 | 5d |
+| gamma (HH AND HV) | 0.92 (219) | 0.97 (401) | 0.97 (401)† | 25-1840 | 10 |
+| log-normal (HH AND HV) | 0.87 (96)† | 0.87 (96)† | 0.97 (919) | 0-311178 | 11 |
+| K (HH AND HV) | 0.95 (225) | 0.95 (225)† | 0.95 (225)† | 0-340049 | 11 |
+| Wishart | 0.95 (225) | 0.95 (225)† | 0.97 (690)† | 2-690 | 11 |
+| NIS | 0.95 (223) | 0.97 (440) | 0.97 (823) | 79-6606 | 10 |
+| iDPolRAD (window cropped to 41 px) | 0.92 (215) | 0.97 (356)† | 0.97 (356)† | 42-107173 | 11 |
+| my CA-CFAR, HV, no length rule | 0.85 (156)† | 0.95 (294)† | 1.00 (534)† | 8-534 | 11 |
+| my CA-CFAR, HV, with length rule | 0.82 (137)† | 0.61 (376)† | 0.61 (376)† | 7-376 | 11 |
+| my CA-CFAR, HV, no length rule, own windows | 0.85 (165)† | 0.95 (300)† | 1.00 (528)† | 13-528 | 11 |
+| my CA-CFAR, HV, with length rule, own windows | 0.82 (136)† | 0.41 (355)† | 0.41 (355)† | 12-355 | 11 |
+| my CA-CFAR, HH AND HV, no length rule | 0.90 (184)† | 1.00 (417) | 1.00 (417)† | 41-284366 | 11 |
+| my CA-CFAR 10 m, no length rule | 0.90 (167)† | 0.97 (279)† | 0.97 (591)† | 38-2092 | 5d |
+| my CA-CFAR 10 m, HH AND HV, no length rule | 0.95 (183)† | 0.97 (306)† | 1.00 (870) | 67-70161 | 9 |
+| my CA-CFAR 10 m, with length rule (old 5d) | 0.80 (236) | 0.80 (236)† | 0.80 (539)† | 30-2035 | 5d |
+| THOR pipeline, linear head, 10 m (5d) | 0.95 (247) | 1.00 (455) | 1.00 (876) | 0-4162 | 5d |
 
-Blank: the curve doesn't reach that count. 10 m rows (own windows): the CA-CFAR without the length rule is this sweep's `cacfar-nolength-10m` (current 5d's curve on open-water frames); with the rule, the old 5d run with the rule always on (`ref_5d_dir`; current 5d's curve on icy frames); THOR, 5d's score sweep.
+Each cell: recall of the real run with the most detections at or below the budget, with its detection count (no interpolation). †: that run has fewer than 0.8 x the budget. `none`: the detector has no run at or below the budget.
 
-### Recall by IIP size, near 500 detections
+10 m rows (own windows): the CA-CFAR without the length rule is this sweep's `cacfar-nolength-10m` (current 5d's curve on open-water frames); with the rule, the old 5d run with the rule always on (`ref_5d_dir`; current 5d's curve on icy frames); THOR, 5d's score sweep.
 
-| Detector | PFA | Detections | small 15-60 m (n=3) | medium 61-120 m (n=43) |
+### Recall by IIP size, at most 500 detections (real runs)
+
+| Detector | PFA | Detections | small 15-60 m (n=3) | medium 61-120 m (n=36) |
 |---|---|---|---|---|
-| gamma (HH AND HV) | 1e-05 | 401 | 2/3 | 36/43 |
-| log-normal (HH AND HV) | 1e-03 | 919 | 2/3 | 36/43 |
-| K (HH AND HV) | 1e-03 | 225 | 2/3 | 35/43 |
-| Wishart | 1e-01 | 690 | 2/3 | 36/43 |
-| NIS | 1e-07 | 440 | 2/3 | 36/43 |
-| iDPolRAD (window cropped to 41 px) | 1e-05 | 356 | 2/3 | 36/43 |
-| my CA-CFAR, HV, no length rule | 1e-01 | 534 | 3/3 | 36/43 |
-| my CA-CFAR, HV, with length rule | 1e-01 | 376 | 2/3 | 22/43 |
-| my CA-CFAR, HV, no length rule, own windows | 1e-01 | 528 | 3/3 | 36/43 |
-| my CA-CFAR, HV, with length rule, own windows | 1e-01 | 355 | 2/3 | 14/43 |
-| my CA-CFAR, HH AND HV, no length rule | 1e-05 | 417 | 3/3 | 36/43 |
-| my CA-CFAR 10 m, no length rule | 1e-04 | 591 | 2/3 | 36/43 |
-| my CA-CFAR 10 m, HH AND HV, no length rule | 1e-08 | 306 | 2/3 | 36/43 |
-| my CA-CFAR 10 m, with length rule (old 5d) |  |  | 1/3 | 27/43 |
-| THOR linear 10 m (5d) |  |  | 1/3 | 30/43 |
+| gamma (HH AND HV) | 1e-05 | 401 | 2/3 | 36/36 |
+| log-normal (HH AND HV) | 1e-05 | 96 | 2/3 | 32/36 |
+| K (HH AND HV) | 1e-03 | 225 | 2/3 | 35/36 |
+| Wishart | 1e-03 | 225 | 1/3 | 36/36 |
+| NIS | 1e-07 | 440 | 2/3 | 36/36 |
+| iDPolRAD (window cropped to 41 px) | 1e-05 | 356 | 2/3 | 36/36 |
+| my CA-CFAR, HV, no length rule | 1e-03 | 294 | 1/3 | 36/36 |
+| my CA-CFAR, HV, with length rule | 1e-01 | 376 | 2/3 | 22/36 |
+| my CA-CFAR, HV, no length rule, own windows | 1e-03 | 300 | 1/3 | 36/36 |
+| my CA-CFAR, HV, with length rule, own windows | 1e-01 | 355 | 2/3 | 14/36 |
+| my CA-CFAR, HH AND HV, no length rule | 1e-05 | 417 | 3/3 | 36/36 |
+| my CA-CFAR 10 m, no length rule | 1e-05 | 279 | 2/3 | 36/36 |
+| my CA-CFAR 10 m, HH AND HV, no length rule | 1e-08 | 306 | 2/3 | 36/36 |
+| my CA-CFAR 10 m, with length rule (old 5d) |  |  | 1/3 | 27/36 |
+| THOR pipeline, linear head, 10 m (5d) |  |  | 1/3 | 30/36 |
 
 10 m rows without a PFA: 5d's operating points (CA-CFAR at `cfar.pfa`, THOR at the same detection count).
 
@@ -217,70 +224,69 @@ Detections and matches summed per detector and PFA (THOR: score threshold) over 
 
 ### Recall at 2 x the labels
 
-Each curve read at 2 detections per label of that frame (pooled: 1024), since the frames hold 46-267 labels and a fixed count would sit at a different point of each curve.
+Each curve read at 2 detections per label of that frame (pooled: 948), since the frames hold 46-267 labels and a fixed count would sit at a different point of each curve.
 
-| Detector | 04-17 (46) | 04-23 (150) | 04-24 (49) | 04-29 (267) | pooled (512) |
+| Detector | 04-17 (39) | 04-23 (130) | 04-24 (49) | 04-29 (256) | pooled (474) |
 |---|---|---|---|---|---|
-| gamma (HH AND HV) | 0.57 | 0.81 | 0.95 | 0.88 | 0.83 |
-| log-normal (HH AND HV) | 0.73 | 0.80 | 0.94 | 0.85 | 0.82 |
-| K (HH AND HV) | 0.58 | 0.80 | 0.92 | 0.85 | 0.81 |
-| Wishart | 0.62 |  |  |  |  |
-| NIS | 0.56 |  | 1.00 |  |  |
-| iDPolRAD (window cropped to 41 px) | 0.57 | 0.79 | 0.94 | 0.88 | 0.66 |
-| my CA-CFAR, HV, no length rule | 0.61 | 0.82 |  | 0.85 | 0.82 |
-| my CA-CFAR, HV, with length rule | 0.63 | 0.80 |  | 0.84 | 0.81 |
-| my CA-CFAR, HV, no length rule, own windows | 0.58 | 0.81 |  | 0.87 | 0.83 |
-| my CA-CFAR, HV, with length rule, own windows | 0.63 | 0.79 |  | 0.84 | 0.81 |
-| my CA-CFAR, HH AND HV, no length rule | 0.52 | 0.82 | 0.97 | 0.87 | 0.83 |
-| my CA-CFAR 10 m, no length rule | 0.64 | 0.82 | 0.95 | 0.84 | 0.82 |
-| my CA-CFAR 10 m, HH AND HV, no length rule | 0.63 | 0.82 | 0.97 | 0.86 | 0.83 |
-| my CA-CFAR 10 m, with length rule (old 5d) | 0.53 | 0.79 | 0.90 | 0.77 | 0.76 |
-| THOR linear 10 m (5d) | 0.61 | 0.85 | 0.98 | 0.91 | 0.86 |
-| my CA-CFAR 10 m, current 5d (length rule in icy frames) | 0.53 | 0.79 | 0.95 | 0.84 | 0.81 |
+| gamma (HH AND HV) | 0.59 (71) | 0.92 (238) | 0.92 (63)† | 0.91 (492) | 0.84 (777) |
+| log-normal (HH AND HV) | 0.51 (32)† | 0.71 (140)† | 0.94 (82) | 0.88 (466) | 0.88 (877) |
+| K (HH AND HV) | 0.49 (48)† | 0.84 (203)† | 0.92 (65)† | 0.82 (371)† | 0.80 (670)† |
+| Wishart | 0.67 (72) | 0.42 (71)† | 1.00 (79) | 0.30 (92)† | 0.46 (932) |
+| NIS | none | none | 1.00 (95) | none | none |
+| iDPolRAD (window cropped to 41 px) | 0.59 (73) | 0.89 (228) | 0.94 (90) | 0.91 (495) | 0.69 (889) |
+| my CA-CFAR, HV, no length rule | 0.56 (60)† | 0.85 (202)† | 1.00 (87) | 0.88 (480) | 0.79 (673)† |
+| my CA-CFAR, HV, with length rule | 0.54 (50)† | 0.83 (199)† | 0.86 (80) | 0.86 (462) | 0.86 (914) |
+| my CA-CFAR, HV, no length rule, own windows | 0.59 (71) | 0.86 (219) | 1.00 (90) | 0.90 (502) | 0.81 (722)† |
+| my CA-CFAR, HV, with length rule, own windows | 0.56 (53)† | 0.84 (212) | 0.80 (78)† | 0.87 (476) | 0.87 (935) |
+| my CA-CFAR, HH AND HV, no length rule | 0.54 (73) | 0.92 (238) | 0.96 (65)† | 0.90 (508) | 0.86 (832) |
+| my CA-CFAR 10 m, no length rule | 0.61 (57)† | 0.89 (241) | 0.90 (62)† | 0.87 (508) | 0.81 (800) |
+| my CA-CFAR 10 m, HH AND HV, no length rule | 0.67 (67) | 0.89 (222) | 0.96 (77)† | 0.85 (465) | 0.87 (897) |
+| my CA-CFAR 10 m, with length rule (old 5d) | 0.56 (59)† | 0.87 (235) | 0.84 (59)† | 0.77 (476) | 0.80 (926) |
+| THOR pipeline, linear head, 10 m (5d) | 0.69 (76) | 0.93 (257) | 0.96 (86) | 0.94 (502) | 0.92 (948) |
+| my CA-CFAR 10 m, current 5d (length rule in icy frames) | 0.54 (53)† | 0.90 (260) | 0.96 (77)† | 0.85 (465) | 0.85 (855) |
 
-Blank: the curve doesn't reach that count in that frame (pooled: in every frame at a shared setting).
+Each cell: recall of the real run with the most detections at or below the budget, with its detection count (no interpolation). †: that run has fewer than 0.8 x the budget. `none`: the detector has no run at or below the budget.
 
 ### Pooled recall at matched detection counts
 
 | Detector | @500 | @1000 | @2000 | Detections covered |
 |---|---|---|---|---|
-| gamma (HH AND HV) | 0.63 | 0.83 | 0.89 | 374-4510 |
-| log-normal (HH AND HV) | 0.62 | 0.82 | 0.88 | 1-1199626 |
-| K (HH AND HV) | 0.64 | 0.81 | 0.89 | 8-1447106 |
-| Wishart | 0.37 |  |  | 71-932 |
-| NIS |  |  | 0.92 | 1082-28528 |
-| iDPolRAD (window cropped to 41 px) | 0.53 | 0.66 | 0.76 | 349-9127 |
-| my CA-CFAR, HV, no length rule | 0.63 | 0.82 | 0.89 | 107-3462 |
-| my CA-CFAR, HV, with length rule | 0.63 | 0.81 | 0.84 | 104-3188 |
-| my CA-CFAR, HV, no length rule, own windows | 0.63 | 0.83 | 0.89 | 141-3393 |
-| my CA-CFAR, HV, with length rule, own windows | 0.63 | 0.81 | 0.81 | 135-3061 |
-| my CA-CFAR, HH AND HV, no length rule | 0.64 | 0.83 | 0.90 | 384-1136899 |
-| my CA-CFAR 10 m, no length rule | 0.58 | 0.82 | 0.88 | 319-4923 |
-| my CA-CFAR 10 m, HH AND HV, no length rule |  | 0.83 | 0.89 | 573-193521 |
-| my CA-CFAR 10 m, with length rule (old 5d) | 0.55 | 0.75 | 0.81 | 286-4798 |
-| THOR linear 10 m (5d) | 0.62 | 0.86 | 0.91 | 0-10144 |
-| my CA-CFAR 10 m, current 5d (length rule in icy frames) | 0.58 | 0.80 | 0.86 | 311-4856 |
+| gamma (HH AND HV) | 0.66 (462) | 0.89 (956) | 0.96 (1784) | 374-4510 |
+| log-normal (HH AND HV) | 0.62 (435) | 0.88 (877) | 0.88 (877)† | 1-1199626 |
+| K (HH AND HV) | 0.59 (376)† | 0.80 (670)† | 0.96 (1505)† | 8-1447106 |
+| Wishart | 0.38 (400) | 0.46 (932) | 0.46 (932)† | 71-932 |
+| NIS | none | none | 0.99 (1742) | 1082-28528 |
+| iDPolRAD (window cropped to 41 px) | 0.49 (349)† | 0.69 (889) | 0.77 (1330)† | 349-9127 |
+| my CA-CFAR, HV, no length rule | 0.68 (496) | 0.88 (956) | 0.95 (1542)† | 107-3462 |
+| my CA-CFAR, HV, with length rule | 0.67 (478) | 0.86 (914) | 0.93 (1487)† | 104-3188 |
+| my CA-CFAR, HV, no length rule, own windows | 0.62 (417) | 0.89 (999) | 0.95 (1550)† | 141-3393 |
+| my CA-CFAR, HV, with length rule, own windows | 0.59 (393)† | 0.87 (935) | 0.92 (1468)† | 135-3061 |
+| my CA-CFAR, HH AND HV, no length rule | 0.65 (439) | 0.86 (832) | 0.97 (1784) | 384-1136899 |
+| my CA-CFAR 10 m, no length rule | 0.59 (454) | 0.81 (800) | 0.93 (1323)† | 319-4923 |
+| my CA-CFAR 10 m, HH AND HV, no length rule | none | 0.87 (897) | 0.95 (1575)† | 573-193521 |
+| my CA-CFAR 10 m, with length rule (old 5d) | 0.52 (406) | 0.80 (926) | 0.87 (1885) | 286-4798 |
+| THOR pipeline, linear head, 10 m (5d) | 0.67 (488) | 0.92 (976) | 0.99 (1979) | 0-10144 |
+| my CA-CFAR 10 m, current 5d (length rule in icy frames) | 0.62 (463) | 0.87 (975) | 0.93 (1516)† | 387-5123 |
 
-### Pooled recall by IIP size, near 1024 detections
+### Pooled recall by IIP size, at most 948 detections (real runs)
 
-| Detector | PFA | Detections | small 15-60 m (n=73) | medium 61-120 m (n=425) | large >120 m (n=14) |
+| Detector | PFA | Detections | small 15-60 m (n=71) | medium 61-120 m (n=390) | large >120 m (n=13) |
 |---|---|---|---|---|---|
-| gamma (HH AND HV) | 1e-09 | 956 | 46/73 | 362/425 | 13/14 |
-| log-normal (HH AND HV) | 1e-05 | 877 | 49/73 | 355/425 | 12/14 |
-| K (HH AND HV) | 1e-03 | 1505 | 61/73 | 379/425 | 13/14 |
-| Wishart | 1e-01 | 932 | 27/73 | 186/425 | 7/14 |
-| NIS | 1e-21 | 1082 | 63/73 | 373/425 | 13/14 |
-| iDPolRAD (window cropped to 41 px) | 1e-13 | 889 | 37/73 | 277/425 | 13/14 |
-| my CA-CFAR, HV, no length rule | 1e-05 | 956 | 45/73 | 359/425 | 13/14 |
-| my CA-CFAR, HV, with length rule | 1e-05 | 914 | 45/73 | 354/425 | 10/14 |
-| my CA-CFAR, HV, no length rule, own windows | 1e-05 | 999 | 46/73 | 364/425 | 13/14 |
-| my CA-CFAR, HV, with length rule, own windows | 1e-05 | 935 | 46/73 | 358/425 | 7/14 |
-| my CA-CFAR, HH AND HV, no length rule | 1e-09 | 1020 | 47/73 | 367/425 | 13/14 |
-| my CA-CFAR 10 m, no length rule | 1e-06 | 1008 | 53/73 | 353/425 | 13/14 |
-| my CA-CFAR 10 m, HH AND HV, no length rule | 1e-10 | 1152 | 57/73 | 370/425 | 13/14 |
-| my CA-CFAR 10 m, with length rule (old 5d) |  |  | 52/73 | 324/425 | 4/14 |
-| my CA-CFAR 10 m, current 5d (length rule in icy frames) |  |  | 52/73 | 346/425 | 10/14 |
-| THOR linear 10 m (5d) |  |  | 52/73 | 372/425 | 11/14 |
+| gamma (HH AND HV) | 1e-11 | 777 | 40/71 | 345/390 | 13/13 |
+| log-normal (HH AND HV) | 1e-05 | 877 | 49/71 | 355/390 | 12/13 |
+| K (HH AND HV) | 1e-05 | 670 | 38/71 | 327/390 | 12/13 |
+| Wishart | 1e-01 | 932 | 27/71 | 186/390 | 7/13 |
+| iDPolRAD (window cropped to 41 px) | 1e-13 | 889 | 37/71 | 277/390 | 13/13 |
+| my CA-CFAR, HV, no length rule | 1e-07 | 673 | 36/71 | 327/390 | 13/13 |
+| my CA-CFAR, HV, with length rule | 1e-05 | 914 | 45/71 | 354/390 | 10/13 |
+| my CA-CFAR, HV, no length rule, own windows | 1e-07 | 722 | 39/71 | 332/390 | 13/13 |
+| my CA-CFAR, HV, with length rule, own windows | 1e-05 | 935 | 46/71 | 358/390 | 7/13 |
+| my CA-CFAR, HH AND HV, no length rule | 1e-11 | 832 | 43/71 | 353/390 | 13/13 |
+| my CA-CFAR 10 m, no length rule | 1e-07 | 800 | 43/71 | 327/390 | 12/13 |
+| my CA-CFAR 10 m, HH AND HV, no length rule | 1e-12 | 897 | 53/71 | 347/390 | 13/13 |
+| my CA-CFAR 10 m, with length rule (old 5d) |  |  | 52/71 | 324/390 | 4/13 |
+| my CA-CFAR 10 m, current 5d (length rule in icy frames) |  |  | 55/71 | 349/390 | 10/13 |
+| THOR pipeline, linear head, 10 m (5d) |  |  | 53/71 | 374/390 | 11/13 |
 
 10 m rows without a PFA: 5d's pooled operating points (CA-CFAR at `cfar.pfa`, THOR at the current CA-CFAR's count).
 
