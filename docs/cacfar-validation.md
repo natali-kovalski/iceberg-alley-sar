@@ -10,6 +10,33 @@ against the six published CFAR detectors of Færch et al. 2023 (their code), on 
   Scored by recall at matched detection counts (precision isn't measurable without AIS).
   Details: [m2b_iw40.md](../benchmarks/m2b_iw40.md).
 
+> **Revision 2026-11-02 (after external review): read this first.** All scores now use one
+> evaluation mask for labels and detections: 487 of the 492 Færch labels (5 lie outside the
+> scoring area), 474 of the 512 IW labels (38 lie within 5 km of pack ice, where detections
+> were already dropped). IW recall is read at a fixed detection budget (2 per label = 948) from
+> the real run with the most detections at or below it, never interpolated between PFAs.
+> Updated numbers:
+>
+> | | Færch, best F (no TNR) [95% CI] | Færch ΔF vs gamma [95% CI] | IW pooled recall, real run ≤ 948 |
+> |---|---|---|---|
+> | Gamma (library) | 0.640 [0.599, 0.675] | | 0.84 (777 det.) |
+> | My CA-CFAR, HV + 6 dB check, no length rule | 0.591 | −0.049 [−0.076, −0.024] | 0.79 (673 det.) |
+> | **My CA-CFAR, HH AND HV, no length rule** | **0.644** [0.604, 0.679] | **+0.004** [−0.012, +0.018] | **0.86** (832 det.) |
+> | Wishart / NIS | 0.657 / 0.654 | +0.017 / +0.014 (both include 0) | 0.46 (932) / none ≤ 948 |
+>
+> **Not distinguishable with this sample:** the HH AND HV CA-CFAR, gamma, Wishart and NIS on
+> the Færch scene (bootstrap intervals, [revision-robustness.md](revision-robustness.md)); on
+> IW the 40 m detectors land at different detection counts, so compare the curves. Where the
+> two pipelines differ (revision C11b, [revision-ablation.md](revision-ablation.md)): from my
+> HH AND HV CA-CFAR, fixing the ENL at 10.7, using the library's circular 68 px ring, and its
+> object handling (4-connected, 2-500 px, no merging, no edge buffer) each change F by at most
+> ±0.013; all three give 0.643 vs gamma 0.640. Fixing the ENL moves the best PFA one decade, onto
+> gamma's. **In an ablation on this one scene, the co-pol check accounts for the gap to gamma
+> (6 dB check −0.049, HH AND HV +0.004); window geometry, ENL and object handling don't
+> measurably change it, and the remaining difference (numerical vs closed-form threshold) is
+> not separated.** "Ties" below means not
+> distinguishable with this sample.
+
 ## Answer
 
 **Yes, at matched detection counts. On F it lags, and the 6 dB co-pol check is the reason.**

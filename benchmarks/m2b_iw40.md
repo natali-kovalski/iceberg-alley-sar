@@ -299,6 +299,14 @@ Figure: `docs/img/m2b_recall_pooled.png`. Tables: `pooled_sweep.csv`, `summary_r
 ![10 m recall vs detections](../docs/img/m2b_recall_10m_and.png)
 
 <!-- hand-written notes below; kept when bench-iw-compare re-runs -->
+
+> **Revision 2026-11-02.** The tables above use the shared evaluation mask (474 labels; 38 near
+> pack ice now out of the domain for labels as well as detections) and real runs at or below
+> each budget (no interpolation). The hand-written notes below quote the earlier numbers (512
+> labels, interpolated recall); read their gaps with the bootstrap intervals in
+> `docs/revision-robustness.md` (pooled recall about ±0.03, paired differences about ±0.03):
+> gaps called "ties" below are "not distinguishable with this sample". The THOR pipeline on
+> this same 40 m input: `docs/revision-thor-iw40.md` (0.914 at 925 detections).
 ## Observations: all four frames (2026-10-29)
 
 Four held-out April 2019 frames, 512 same-pass IIP labels (04-17: 46, 04-23: 150, 04-24: 49,

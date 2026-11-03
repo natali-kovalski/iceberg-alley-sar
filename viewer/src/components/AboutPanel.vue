@@ -26,24 +26,27 @@ const WRITEUP = `${REPO}/blob/main/docs/thor-vs-cfar.md`;
         detector? <b>THOR</b> is a model pretrained on huge amounts of satellite imagery,
         including Sentinel-1. It stays frozen here; only a tiny head of 769 numbers was trained
         on its features, using icebergs that International Ice Patrol analysts marked on 2019
-        and 2020 passes. The comparison is a <b>CA-CFAR</b>, the textbook method that flags
+        and 2020 passes. The detector is this <b>THOR pipeline</b> (frozen encoder + trained
+        head), not THOR on its own. The comparison is a <b>CA-CFAR</b>, the textbook method that flags
         pixels much brighter than the sea around them.
       </p>
 
       <h3>The result</h3>
       <p>
-        On four April 2019 passes that neither detector was tuned on, with 512 icebergs marked by
-        Ice Patrol analysts, THOR found <b>85%</b> and the CFAR <b>80%</b>, with the same number of
-        detections each. THOR's gain is mostly in medium-sized bergs; for large bergs it was
-        <b>11 of 14</b> against 10. On the globe, cyan
-        rings are THOR and orange circles the CFAR baseline. Click a pass marked "THOR vs CFAR" for
+        On four April 2019 passes that neither detector was tuned on, with 474 icebergs in open
+        water marked by Ice Patrol analysts, the THOR pipeline found <b>92%</b> and the CFAR
+        <b>87%</b> with the same detection budget (a gap of 5 points, 95% interval 2 to 8). The
+        gain is mostly in medium-sized bergs; for large bergs it was <b>11 of 13</b> against 10.
+        On the globe, cyan rings are the THOR pipeline and orange circles the CFAR baseline. Click a pass marked "THOR vs CFAR" for
         its chart.
       </p>
       <p class="note">
-        The fine print: it is one month of one year. THOR still needs the classical pack-ice
-        mask, because on its own it mistakes pack ice for bergs. Small bergs are a tie. Ships look
-        like bergs to radar, and without ship positions (AIS) neither detector's false-alarm rate
-        can be measured.
+        The fine print: it is one month of one year, scored after the fact on passes already
+        looked at. The pipeline still needs the classical pack-ice mask, because on its own it
+        mistakes pack ice for bergs. On small bergs the two can't be told apart. Ships look like
+        bergs to radar, and without ship positions (AIS) neither detector's false-alarm rate can
+        be measured; AIS would confirm ships only, and a target with no AIS match stays
+        "unknown".
       </p>
 
       <h3>How it's built</h3>

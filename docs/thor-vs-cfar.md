@@ -3,6 +3,21 @@
 Frozen THOR encoder (FM4CS, Apache 2.0) + a small trained head, compared with the CA-CFAR
 on the same HH/HV scenes and IIP labels. Reference: Forgaard et al., IGARSS 2026.
 
+> **Revision 2026-11-02 (after external review): read this first.** Scoring now uses one
+> evaluation mask for labels and detections (`evaluation.EvalDomain`). Before, detections
+> within 5 km of pack ice were dropped but the 38 labels there stayed in the denominator as
+> misses no detector could avoid. With the shared mask, 474 labels: the **THOR pipeline**
+> (frozen encoder + IW-trained head) **0.92 (438) vs CA-CFAR 0.87 (414)** at a fixed budget of
+> 975 detections, difference +0.05 [+0.02, +0.08] (95% bootstrap, labels resampled within
+> passes; passes resampled: [+0.03, +0.06]); medium 0.96 vs 0.89, small 0.75 vs 0.77, large
+> 11 vs 10 of 13. "Recall at a fixed detection budget" compares review workload, not
+> false-alarm rate or precision. The length rule's 500 km² trigger was set after seeing these
+> passes, so the numbers are retrospective diagnostics; the trigger is frozen. The 38 near-ice
+> labels on their own: [revision-near-ice.md](revision-near-ice.md) (no measurable benefit of
+> the rule). Every number below this note counts the old 512 labels; the matches are the same,
+> only the denominator changed. Intervals and chance tests:
+> [revision-robustness.md](revision-robustness.md).
+>
 > **Update 2026-11-02:** the CFAR now uses HH AND HV per pixel instead of the 6 dB HH check
 > (`detections.copol_test: and`, `cfar.pfa` 1e-11, set by detection count). 5d re-run: pooled
 > THOR 0.86 (438) vs CFAR 0.81 (414) at 975 detections (was 0.85 vs 0.80 at 961); medium 0.88

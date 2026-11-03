@@ -1,12 +1,12 @@
 # Iceberg Alley SAR
 
-Detecting icebergs off Newfoundland & Labrador in Sentinel-1 radar imagery with **THOR**, a SAR foundation model, benchmarked against a classical CA-CFAR detector, and showing them on an interactive CesiumJS globe with a timeline.
+Detecting icebergs off Newfoundland & Labrador in Sentinel-1 radar imagery with a pipeline built on **THOR**, a SAR foundation model (frozen encoder + a small head trained on IW frames), benchmarked against a classical CA-CFAR detector, and showing them on an interactive CesiumJS globe with a timeline.
 
 **Live demo:** https://natali-kovalski.github.io/iceberg-alley-sar/
 
 ![Cesium viewer: spring 2025 detections off NE Newfoundland](docs/img/viewer.png)
 
-**In short:** the frozen THOR foundation model with a 769-parameter linear head finds **86% of the icebergs that International Ice Patrol analysts marked** on four held-out Sentinel-1 passes (438 of 512). A well-tuned classical CA-CFAR detector finds **81%** at the same number of detections. THOR's gain is mostly in medium-sized bergs; for large bergs (> 120 m) it is 11 of 14 against the CFAR's 10. The classical SAR pipeline still matters: calibration, the land mask and the pack-ice mask come from it, and THOR depends on them.
+**In short:** our THOR-based pipeline (the frozen THOR encoder with a 769-parameter linear head trained on IW frames) finds **92% of the icebergs that International Ice Patrol analysts marked** in open water on four held-out Sentinel-1 passes (438 of 474). A classical CA-CFAR detector finds **87%** with the same detection budget; the difference is +5 points, 95% interval [+2, +8]. The gain is mostly in medium-sized bergs; for large bergs (> 120 m) it is 11 of 13 against the CFAR's 10. These are retrospective numbers from one month of one year, and the CFAR's ice-strip rule was set after seeing these passes. The classical SAR pipeline still matters: calibration, the land mask and the pack-ice mask come from it, and the THOR pipeline depends on them.
 
 ## The problem
 
@@ -16,25 +16,26 @@ This project builds that pipeline on free Copernicus Sentinel-1 data, for the co
 
 ## Results
 
-Both detectors ran on four held-out April 2019 passes with same-pass IIP analyst labels (512 bergs), with identical land and pack-ice masks and the same 500 m one-to-one matching. Precision can't be measured without AIS ship positions, so the comparison is **recall at the same number of detections**: the CFAR is swept over its false-alarm rate, THOR over its score, and both are read at the CFAR's detection count at its operating point (PFA 10⁻¹¹, HH AND HV). THOR was not tuned on these passes. The CFAR's ice-strip rule now applies only in scenes with pack ice (≥ 500 km² in its mask); that cutoff was set after seeing one of these passes, though it uses no labels (see [docs/thor-vs-cfar.md](docs/thor-vs-cfar.md)).
+Both detectors ran on four held-out April 2019 passes with same-pass IIP analyst labels, with identical land and pack-ice masks and the same 500 m one-to-one matching. The scoring domain is the same for labels and detections: open water at least 5 km from pack ice, which leaves 474 labels (38 more lie near the ice and are scored separately). Precision can't be measured without AIS ship positions, so the comparison is **recall at a fixed detection budget**: the CFAR's detection count at its operating point (PFA 10⁻¹¹, HH AND HV), 975 detections over the four passes. This compares review workload, not false-alarm rate or precision. The THOR pipeline was not tuned on these passes. The CFAR's ice-strip rule applies only in scenes with pack ice (≥ 500 km² in its mask); that cutoff was set after seeing these passes, though it uses no labels, so these are **retrospective diagnostics**: the cutoff is now frozen and needs independent scenes (see [docs/thor-vs-cfar.md](docs/thor-vs-cfar.md)).
 
-| Recall at the same detection count | **THOR** (linear head) | CA-CFAR (baseline) |
+| Recall at a fixed detection budget (975) | **THOR pipeline** (linear head) | CA-CFAR (baseline) |
 |---|---|---|
-| **4 passes pooled, 512 labels** | **0.86** (438) | 0.81 (414) |
-| 2019-04-29 (267 labels) | **0.90** | 0.85 |
-| Large bergs, > 120 m (14) | **11 of 14** | 10 of 14 |
-| Medium bergs, 61–120 m (425) | **0.88** | 0.82 |
-| Small bergs, 15–60 m (73) | 0.73 | **0.75** |
-| Highest recall, any setting | 0.92 | 0.89 |
+| **4 passes pooled, 474 labels** | **0.92** (438) [0.90, 0.95] | 0.87 (414) [0.84, 0.90] |
+| Difference, 95% bootstrap interval | **+0.05** [+0.02, +0.08] | |
+| 2019-04-29 (256 labels) | **0.94** | 0.89 |
+| Large bergs, > 120 m (13) | **11 of 13** | 10 of 13 |
+| Medium bergs, 61–120 m (390) | **0.96** | 0.89 |
+| Small bergs, 15–60 m (71) | 0.75 | **0.77** |
+| Highest recall, any setting | 1.00 | 0.96 |
 | Compute per 10 m scene | GPU, 8–15 min (laptop RTX 3070) | CPU |
 
 ![Recall vs. detections per pass, THOR vs. CA-CFAR](docs/img/thor_vs_cfar_recall.png)
 
-- **THOR leads pooled by 5 points**, mostly on medium bergs. It reaches the CFAR's pooled recall with about 17% fewer detections.
+- **The THOR pipeline leads pooled by 5 points**, mostly on medium bergs, and the bootstrap interval of the difference excludes zero (labels resampled within passes; resampling whole passes gives [+0.03, +0.06]). It reaches the CFAR's pooled recall with about 17% fewer detections. Intervals: [docs/revision-robustness.md](docs/revision-robustness.md).
 - **The CFAR flattens out.** Loosening its false-alarm rate from 10⁻⁸ to 10⁻⁵ adds about 3,600 detections and 16 bergs. THOR keeps climbing.
-- **Large bergs:** the CFAR sees them (30+ dB above the sea), but its 300 m ice-strip rule throws them away. With the rule applied in every scene, the CFAR found 4 of 14 and THOR led by 10 points (0.84 vs 0.74). Applied only where there is pack ice, the CFAR finds 10, and half of that gap is gone.
-- **Small bergs:** the CFAR is now slightly ahead (55 vs 53 of 73). A THOR token covers 80 m, which is coarse for a 20 m target. A 4×4 patch run is the next test.
-- **Caveats.** It is one month of one year, and the passes share some bergs. THOR learned from IIP analyst labels, so part of the gap may be agreement with their labelling style. Neither detector's precision is known.
+- **Large bergs:** the CFAR sees them (30+ dB above the sea), but its 300 m ice-strip rule throws them away. With the rule applied in every scene, the CFAR found 4 of the large bergs. Applied only where there is pack ice, it finds 10 of 13. Near the ice, where the rule is meant to help, it shows no measurable benefit on these passes: at equal detection counts, recall with and without it is the same ([docs/revision-near-ice.md](docs/revision-near-ice.md)).
+- **Small bergs:** the CFAR is slightly ahead (55 vs 53 of 71). A THOR token covers 80 m, which is coarse for a 20 m target. A 4×4 patch run is the next test.
+- **Caveats.** It is one month of one year, and the passes share some bergs. The head learned from IIP analyst labels, so part of the gap may be agreement with their labelling style. Neither detector's precision is known: a detection with no label may be an unlabelled berg, a ship or clutter. AIS would confirm ships only; a target with no AIS match is "unknown", not an iceberg.
 
 The viewer shows 32 scenes (28 passes) from spring 2019, 2020 and 2025 and autumn 2026, with THOR and CFAR as separate layers. Each test pass opens its own recall chart:
 
@@ -109,16 +110,18 @@ How the CFAR was tuned is in [docs/milestone2-cfar-findings.md](docs/milestone2-
 
 Until November 2026 the CFAR ran on HV alone, and each target also had to be 6 dB above its background in HH. That check is a second threshold that doesn't move with the false-alarm rate, so it capped recall. Since 2026-11-02 the pipeline runs a CA-CFAR on HH as well, per pixel, both bands at √PFA with their own measured ENL, as the gamma detector of Færch et al. 2023 does (`detections.copol_test: and`; `db` restores the old check). The new default PFA of 10⁻¹¹ gives the same number of detections as the 6 dB check at its old 10⁻⁶ (chosen by count, no labels used).
 
-| Recall at matched detection counts | 6 dB check | HH AND HV |
+| Same scoring for both (shared evaluation mask, 2026-11-02 revision) | 6 dB check | HH AND HV |
 |---|---|---|
-| Færch 2023 EW scene, 40 m, best F (paper's gamma: 0.636) | 0.587 | **0.639** |
-| 4 IW passes at 40 m, pooled @ 1,024 (gamma: 0.83) | 0.82 | **0.83** |
-| 4 IW passes at 10 m, no ice-strip rule, pooled @ 1,000 | 0.82 | **0.83** |
-| 5d at the operating point (rule in icy passes), pooled | 0.80 (408 of 512, 961 det.) | **0.81** (414, 975 det.) |
+| Færch 2023 EW scene, 40 m, best F (library gamma: 0.640) | 0.591 | **0.644** |
+| 4 IW passes at 40 m, pooled, real run ≤ 948 detections (gamma: 0.84 at 777) | 0.79 (673 det.) | **0.86** (832 det.) |
+| 4 IW passes at 10 m, no ice-strip rule, real run ≤ 948 | 0.81 (800 det.) | **0.87** (897 det.) |
+| 5d at the operating point (rule in icy passes), pooled, 474 labels | 0.86 (408, 961 det.) | **0.87** (414, 975 det.) |
 | — small / medium / large bergs | 52 / 346 / 10 | **55 / 349 / 10** |
-| THOR at the same count | 0.85 | 0.86 |
+| THOR pipeline at the same count | 0.92 | 0.92 |
 
-The gain is small (about 1 point), but the baseline now behaves like a standard dual-pol gamma CA-CFAR. At loose settings the AND curve floods faster: past about 2 detections per label the 6 dB check was hiding HV speckle. Details: [docs/cacfar-validation.md](docs/cacfar-validation.md). The 6 dB run is kept in `data/outputs/thor/5d_6db_check/`.
+The 40 m and 10 m rows compare real runs at or below the budget, so the two columns sit at different detection counts; the 5d rows share one count. On the Færch scene the HH AND HV CA-CFAR and gamma are not distinguishable (ΔF +0.004, 95% interval [−0.012, +0.018]).
+
+At the 5d operating point the gain is small (1 point), and the baseline now behaves like a standard dual-pol gamma CA-CFAR. At loose settings the AND curve floods faster: past about 2 detections per label the 6 dB check was hiding HV speckle. Details: [docs/cacfar-validation.md](docs/cacfar-validation.md). The 6 dB run is kept in `data/outputs/thor/5d_6db_check/`.
 
 ## Quickstart
 

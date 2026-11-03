@@ -106,6 +106,11 @@ everything and HH decides. It was added for 10 m HyP3 HV, where speckle grains p
 minimum; at 40 m on this stack it costs 0.02 F at the optimum and flattens the curve. The
 remaining gap to gamma (0.609-0.613 vs 0.636) is about what one channel (HV) costs against
 gamma's HH AND HV test, at the same windows. The edge buffer costs ~0.01; merging nothing.
+Revision C11b (2026-11-02, `docs/revision-ablation.md`): with HH AND HV instead of the check,
+F 0.644 vs gamma 0.640 (paired difference +0.004 [-0.012, +0.018]). From there, fixed ENL 10.7,
+the library's circular ring and its object handling each move F by at most ±0.013; in this
+ablation the co-pol check accounts for the gap, and the other pipeline differences don't
+measurably add to it on this scene.
 
 **Length rule.** Off is better by 0.02 F, all of it in medium and large bergs (large 87 vs
 82 %). This scene has no pack-ice mask; the rule only removes bergs here, as in 5d and 2b. At
