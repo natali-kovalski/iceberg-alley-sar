@@ -10,6 +10,12 @@ benchmark:
   cfar_runner: external/cfar_runner/run_cfar.py
   out_dir: data/benchmark
   window_limit_px: 41       # library stencil is +-20 px; wider windows are silently cropped
+  near_ice:                 # revision C8 (`bench-near-ice`): the labels within 5 km of pack ice on their own
+    rule_always_dir: data/outputs/thor/5d_rule_always   # archived 5d: 6 dB check, length rule always on
+    rule_always_pfas: [1.0e-3, 1.0e-4, 1.0e-5, 1.0e-6, 1.0e-7, 1.0e-8, 1.0e-10, 1.0e-12]
+    table: data/benchmark/near_ice/near_ice_sweep.csv
+    figure: docs/img/revision_near_ice.png
+    report: docs/revision-near-ice.md
   robustness:               # revision phase 3 (`bench-robustness`): N1, N2, C10 on detections on disk
     out_dir: data/benchmark/robustness
     report: docs/revision-robustness.md

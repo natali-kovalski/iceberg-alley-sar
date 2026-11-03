@@ -883,6 +883,16 @@ def bench_robustness(config: ConfigOption = DEFAULT_CONFIG) -> None:
         typer.echo(f"ok  {key}: {path}")
 
 
+@app.command("bench-near-ice")
+def bench_near_ice(config: ConfigOption = DEFAULT_CONFIG) -> None:
+    """Revision C8: the labels within 5 km of pack ice on their own, length rule on vs off."""
+    from iceberg_sar.benchmark.nearice import run_near_ice
+
+    cfg = load_config(config)
+    for key, path in run_near_ice(cfg, log=lambda m: typer.echo(m)).items():
+        typer.echo(f"ok  {key}: {path}")
+
+
 @app.command("bench-scenes")
 def bench_scenes(
     write_config: Annotated[bool, typer.Option(
