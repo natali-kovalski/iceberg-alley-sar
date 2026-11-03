@@ -87,13 +87,18 @@ benchmark:
     # Rows per block at 10 m (detections.block_rows is 1024). A 10 m row is 28,591 px, so 1024-row
     # blocks need a few GB; smaller blocks give the same detections (halo) with less peak RAM.
     cacfar_10m_block_rows: 256
-    # Scoring as in 5d (thor.compare): same labels, open-water filter (viewer.near_ice_km), radius
-    # validation.max_dist_m. Recall is read off each curve at these detection counts.
+    # Scoring as in 5d (thor.compare): same labels, same domain (labels and detections alike,
+    # revision C3): open_water = >= viewer.near_ice_km from pack ice, near_ice = only within it
+    # (revision C8); radius validation.max_dist_m. Recall at these detection budgets, from the
+    # real run with the most detections at or below each (revision C6, no interpolation); a run
+    # with < budget_min_fraction x the budget is flagged.
+    zone: open_water
+    budget_min_fraction: 0.8
     matched_counts: [250, 500, 1000]
-    breakdown_count: 500    # size breakdown at each detector's operating point nearest this count
+    breakdown_count: 500    # size breakdown at each detector's run with the most detections <= this
     # Pooled over the frames (5d pools the same way). Frames hold 46-267 labels, so the summary
-    # reads every curve at this many detections per label of the frame (pooled: x 512 = 1024,
-    # near 5d's matched count of 961); the pooled size breakdown uses that count too.
+    # uses a budget of this many detections per label of the frame (pooled: x 474 = 948; 1,024
+    # with the 512 labels before revision C3); the pooled size breakdown uses that budget too.
     summary_detections_per_label: 2
     pooled_matched_counts: [500, 1000, 2000]
     pooled_figure: docs/img/m2b_recall_pooled.png
@@ -171,6 +176,13 @@ benchmark:
       # Detections within this of an "unknown SAR object" (Path A) are ignored: neither TP nor FP
       # (paper: bright objects under clouds, bergs drifting in, one ship were removed).
       unknown_ignore_m: 250
+      # Revision C4: greedy = the paper's "nearest first" (default); optimal = most matches,
+      # then least total distance. Radii in true metres or EPSG:5938 metres (the paper's grid,
+      # ~7 % longer here). radius_interpolated_m: null = the labels' own 1789 m.
+      matching: {matcher: greedy, radius_units: metres, radius_interpolated_m: null}
+      # Revision C2: detectors that compute 1 - pfa (iDPolRAD's pde); runs whose effective PFA
+      # is off by more than rel_err (all PFAs <= 1e-17) are flagged and never an optimum.
+      unreliable: {pde_detectors: [idpolrad], rel_err: 0.5}
       reference: benchmarks/faerch2023/reference.yaml
       fig6_csv: benchmarks/faerch2023/reference_fig6.csv   # digitized by hand; overlay only if present
       figure: docs/img/faerch2023_f_vs_pfa.png

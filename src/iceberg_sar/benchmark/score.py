@@ -3,15 +3,24 @@
 Protocol (paper sec. 3.4, `faerch2023.xml`): a detection within a label's search radius
 (250 m verified, 1789 m interpolated) is a true positive, one detection per label, the nearest
 first; other detections are false positives; labels without one are false negatives.
-Matching here is greedy by distance over all (label, detection) pairs inside the label's
-radius, so the closest pairs are taken first and each side is used once.
+Matching (`score.matching`, revision C4): `greedy` by distance over all (label, detection)
+pairs inside the label's radius, closest first, each side used once (the paper's wording, the
+default); or `optimal`, the one-to-one assignment with the most matches (then the least total
+distance). Radii in true metres (`radius_units: metres`, default) or in EPSG:5938 metres, the
+paper's grid (`epsg5938`: each radius / that label's scale factor, ~1.07).
 
-- All-labels: every label, its own radius (the paper's protocol, compared with Table 3).
-- Verified-only: verified labels and the 250 m radius. Detections inside an interpolated
-  label's radius that match no verified label are ignored (neither TP nor FP): they may well
-  be that berg, the label just isn't trusted at 250 m.
-- Scoring area: detections outside it are dropped (labels all count: the paper scores all 492).
+- All-labels: every label in the domain, its own radius (the paper's protocol, Table 3).
+- Verified-only recall (revision C5): the share of verified labels matched in that same
+  all-labels matching. It replaces the old verified-only F, which mixed a different label set
+  with its own false-positive accounting.
+- Scoring domain (`evaluation.EvalDomain`, revision C3): the scoring area, applied to labels
+  (at their S1 position) and detections alike. Before 2026-11-02 only detections were clipped
+  and all 492 labels counted, so the 5 labels outside the area were misses by construction.
   Detections near a Path A "unknown SAR object" are dropped too (paper: masked out).
+- Numerically unreliable runs (revision C2): iDPolRAD computes `1 - pfa`, which is exactly 1.0
+  in float64 for PFA <= 1e-17, so those runs all use one threshold. Runs whose effective PFA
+  (1 - (1 - pfa)) is off by more than `unreliable_rel_err` are flagged `unreliable` and left
+  out of every optimum.
 
 `reference.yaml` holds Tables 3 and 5, parsed from the XML by `write_reference`; F at the paper's
 optimum is derived from Table 3 (2 TP / (2 TP + FP + FN)), which the paper does not print.
@@ -24,6 +33,7 @@ import os
 import re
 import xml.etree.ElementTree as ET
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +47,7 @@ from iceberg_sar.benchmark.labels import SIZE_CLASSES
 from iceberg_sar.benchmark.scenes import TABLE_NS, _text
 from iceberg_sar.benchmark.sweep import sweep_dir
 from iceberg_sar.config import Config
+from iceberg_sar.evaluation import EvalDomain
 
 # Column headers of Tables 3 and 5 -> detector names in config / the runner
 PAPER_NAMES = {"Gamma": "gamma", "iDPolRAD": "idpolrad", "K": "k", "Log-normal": "lognorm",
@@ -131,6 +142,76 @@ def load_reference(path: Path) -> dict[str, Any]:
 
 # --- matching ----------------------------------------------------------------------------------
 
+MATCHERS = ("greedy", "optimal")
+
+
+@dataclass(frozen=True)
+class MatchSettings:
+    matcher: str = "greedy"
+    radius_units: str = "metres"                # metres (true) | epsg5938
+    radius_interpolated_m: float | None = None  # None: the labels' own (1789 m)
+
+    @classmethod
+    def from_config(cls, cfg: Config) -> MatchSettings:
+        m = cfg.section("benchmark")["faerch2023"]["score"].get("matching") or {}
+        r = m.get("radius_interpolated_m")
+        out = cls(matcher=m.get("matcher", "greedy"),
+                  radius_units=m.get("radius_units", "metres"),
+                  radius_interpolated_m=None if r is None else float(r))
+        out.check()
+        return out
+
+    def check(self) -> None:
+        if self.matcher not in MATCHERS:
+            raise ValueError(f"score.matching.matcher must be one of {MATCHERS}")
+        if self.radius_units not in ("metres", "epsg5938"):
+            raise ValueError("score.matching.radius_units must be metres or epsg5938")
+
+    def describe(self) -> str:
+        r = ("labels' own" if self.radius_interpolated_m is None
+             else f"{self.radius_interpolated_m:g} m")
+        return (f"{self.matcher} matching, radii in "
+                f"{'true' if self.radius_units == 'metres' else 'EPSG:5938'} metres, "
+                f"interpolated radius {r}")
+
+
+def apply_match_settings(labels: pd.DataFrame, ms: MatchSettings) -> pd.DataFrame:
+    """Labels with `radius_m` set for these settings (scoring CRS metres)."""
+    r = labels.radius_m.to_numpy(float).copy()
+    if ms.radius_interpolated_m is not None:
+        r[(labels.status != "verified").to_numpy()] = ms.radius_interpolated_m
+    if ms.radius_units == "epsg5938":
+        r = r / labels["scale_5938"].to_numpy(float)
+    return labels.assign(radius_m=r)
+
+
+def optimal_match(det_xy: np.ndarray, lab_xy: np.ndarray, radius: np.ndarray
+                  ) -> tuple[np.ndarray, np.ndarray]:
+    """One-to-one pairs with the most matches, then the least total distance, each within the
+    label's radius (`linear_sum_assignment` on the detections near any label)."""
+    from scipy.optimize import linear_sum_assignment
+
+    if len(det_xy) == 0 or len(lab_xy) == 0:
+        return np.empty(0, int), np.empty(0, int)
+    tree = cKDTree(det_xy)
+    near = sorted({i for j in range(len(lab_xy))
+                   for i in tree.query_ball_point(lab_xy[j], radius[j])})
+    if not near:
+        return np.empty(0, int), np.empty(0, int)
+    cand = det_xy[near]
+    d = np.linalg.norm(cand[:, None, :] - lab_xy[None, :, :], axis=2)
+    ok = d <= radius[None, :]
+    big = float(radius.max()) * (len(lab_xy) + 1) * 10   # any match beats any distance saving
+    rows, cols = linear_sum_assignment(np.where(ok, d, big))
+    keep = ok[rows, cols]
+    return np.asarray(near)[rows[keep]], cols[keep]
+
+
+def match(det_xy: np.ndarray, lab_xy: np.ndarray, radius: np.ndarray, matcher: str = "greedy"
+          ) -> tuple[np.ndarray, np.ndarray]:
+    return (optimal_match if matcher == "optimal" else greedy_match)(det_xy, lab_xy, radius)
+
+
 def greedy_match(det_xy: np.ndarray, lab_xy: np.ndarray, radius: np.ndarray
                  ) -> tuple[np.ndarray, np.ndarray]:
     """One-to-one pairs (det index, label index), closest first, each within the label's radius."""
@@ -159,13 +240,14 @@ def _prf(tp: int, fp: int, fn: int) -> tuple[float, float, float]:
     return r, p, f
 
 
-def score_points(det_xy: np.ndarray, labels: pd.DataFrame) -> dict[str, Any]:
-    """All-labels and verified-only scores for one detection set. `labels`: x, y, radius_m,
-    status, size_class."""
+def score_points(det_xy: np.ndarray, labels: pd.DataFrame, matcher: str = "greedy"
+                 ) -> dict[str, Any]:
+    """All-labels scores and verified-only recall for one detection set. `labels` (already in
+    the scoring domain): x, y, radius_m, status, size_class."""
     lab_xy = labels[["x", "y"]].to_numpy(float)
     radius = labels.radius_m.to_numpy(float)
     ver = (labels.status == "verified").to_numpy()
-    _, li = greedy_match(det_xy, lab_xy, radius)
+    _, li = match(det_xy, lab_xy, radius, matcher)
     tp = len(li)
     out: dict[str, Any] = {"n_det": len(det_xy), "TP": tp, "FP": len(det_xy) - tp,
                            "FN": len(labels) - tp}
@@ -176,19 +258,9 @@ def score_points(det_xy: np.ndarray, labels: pd.DataFrame) -> dict[str, Any]:
         m = (labels.size_class == name).to_numpy()
         out[f"recall_{name}"] = hit[m].mean() if m.any() else np.nan
 
-    vdi, vli = greedy_match(det_xy, lab_xy[ver], radius[ver])
-    free = np.ones(len(det_xy), bool)
-    free[vdi] = False
-    near_interp = np.zeros(len(det_xy), bool)
-    if (~ver).any() and len(det_xy):
-        tree = cKDTree(det_xy)
-        for xy, r in zip(lab_xy[~ver], radius[~ver], strict=True):
-            near_interp[tree.query_ball_point(xy, r)] = True
-    tp_v = len(vli)
-    fp_v = int((free & ~near_interp).sum())
-    fn_v = int(ver.sum()) - tp_v
-    out |= {"TP_v": tp_v, "FP_v": fp_v, "FN_v": fn_v, "ignored_v": int((free & near_interp).sum())}
-    out["recall_v"], out["precision_v"], out["f_v"] = _prf(tp_v, fp_v, fn_v)
+    n_v = int(ver.sum())
+    out |= {"n_v": n_v, "TP_v": int(hit[ver].sum()),
+            "recall_v": hit[ver].mean() if n_v else np.nan}
     return out
 
 
@@ -211,7 +283,34 @@ def load_labels(cfg: Config, source: str) -> tuple[pd.DataFrame, np.ndarray]:
         raise ValueError(f"labels source must be faerch or reconstructed, not {source!r}")
     df = pd.DataFrame({"label_id": lab.label_id, "status": lab.status, "radius_m": lab.radius_m,
                        "size_class": lab.size_class, "x": lab.geometry.x, "y": lab.geometry.y})
+    # EPSG:5938 metres per true metre at the label (Path A: from the paper-unit length)
+    if {"length_m", "length_m_paper"} <= set(lab.columns):
+        k = (lab.length_m_paper / lab.length_m.where(lab.length_m > 0)).to_numpy(float)
+        df["scale_5938"] = np.where(np.isfinite(k), k, np.nanmedian(k))
+    else:
+        df["scale_5938"] = np.nan
     return df, unknown
+
+
+def eval_domain(cfg: Config, kind: str) -> EvalDomain:
+    """The EW scoring domain (revision C3): the scoring area `kind`, for labels and detections."""
+    return EvalDomain(area=scoring_aoi(cfg, kind))
+
+
+def labels_in_domain(labels: pd.DataFrame, domain: EvalDomain) -> pd.DataFrame:
+    return labels[domain.keep(labels[["x", "y"]].to_numpy(float))].reset_index(drop=True)
+
+
+def effective_pfa(pfa: float) -> float:
+    """PFA after the `1 - pfa` round trip in float64 (iDPolRAD's `pde`)."""
+    return float(1.0 - np.float64(1.0 - pfa))
+
+
+def is_unreliable(detector: str, pfa: float, cfg_score: dict[str, Any]) -> bool:
+    u = cfg_score.get("unreliable") or {}
+    if detector not in u.get("pde_detectors", []):
+        return False
+    return abs(effective_pfa(pfa) / pfa - 1) > float(u.get("rel_err", 0.5))
 
 
 def scoring_aoi(cfg: Config, kind: str) -> Any:
@@ -232,36 +331,43 @@ def scoring_aoi(cfg: Config, kind: str) -> Any:
     raise ValueError(f"score.aoi must be fig1 or reconstructed, not {kind!r}")
 
 
-def detections_xy(path: Path, crs: str, aoi: Any, unknown: np.ndarray, ignore_m: float
+def detections_xy(path: Path, crs: str, domain: EvalDomain, unknown: np.ndarray, ignore_m: float
                   ) -> tuple[np.ndarray, int]:
-    """Detection centroids inside `aoi`, minus those near unknown objects (and how many)."""
+    """Detection centroids in the scoring domain, minus those near unknown objects (and how
+    many)."""
     gdf = gpd.read_file(path)
     if gdf.empty:
         return np.empty((0, 2)), 0
     gdf = gdf.to_crs(crs)
-    gdf = gdf[gdf.within(aoi)]
     xy = np.column_stack([gdf.geometry.x, gdf.geometry.y])
+    xy = xy[domain.keep(xy)]
     if len(unknown) and len(xy):
         near = cKDTree(unknown).query(xy, distance_upper_bound=ignore_m)[0] <= ignore_m
         return xy[~near], int(near.sum())
     return xy, 0
 
 
-def score_sweep(cfg: Config, labels: pd.DataFrame, unknown: np.ndarray, aoi: Any,
-                log: Callable[[str], None] = print) -> pd.DataFrame:
-    """One row per (detector, PFA) of the sweep; over-cap PFAs get NaN scores."""
+def score_sweep(cfg: Config, labels: pd.DataFrame, unknown: np.ndarray, domain: EvalDomain,
+                log: Callable[[str], None] = print, ms: MatchSettings | None = None
+                ) -> pd.DataFrame:
+    """One row per (detector, PFA) of the sweep; over-cap PFAs get NaN scores. `labels` are
+    taken into `domain` here, so labels and detections share it."""
     fc = cfg.section("benchmark")["faerch2023"]
+    ms = ms or MatchSettings.from_config(cfg)
+    labels = apply_match_settings(labels_in_domain(labels, domain), ms)
     out_dir = sweep_dir(cfg)
     runtime = pd.read_csv(out_dir / "sweep_runtime.csv")
     rows = []
     for r in runtime.itertuples():
         row = {"detector": r.detector, "pfa": r.pfa, "pfa_per_channel": r.pfa_per_channel,
-               "objects_raw": r.objects_raw, "over_cap": bool(r.over_cap)}
+               "objects_raw": r.objects_raw, "over_cap": bool(r.over_cap),
+               "unreliable": is_unreliable(r.detector, r.pfa, fc["score"]),
+               "labels_scored": len(labels)}
         if not r.over_cap:
             path = out_dir / r.detector / str(r.geojson)
-            xy, n_unk = detections_xy(path, fc["crs"], aoi, unknown,
+            xy, n_unk = detections_xy(path, fc["crs"], domain, unknown,
                                       float(fc["score"]["unknown_ignore_m"]))
-            row |= {"ignored_unknown": n_unk, **score_points(xy, labels)}
+            row |= {"ignored_unknown": n_unk, **score_points(xy, labels, ms.matcher)}
         rows.append(row)
     df = pd.DataFrame(rows).sort_values(["detector", "pfa"]).reset_index(drop=True)
     log(f"scored {len(df)} (detector, PFA) runs")
@@ -269,8 +375,12 @@ def score_sweep(cfg: Config, labels: pd.DataFrame, unknown: np.ndarray, aoi: Any
 
 
 def optimum(scores: pd.DataFrame, col: str = "f") -> pd.DataFrame:
-    """Row of the highest `col` per detector (ties: the lower PFA)."""
-    ok = scores.dropna(subset=[col]).sort_values(["detector", col, "pfa"],
+    """Row of the highest `col` per detector (ties: the lower PFA); runs flagged `unreliable`
+    (revision C2) never count."""
+    ok = scores.dropna(subset=[col])
+    if "unreliable" in ok:
+        ok = ok[~ok.unreliable.astype(bool)]
+    ok = ok.sort_values(["detector", col, "pfa"],
                                                  ascending=[True, False, True])
     return ok.groupby("detector", sort=False).head(1).set_index("detector")
 
@@ -286,8 +396,9 @@ GREY = "#9a9a96"         # the other stack variant (context, not a series of its
 def f_figure(scores: pd.DataFrame, ref: dict[str, Any], fig6: pd.DataFrame | None,
              detectors: list[str], out: Path, note: str,
              alt: pd.DataFrame | None = None, alt_label: str = "") -> Path:
-    """Small multiples: F vs PFA per detector, all-labels and verified-only, paper optimum;
-    `alt`: the other stack variant's all-labels F, drawn in grey."""
+    """Small multiples: F vs PFA per detector (all labels), verified-only recall, paper
+    optimum; `alt`: the other stack variant's all-labels F, drawn in grey. Runs flagged
+    `unreliable` (revision C2) are grey crosses, not part of the curve."""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -299,11 +410,19 @@ def f_figure(scores: pd.DataFrame, ref: dict[str, Any], fig6: pd.DataFrame | Non
         ax.set_visible(False)
     for ax, det in zip(axes.flat, detectors, strict=False):
         d = scores[scores.detector == det].sort_values("pfa")
+        bad = d.unreliable.astype(bool) if "unreliable" in d else pd.Series(False, d.index)
+        u, d = d[bad], d[~bad]
         x = np.log10(d.pfa)
-        ax.plot(x, d.f, color=LIGHT_BLUE, lw=2, marker="o", ms=4, label="mine, all labels")
-        ax.plot(x, d.f_v, color=LIGHT_BLUE, lw=2, ls=(0, (4, 3)), label="mine, verified only")
+        ax.plot(x, d.f, color=LIGHT_BLUE, lw=2, marker="o", ms=4, label="mine, F (all labels)")
+        ax.plot(x, d.recall_v, color=LIGHT_BLUE, lw=1.2, ls=(0, (1, 2)),
+                label="mine, verified-only recall")
+        if len(u):
+            ax.plot(np.log10(u.pfa), u.f, color=GREY, marker="x", ms=6, ls="none",
+                    label="numerically unreliable PFA (not scored)")
         if alt is not None:
             a = alt[alt.detector == det].sort_values("pfa")
+            if "unreliable" in a:
+                a = a[~a.unreliable.astype(bool)]
             ax.plot(np.log10(a.pfa), a.f, color=GREY, lw=1.5, label=alt_label)
         if fig6 is not None:
             g = fig6[fig6.detector == det].sort_values("pfa")
@@ -328,9 +447,13 @@ def f_figure(scores: pd.DataFrame, ref: dict[str, Any], fig6: pd.DataFrame | Non
     for ax in axes[-1]:
         ax.set_xlabel("log10 PFA (total)")
     for ax in axes[:, 0]:
-        ax.set_ylabel("F score")
-    h, lab = axes.flat[0].get_legend_handles_labels()
-    fig.legend(h, lab, loc="upper center", ncol=len(lab), frameon=False)
+        ax.set_ylabel("F score / verified-only recall")
+    leg: dict[str, Any] = {}
+    for ax in axes.flat:
+        for h_, l_ in zip(*ax.get_legend_handles_labels(), strict=True):
+            leg.setdefault(l_, h_)
+    fig.legend(list(leg.values()), list(leg), loc="upper center", ncol=min(len(leg), 4),
+               frameon=False)
     fig.text(0.5, 0.005, note, ha="center", fontsize=8, color="#5f5e5a")
     fig.tight_layout(rect=(0, 0.03, 1, 0.94))
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -359,7 +482,10 @@ def fig6_style_figure(scores: pd.DataFrame, detectors: list[str], out: Path, sub
     fig, ax = plt.subplots(figsize=(10, 6.5))
     ax.set_facecolor("#eaeaf2")
     for det in [d for d in FIG6_STYLE if d in detectors]:
-        d = scores[(scores.detector == det) & np.isfinite(scores.f)].sort_values("pfa")
+        d = scores[(scores.detector == det) & np.isfinite(scores.f)]
+        if "unreliable" in d:   # revision C2: not part of the curve
+            d = d[~d.unreliable.astype(bool)]
+        d = d.sort_values("pfa")
         color, marker = FIG6_STYLE[det]
         mine = det in MINE
         ax.plot(d.pfa, d.f, color=color, marker=marker, ms=6 if mine else 9, mew=1.5, lw=2,
@@ -407,8 +533,7 @@ def compare_table(scores: pd.DataFrame, ref: dict[str, Any], tol: float,
                "paper_TP": t["TP"], "TP": int(b.TP), "paper_FP": t["FP"], "FP": int(b.FP),
                "paper_FN": t["FN"], "FN": int(b.FN), "paper_f": f_ref, "f": b.f,
                "diff": b.f - f_ref, "within": abs(b.f - f_ref) <= tol,
-               "f_v": b.f_v, "pfa_v": optimum(scores, "f_v").loc[det].pfa,
-               "f_v_best": optimum(scores, "f_v").loc[det].f_v}
+               "recall_v": b.recall_v}
         if sens is not None and det in optimum(sens).index:
             row["f_sens"] = optimum(sens).loc[det].f
         if alt is not None:
@@ -421,8 +546,7 @@ def compare_table(scores: pd.DataFrame, ref: dict[str, Any], tol: float,
         row = {"detector": det, "paper_pfa": np.nan, "pfa": b.pfa, "paper_TP": None,
                "TP": int(b.TP), "paper_FP": None, "FP": int(b.FP), "paper_FN": None,
                "FN": int(b.FN), "paper_f": np.nan, "f": b.f, "diff": np.nan, "within": None,
-               "f_v": b.f_v, "pfa_v": optimum(scores, "f_v").loc[det].pfa,
-               "f_v_best": optimum(scores, "f_v").loc[det].f_v}
+               "recall_v": b.recall_v}
         if sens is not None:
             s_best = optimum(sens)
             row["f_sens"] = s_best.loc[det].f if det in s_best.index else np.nan
@@ -434,13 +558,19 @@ def compare_table(scores: pd.DataFrame, ref: dict[str, Any], tol: float,
     return pd.DataFrame(rows)
 
 
+def same_pfa(pfas: Any, pfa: float) -> np.ndarray:
+    """Exact match on the log-spaced PFA grid (revision C1). `np.isclose` with its default
+    atol=1e-8 calls every PFA below 1e-8 equal, so 1e-19 used to select the 1e-21 row."""
+    return np.isclose(np.log10(np.asarray(pfas, float)), np.log10(pfa), rtol=0, atol=1e-6)
+
+
 def size_table(scores: pd.DataFrame, ref: dict[str, Any]) -> pd.DataFrame:
     best = optimum(scores)
     rows = []
     for det, t in ref["table5"].items():
         if det not in best.index:
             continue
-        at5 = scores[(scores.detector == det) & np.isclose(scores.pfa, t["pfa"])]
+        at5 = scores[(scores.detector == det) & same_pfa(scores.pfa, t["pfa"])]
         at5 = at5.iloc[0] if len(at5) else None
         for name, _, _ in SIZE_CLASSES:
             rows.append({"detector": det, "size": name, "paper_pct": t["detected_pct"][name],
@@ -500,13 +630,16 @@ def report(cfg: Config, source: str, ref: dict[str, Any], cmp: pd.DataFrame, siz
         f"- PFA: {len(sp.pfas)} levels, {_e(sp.pfas[0])} .. {_e(sp.pfas[-1])} total; a detector "
         f"stops after the first PFA with > {sp.max_objects} objects in the scene (dotted line).",
         f"- Labels: {'Færch (Path A)' if source == 'faerch' else 'reconstructed (Path B)'}, "
-        f"{n_labels} bergs ({n_outside} outside the scoring area, still counted as the paper "
-        "counts all 492). Radii 250 m verified / 1789 m interpolated.",
+        f"{n_labels - n_outside} of {n_labels} bergs scored: the {n_outside} outside the scoring "
+        "area are dropped with the detections there (one shared evaluation mask, revision C3; "
+        "the paper counts all 492). Radii 250 m verified / 1789 m interpolated.",
         f"- Scoring area: `{sc['aoi']}` (S1 valid area x the S2 and ALOS-2 outlines georeferenced "
         "from Fig. 1, a few km accuracy). Detections within "
         f"{sc['unknown_ignore_m']} m of an unknown SAR object are ignored.",
-        "- Matching: greedy one-to-one, closest pair first. Verified-only: verified labels, 250 m;",
-        "  detections near interpolated labels that match nothing are ignored.",
+        f"- Matching: {MatchSettings.from_config(cfg).describe()}. Verified-only recall: the "
+        "share of verified labels matched in the same all-labels matching.",
+        "- Numerically unreliable runs (iDPolRAD below ~1e-16, where `1 - pfa` rounds to 1.0) "
+        "are flagged and left out of every optimum.",
         "",
         f"## F at the optimum PFA (tolerance {tol})",
         "",
@@ -515,7 +648,7 @@ def report(cfg: Config, source: str, ref: dict[str, Any], cmp: pd.DataFrame, siz
         "",
         "| Detector | Paper PFA | My PFA | Paper TP / FP / FN | Mine TP / FP / FN | Paper F |"
         " My F |"
-        " Diff | Within | Verified-only F (at my PFA / best) |"
+        " Diff | Within | Verified-only recall (at my PFA) |"
         + (" F, AOI `" + str(sc["aoi_sensitivity"]) + "` |" if "f_sens" in cmp else "")
         + (f" F {'with' if not tnr else 'without'} TNR (PFA) |" if "f_alt" in cmp else ""),
         "|---|---|---|---|---|---|---|---|---|---|" + ("---|" if "f_sens" in cmp else "")
@@ -525,7 +658,7 @@ def report(cfg: Config, source: str, ref: dict[str, Any], cmp: pd.DataFrame, siz
         if r.detector in MINE:   # 2a: no paper value, no diff or tolerance
             lines.append(
                 f"| {DISPLAY[r.detector]} | – | {_e(r.pfa)} | – | {r.TP} / {r.FP} / {r.FN} | – | "
-                f"{r.f:.3f} | – | – | {r.f_v:.3f} / {r.f_v_best:.3f} ({_e(r.pfa_v)}) |"
+                f"{r.f:.3f} | – | – | {r.recall_v:.3f} |"
                 + (f" {r.f_sens:.3f} |" if "f_sens" in cmp else "")
                 + ((f" {r.f_alt:.3f} ({_e(r.pfa_alt)}) |" if np.isfinite(r.f_alt)
                     else " not run |") if "f_alt" in cmp else ""))
@@ -534,7 +667,7 @@ def report(cfg: Config, source: str, ref: dict[str, Any], cmp: pd.DataFrame, siz
             f"| {DISPLAY[r.detector]} | {_e(r.paper_pfa)} | {_e(r.pfa)} | "
             f"{r.paper_TP:.0f} / {r.paper_FP:.0f} / {r.paper_FN:.0f} | {r.TP} / {r.FP} / {r.FN} | "
             f"{r.paper_f:.3f} | {r.f:.3f} | {r.diff:+.3f} | {'yes' if r.within else '**no**'} | "
-            f"{r.f_v:.3f} / {r.f_v_best:.3f} ({_e(r.pfa_v)}) |"
+            f"{r.recall_v:.3f} |"
             + (f" {r.f_sens:.3f} |" if "f_sens" in cmp else "")
             + ((f" {r.f_alt:.3f} ({_e(r.pfa_alt)}) |" if np.isfinite(r.f_alt) else " none |")
                if "f_alt" in cmp else ""))
@@ -600,19 +733,19 @@ def run_score(cfg: Config, source: str | None = None, log: Callable[[str], None]
         raise FileNotFoundError(f"{ref_path} missing; run `bench-reference` and check it")
     ref = load_reference(ref_path)
     labels, unknown = load_labels(cfg, source)
-    aoi = scoring_aoi(cfg, sc["aoi"])
-    in_aoi = gpd.GeoSeries(gpd.points_from_xy(labels.x, labels.y)).within(aoi)
-    log(f"{len(labels)} labels ({source}), {int((~in_aoi).sum())} outside the `{sc['aoi']}` "
-        f"area; {len(unknown)} unknown objects")
-    scores = score_sweep(cfg, labels, unknown, aoi, log)
+    domain = eval_domain(cfg, sc["aoi"])
+    n_out = len(labels) - len(labels_in_domain(labels, domain))
+    log(f"{len(labels)} labels ({source}), {n_out} outside the `{sc['aoi']}` area (not "
+        f"scored: {len(labels) - n_out} labels); {len(unknown)} unknown objects")
+    scores = score_sweep(cfg, labels, unknown, domain, log)
     other = _other_variant(cfg)
     alt = None
     if (sweep_dir(other) / "sweep_runtime.csv").is_file():
         log(f"also scoring the {_variant(other)} sweep")
-        alt = score_sweep(other, labels, unknown, aoi, log)
+        alt = score_sweep(other, labels, unknown, domain, log)
     sens = None
     if sc.get("aoi_sensitivity"):
-        sens = score_sweep(cfg, labels, unknown, scoring_aoi(cfg, sc["aoi_sensitivity"]), log)
+        sens = score_sweep(cfg, labels, unknown, eval_domain(cfg, sc["aoi_sensitivity"]), log)
     base = cfg.root / sc["table_csv"]
     base.parent.mkdir(parents=True, exist_ok=True)
     csvs = {_variant(cfg): base.with_name(f"{base.stem}_{_variant(cfg)}.csv")}
@@ -637,7 +770,7 @@ def run_score(cfg: Config, source: str | None = None, log: Callable[[str], None]
         note.split("; dotted")[0] + "; all labels; over-cap PFAs left out")
     rep = cfg.root / sc["report"]
     rep.write_text(report(cfg, source, ref, cmp, sizes, scores, len(labels),
-                          int((~in_aoi).sum()), fig, fig6 is not None, csvs, fig_s),
+                          n_out, fig, fig6 is not None, csvs, fig_s),
                    encoding="utf-8")
     for r in cmp.itertuples():
         log(f"{r.detector:9s} F {r.f:.3f} at {_e(r.pfa)}" + ("" if r.detector in MINE else

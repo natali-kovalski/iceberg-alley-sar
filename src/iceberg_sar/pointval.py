@@ -20,7 +20,9 @@ import rasterio
 from rasterio.windows import Window
 
 from iceberg_sar.config import Config
+from iceberg_sar.evaluation import EvalDomain
 from iceberg_sar.matching import OffsetResult, estimate_offset, match_points
+from iceberg_sar.seaice import distance_to_ice_km
 
 
 @dataclass(frozen=True)
@@ -65,8 +67,13 @@ def validate_points(
     sar_time: pd.Timestamp,
     p: PointValParams,
     truth_area: gpd.GeoDataFrame | None = None,
+    domain: EvalDomain | None = None,
+    ice_mask: Path | None = None,
 ) -> tuple[dict, gpd.GeoDataFrame, gpd.GeoDataFrame]:
-    """Score detections against truth points. Returns summary, truth and detections with flags."""
+    """Score detections against truth points. Returns summary, truth and detections with flags.
+
+    `domain` (revision C3) is applied to the truth here, at its SAR-time position, with the
+    distance to `ice_mask`; the caller applies the same domain to the detections."""
     with rasterio.open(masked_tif) as src:
         crs = src.crs
     det_xy, truth_xy = _xy(detections, crs), _xy(truth, crs)
@@ -82,6 +89,11 @@ def validate_points(
     shift = np.array([off.dx_m, off.dy_m]) if reliable else np.zeros(2)
 
     truth_ok = sar_valid_at(masked_tif, truth_xy - shift, p.valid_block_px)
+    if domain is not None and len(truth_xy):
+        t = truth_xy - shift
+        ice_km = (distance_to_ice_km(ice_mask, t[:, 0], t[:, 1])
+                  if ice_mask is not None and ice_mask.is_file() else np.full(len(t), np.nan))
+        truth_ok &= domain.keep(t, ice_km)
     det_ok = np.ones(len(det_xy), dtype=bool)
     if truth_area is not None and len(det_xy):
         moved = gpd.GeoSeries(gpd.points_from_xy(*(det_xy + shift).T), crs=crs)
@@ -180,9 +192,13 @@ def run_point_validation(
 
     sar_time = pd.Timestamp(scene_timestamp(name)).tz_localize(None)
     det = gpd.read_file(cfg.path("outputs") / "detections" / f"{name}_{band}_detections.geojson")
-    if open_water:
-        near_km = float(cfg.raw.get("viewer", {}).get("near_ice_km", 5))
-        det = det[~(det["distance_to_ice_km"] < near_km)]
+    domain = None
+    if open_water:   # one domain for detections and truth (revision C3)
+        domain = EvalDomain(near_ice_km=float(cfg.raw.get("viewer", {}).get("near_ice_km", 5)))
+        if not det.empty:
+            det = det[domain.keep(np.zeros((len(det), 2)),
+                                  det["distance_to_ice_km"].to_numpy(float))]
     pts, area = load_truth(cfg, name, sar_time, truth_kind)
     masked = cfg.path("interim") / name / f"{name}_{band}_masked.tif"
-    return validate_points(det, pts, masked, sar_time, point_val_params(cfg), area)
+    ice = cfg.path("interim") / name / f"{name}_seaice_mask.tif"
+    return validate_points(det, pts, masked, sar_time, point_val_params(cfg), area, domain, ice)

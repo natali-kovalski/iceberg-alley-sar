@@ -73,25 +73,41 @@ def test_reference_done_needs_same_settings_and_files(tmp_path: Path) -> None:
 
 # --- scoring (iwcompare) ---------------------------------------------------------------------
 
-def test_recall_at_interpolates_in_log_counts_without_extrapolating() -> None:
+def test_at_budget_takes_a_real_run_at_or_below_the_budget() -> None:
     import pandas as pd
 
-    from iceberg_sar.benchmark.iwcompare import recall_at
+    from iceberg_sar.benchmark.iwcompare import at_budget
 
+    # revision C6: no interpolation between runs
     curve = pd.DataFrame({"detections": [100, 1000, 0], "recall": [0.4, 0.8, 0.0]})
-    r = recall_at(curve, [50, 100, 316, 1000, 2000])
-    assert np.isnan(r[0]) and np.isnan(r[-1])
-    assert r[1] == pytest.approx(0.4) and r[3] == pytest.approx(0.8)
-    assert r[2] == pytest.approx(0.6, abs=1e-3)   # half way in log10
+    assert at_budget(curve, 1000, 0.8) == (pytest.approx(0.8), 1000, "")
+    assert at_budget(curve, 999, 0.8) == (pytest.approx(0.4), 100, "short")
+    r, n, flag = at_budget(curve, 50, 0.8)
+    assert np.isnan(r) and np.isnan(n) and flag == "none"
 
 
-def test_recall_at_takes_best_recall_for_repeated_counts() -> None:
+def test_at_budget_best_recall_for_repeated_counts() -> None:
     import pandas as pd
 
-    from iceberg_sar.benchmark.iwcompare import recall_at
+    from iceberg_sar.benchmark.iwcompare import at_budget
 
     curve = pd.DataFrame({"detections": [100, 100, 400], "recall": [0.3, 0.5, 0.7]})
-    assert recall_at(curve, [100])[0] == pytest.approx(0.5)
+    assert at_budget(curve, 120, 0.8) == (pytest.approx(0.5), 100, "")
+
+
+def test_matched_table_flags_detector_without_a_run_near_the_budget() -> None:
+    import pandas as pd
+
+    from iceberg_sar.benchmark.iwcompare import matched_table
+
+    # NIS-like: its loosest run already has more detections than the budget
+    sweep_ = pd.DataFrame({"detector": ["nis", "nis", "gamma", "gamma"],
+                           "detections": [1082, 1500, 600, 1010],
+                           "recall": [0.88, 0.9, 0.7, 0.83]})
+    t = matched_table(sweep_, [1024], 0.8).set_index("detector")
+    assert t.loc["nis", "flag@1024"] == "none" and np.isnan(t.loc["nis", "recall@1024"])
+    assert t.loc["gamma", "recall@1024"] == pytest.approx(0.83)
+    assert t.loc["gamma", "detections@1024"] == 1010
 
 
 def test_faerch_params_21_levels_and_table1_enl() -> None:
@@ -218,11 +234,12 @@ def test_summary_table_reads_each_frame_at_its_own_label_multiple() -> None:
                       "setting": [1e-9, 1e-5] * 2, "detections": [100, 400, 10, 40],
                       "matched": [40, 80, 5, 10], "truth": [100, 100, 10, 10]})
     t["recall"] = t["matched"] / t["truth"]
-    s = summary_table(t, pool_sweep(t, 2), ["a", "b"], per_label=2)
+    s = summary_table(t, pool_sweep(t, 2), ["a", "b"], per_label=2, min_fraction=0.8)
     r = s.iloc[0]
-    assert r["a"] == pytest.approx(0.6, abs=1e-3)   # 200 detections: half way 100..400 in log
-    assert r["b"] == pytest.approx(0.75, abs=1e-3)  # 20 detections: half way 10..40
-    assert r[POOLED] == pytest.approx((45 / 110 + 90 / 110) / 2, abs=1e-3)   # 220 of 110..440
+    # budgets 200 / 20 / 220: the real run at or below each, flagged as short (revision C6)
+    assert (r["a"], r["a_detections"], r["a_flag"], r["a_budget"]) == (0.4, 100, "short", 200)
+    assert (r["b"], r["b_detections"], r["b_flag"]) == (0.5, 10, "short")
+    assert r[POOLED] == pytest.approx(45 / 110, abs=1e-3) and r[f"{POOLED}_detections"] == 110
 
 
 def test_and_cfars_per_channel_pfa_and_own_enl(tmp_path: Path) -> None:

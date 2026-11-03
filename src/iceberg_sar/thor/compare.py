@@ -4,10 +4,13 @@ Precision can't be measured without AIS (an unlabelled detection may be a real b
 clutter), so the detectors are compared by **recall at a matched number of detections**: the
 CFAR is swept over its PFA, THOR over its score threshold, and each operating point gives
 (detections per scene, labels matched). Both see the same things:
-- detections: the CFAR's masked HV raster (THOR peaks already pass it in `infer`), then the
-  open-water filter of `pointval.run_point_validation` (nothing within `viewer.near_ice_km`);
+- detections: the CFAR's masked HV raster (THOR peaks already pass it in `infer`);
 - truth: `pointval.load_truth`, kept where the SAR is valid (`sar_valid_at`) after the drift
   shift;
+- scoring domain (`evaluation.EvalDomain`, revision C3): labels and detections alike, nothing
+  within `viewer.near_ice_km` of pack ice (`zone: open_water`), or only that strip
+  (`zone: near_ice`, revision C8). Before 2026-11-02 only detections were filtered, so the 38
+  labels near ice counted as misses no detector could avoid (512 labels; now 474);
 - matching: `matching.match_points`, one-to-one, at `validation.max_dist_m`.
 
 Drift: same-pass satellite labels need none. Aircraft truth (hours later) gets one offset per
@@ -27,6 +30,7 @@ import pandas as pd
 import rasterio
 
 from iceberg_sar.config import Config
+from iceberg_sar.evaluation import EvalDomain, Zone
 from iceberg_sar.matching import estimate_offset, match_points
 from iceberg_sar.pointval import (
     PointValParams,
@@ -50,6 +54,11 @@ class CompareParams:
     ice_bins_km: list[float]
     incidence_bins_deg: list[float]
     near_ice_km: float
+    zone: Zone = "open_water"
+
+    @property
+    def domain(self) -> EvalDomain:
+        return EvalDomain(near_ice_km=self.near_ice_km, zone=self.zone)
 
     @classmethod
     def from_config(cls, cfg: Config) -> CompareParams:
@@ -61,7 +70,8 @@ class CompareParams:
                    radii_m=[float(r) for r in c["radii_m"]],
                    ice_bins_km=[float(b) for b in c["ice_bins_km"]],
                    incidence_bins_deg=[float(b) for b in c["incidence_bins_deg"]],
-                   near_ice_km=float(cfg.raw.get("viewer", {}).get("near_ice_km", 5)))
+                   near_ice_km=float(cfg.raw.get("viewer", {}).get("near_ice_km", 5)),
+                   zone=c.get("zone", "open_water"))
 
 
 def pfa_label(pfa: float) -> str:
@@ -80,11 +90,20 @@ def cfar_sweep(cfg: Config, product_dir: Path, p: CompareParams, log=print) -> l
     return list(out.values())
 
 
-def open_water(det: gpd.GeoDataFrame, near_ice_km: float) -> gpd.GeoDataFrame:
-    """The `validate-points` filter: drop detections within `near_ice_km` of pack ice."""
+def in_domain(det: gpd.GeoDataFrame, domain: EvalDomain, crs: object | None = None
+              ) -> gpd.GeoDataFrame:
+    """Detections inside the scoring domain, by their `distance_to_ice_km` attribute (the same
+    `seaice.distance_to_ice_km` the labels get) and, for an area, their position in `crs`."""
     if det.empty:
         return det
-    return det[~(det["distance_to_ice_km"] < near_ice_km)]
+    pts = xy(det, crs) if domain.area is not None else np.zeros((len(det), 2))
+    ice = det["distance_to_ice_km"].to_numpy(float) if domain.near_ice_km is not None else None
+    return det[domain.keep(pts, ice)]
+
+
+def open_water(det: gpd.GeoDataFrame, near_ice_km: float) -> gpd.GeoDataFrame:
+    """Detections at least `near_ice_km` from pack ice (`in_domain` with the IW default)."""
+    return in_domain(det, EvalDomain(near_ice_km=near_ice_km))
 
 
 def xy(gdf: gpd.GeoDataFrame, crs: object) -> np.ndarray:
@@ -135,15 +154,17 @@ class SceneData:
     name: str
     truth_kind: str
     crs: object
-    truth: gpd.GeoDataFrame        # compared labels only, with attributes
+    truth: gpd.GeoDataFrame        # compared labels only (SAR valid, in the domain)
     truth_xy: np.ndarray           # in SAR time (drift undone)
     drift: Drift
-    cfar: dict[float, gpd.GeoDataFrame]   # pfa -> open-water detections
-    thor: dict[str, gpd.GeoDataFrame]     # model tag -> open-water detections (all scores)
+    cfar: dict[float, gpd.GeoDataFrame]   # pfa -> detections in the domain
+    thor: dict[str, gpd.GeoDataFrame]     # model tag -> detections in the domain (all scores)
+    labels_outside: int = 0        # SAR-valid labels outside the domain (not scored)
 
 
 def load_scene(cfg: Config, name: str, truth_kind: str, p: CompareParams) -> SceneData:
-    """Truth and every detector's open-water detections for one scene, plus the shared drift."""
+    """Truth and every detector's detections in the scoring domain for one scene, plus the
+    shared drift (estimated from all of them, before the domain is applied)."""
     from iceberg_sar.detections import sample_incidence_deg, scene_timestamp
     from iceberg_sar.preprocess import find_rtc_bands
     from iceberg_sar.seaice import distance_to_ice_km
@@ -161,20 +182,22 @@ def load_scene(cfg: Config, name: str, truth_kind: str, p: CompareParams) -> Sce
         f = p.out_dir / "cfar_sweep" / pfa_label(pfa) / f"{name}_HV_detections.geojson"
         if not f.is_file():
             raise FileNotFoundError(f"{f}; run `thor-compare --sweep` first")
-        cfar[pfa] = open_water(gpd.read_file(f), p.near_ice_km)
+        cfar[pfa] = gpd.read_file(f)
     det_dir = cfg.path("outputs") / "detections"
     thor = {}
     for tag in p.thor_models:
         f = det_dir / f"{name}_{tag}_detections.geojson"
         if not f.is_file():
             raise FileNotFoundError(f"{f}; run `thor-detect` first")
-        thor[tag] = open_water(gpd.read_file(f), p.near_ice_km)
+        thor[tag] = gpd.read_file(f)
 
     t_xy = xy(truth, crs)
     gap_s = float(np.median(np.abs((truth["time"] - sar_time).dt.total_seconds()))) \
         if len(truth) else 0.0
-    ref = [xy(cfar[p.cfar_pfa], crs)] + [xy(d[d["score"] >= p.view_score], crs)
-                                         for d in thor.values()]
+    # Drift from the open-water detections, as before the domain fix (same offsets).
+    ow = EvalDomain(near_ice_km=p.near_ice_km)
+    ref = [xy(in_domain(cfar[p.cfar_pfa], ow), crs)] + [
+        xy(in_domain(d[d["score"] >= p.view_score], ow), crs) for d in thor.values()]
     drift = shared_drift(ref, t_xy, gap_s, vp)
     shift = np.array([drift.dx_m, drift.dy_m]) if drift.applied else np.zeros(2)
     t_xy = t_xy - shift
@@ -186,7 +209,12 @@ def load_scene(cfg: Config, name: str, truth_kind: str, p: CompareParams) -> Sce
     ice = interim / f"{name}_seaice_mask.tif"
     truth["distance_to_ice_km"] = (distance_to_ice_km(ice, t_xy[:, 0], t_xy[:, 1])
                                    if ice.is_file() else np.nan)
-    return SceneData(name, truth_kind, crs, truth, t_xy, drift, cfar, thor)
+    keep = p.domain.keep(t_xy, truth["distance_to_ice_km"].to_numpy(float))
+    truth, t_xy = truth[keep].reset_index(drop=True), t_xy[keep]
+    cfar = {k: in_domain(d, p.domain) for k, d in cfar.items()}
+    thor = {k: in_domain(d, p.domain) for k, d in thor.items()}
+    return SceneData(name, truth_kind, crs, truth, t_xy, drift, cfar, thor,
+                     int((~keep).sum()))
 
 
 def sweep_table(s: SceneData, radius_m: float) -> pd.DataFrame:
@@ -324,8 +352,10 @@ def run_compare(cfg: Config, log=print) -> dict[str, Path]:
     for name, kind in p.scenes.items():
         s = load_scene(cfg, name, kind, p)
         scenes.append(s)
-        log(f"{name}: {len(s.truth_xy)} labels compared ({kind}), drift {asdict(s.drift)}")
+        log(f"{name}: {len(s.truth_xy)} labels compared ({kind}; {s.labels_outside} outside "
+            f"the domain), drift {asdict(s.drift)}")
         meta[name] = {"truth": kind, "labels_compared": len(s.truth_xy),
+                      "labels_outside_domain": s.labels_outside,
                       "drift": asdict(s.drift),
                       "detections": {**{f"cfar {pfa:g}": len(d) for pfa, d in s.cfar.items()},
                                      **{f"{t} >= {p.view_score:g}":
@@ -369,7 +399,8 @@ def run_compare(cfg: Config, log=print) -> dict[str, Path]:
     if len(scored) > 1:
         meta[POOLED] = {"truth": "iip-satellite", "scenes": scored,
                         "labels_compared": sum(meta[n]["labels_compared"] for n in scored)}
-    meta.update({"radius_m": radius, "near_ice_km": p.near_ice_km, "cfar_pfa": p.cfar_pfa,
+    meta.update({"radius_m": radius, "near_ice_km": p.near_ice_km, "zone": p.zone,
+                 "domain": p.domain.describe(), "cfar_pfa": p.cfar_pfa,
                  "view_score": p.view_score})
     (p.out_dir / "summary.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     out["summary"] = p.out_dir / "summary.json"

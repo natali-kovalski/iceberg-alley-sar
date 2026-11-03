@@ -3,12 +3,18 @@ pooled over the frames.
 
 Same protocol as 5d (`thor/compare.py`), so the 40 m curves sit next to the 10 m ones:
 - truth: same-pass IIP labels (`pointval.load_truth`, iip-satellite), kept where the 10 m SAR
-  is valid (`sar_valid_at`): the labels 5d compares (512 on its four frames);
-- detections: open water only (nothing within `viewer.near_ice_km` of pack ice);
+  is valid (`sar_valid_at`);
+- scoring domain (`evaluation.EvalDomain`, revision C3): labels and detections alike, at least
+  `viewer.near_ice_km` from pack ice (`iw_sweep.zone: open_water`; 474 labels on 5d's frames,
+  512 before the fix), or only within it (`near_ice`, revision C8);
 - matching: one-to-one at `validation.max_dist_m`.
 
-Precision isn't measurable without AIS, so detectors are compared by recall at matched numbers
-of detections, read off each PFA curve by interpolation in log(detections).
+Precision isn't measurable without AIS, so detectors are compared by recall at a fixed
+detection budget: a comparison of review workload, not of false-alarm rate or precision.
+Revision C6: the recall at a budget is that of a real run (the one with the most detections at
+or below the budget), never interpolated between runs; a detector with no run at or below the
+budget gets none (`none`), and one whose run there has fewer than `budget_min_fraction` x the
+budget is flagged (`short`).
 The 10 m CA-CFAR (with the length rule, from the old 5d run with the rule always on) and THOR
 curves come from the 5d tables as reference.
 
@@ -34,8 +40,10 @@ import rasterio
 from iceberg_sar.benchmark import adapter
 from iceberg_sar.benchmark.sweep import CACFAR_10M, CACFAR_10M_AND, SweepParams
 from iceberg_sar.config import Config
+from iceberg_sar.evaluation import EvalDomain, Zone
 from iceberg_sar.pointval import load_truth, point_val_params, sar_valid_at
-from iceberg_sar.thor.compare import POOLED, SIZE_GROUPS, open_water, score_points, xy
+from iceberg_sar.thor import PIPELINE_SHORT
+from iceberg_sar.thor.compare import POOLED, SIZE_GROUPS, in_domain, score_points, xy
 
 # 10 m reference curves from 5d: 5d detector name -> label used here
 REF_10M = {"cfar": "cacfar-10m", "thor-linear": "thor-linear-10m"}
@@ -62,8 +70,11 @@ LABELS = {
     CACFAR_10M: "my CA-CFAR 10 m, no length rule",
     CACFAR_10M_AND: "my CA-CFAR 10 m, HH AND HV, no length rule",
     CURRENT_5D: "my CA-CFAR 10 m, current 5d (length rule in icy frames)",
-    "thor-linear-10m": "THOR linear 10 m (5d)",
+    "thor-linear-10m": f"{PIPELINE_SHORT}, linear head, 10 m (5d)",
 }
+_BUDGET_NOTE = ("Each cell: recall of the real run with the most detections at or below the "
+                "budget, with its detection count (no interpolation). †: that run has fewer than "
+                "{f:g} x the budget. `none`: the detector has no run at or below the budget.")
 NOTES_MARKER = "<!-- hand-written notes below; kept when bench-iw-compare re-runs -->"
 
 
@@ -80,6 +91,12 @@ class IwCompareParams:
     per_label: float
     pooled_counts: list[int]
     pooled_figure: Path | None
+    zone: Zone = "open_water"
+    budget_min_fraction: float = 0.8
+
+    @property
+    def domain(self) -> EvalDomain:
+        return EvalDomain(near_ice_km=self.near_ice_km, zone=self.zone)
 
     @classmethod
     def from_config(cls, cfg: Config) -> IwCompareParams:
@@ -96,12 +113,17 @@ class IwCompareParams:
                    per_label=float(s.get("summary_detections_per_label", 2)),
                    pooled_counts=[int(n) for n in s.get("pooled_matched_counts") or []],
                    pooled_figure=(cfg.root / s["pooled_figure"]) if s.get("pooled_figure")
-                   else None)
+                   else None,
+                   zone=s.get("zone", "open_water"),
+                   budget_min_fraction=float(s.get("budget_min_fraction", 0.8)))
 
 
-def scene_truth(cfg: Config, scene: str) -> tuple[gpd.GeoDataFrame, np.ndarray, Any]:
-    """5d's compared labels for a same-pass scene: truth, xy in the scene CRS, the CRS."""
+def scene_truth(cfg: Config, scene: str, domain: EvalDomain
+                ) -> tuple[gpd.GeoDataFrame, np.ndarray, Any]:
+    """5d's compared labels for a same-pass scene: truth (SAR valid, in `domain`), xy in the
+    scene CRS, the CRS."""
     from iceberg_sar.detections import scene_timestamp
+    from iceberg_sar.seaice import distance_to_ice_km
 
     masked = cfg.path("interim") / scene / f"{scene}_HV_masked.tif"
     with rasterio.open(masked) as src:
@@ -110,11 +132,17 @@ def scene_truth(cfg: Config, scene: str) -> tuple[gpd.GeoDataFrame, np.ndarray, 
     truth, _ = load_truth(cfg, scene, sar_time, "iip-satellite")
     t_xy = xy(truth, crs)
     ok = sar_valid_at(masked, t_xy, point_val_params(cfg).valid_block_px)
+    ice = cfg.path("interim") / scene / f"{scene}_seaice_mask.tif"
+    dist = (distance_to_ice_km(ice, t_xy[:, 0], t_xy[:, 1]) if ice.is_file()
+            else np.full(len(t_xy), np.nan))
+    ok &= domain.keep(t_xy, dist)
+    truth = truth.assign(distance_to_ice_km=dist)
     return truth[ok].reset_index(drop=True), t_xy[ok], crs
 
 
-def load_detections(det_dir: Path, tag: str, near_ice_km: float) -> dict[float, gpd.GeoDataFrame]:
-    """Open-water detections per PFA of one detector's sweep (the PFAs it ran)."""
+def load_detections(det_dir: Path, tag: str, domain: EvalDomain
+                    ) -> dict[float, gpd.GeoDataFrame]:
+    """Detections in `domain` per PFA of one detector's sweep (the PFAs it ran)."""
     meta_path = det_dir / f"{tag}_run.json"
     if not meta_path.is_file():
         raise FileNotFoundError(f"{meta_path}; run `bench-iw-sweep` first")
@@ -122,8 +150,8 @@ def load_detections(det_dir: Path, tag: str, near_ice_km: float) -> dict[float, 
     out = {}
     for r in meta["runs"]:
         pfa = float(r["pfa"])
-        out[pfa] = open_water(gpd.read_file(det_dir / f"{tag}_pfa{adapter.pfa_tag(pfa)}.geojson"),
-                              near_ice_km)
+        out[pfa] = in_domain(gpd.read_file(det_dir / f"{tag}_pfa{adapter.pfa_tag(pfa)}.geojson"),
+                             domain)
     return out
 
 
@@ -151,42 +179,50 @@ def reference_10m(ref_5d: Path, scene: str, names: dict[str, str] = REF_10M) -> 
     return t.drop(columns=["scene", "radius_m"], errors="ignore")
 
 
-def recall_at(curve: pd.DataFrame, counts: list[int]) -> list[float]:
-    """Recall at each detection count, interpolated in log(detections) along one detector's
-    curve; NaN outside the range the curve covers (no extrapolation)."""
-    c = curve[curve["detections"] > 0].groupby("detections", as_index=False)["recall"].max()
-    if c.empty:
-        return [np.nan] * len(counts)
-    lx, y = np.log10(c["detections"].to_numpy(float)), c["recall"].to_numpy(float)
-    return [float(np.interp(np.log10(n), lx, y)) if lx[0] <= np.log10(n) <= lx[-1] else np.nan
-            for n in counts]
+def at_budget(curve: pd.DataFrame, budget: int, min_fraction: float
+              ) -> tuple[float, float, str]:
+    """(recall, detections, flag) of the real run with the most detections <= `budget` (best
+    recall among equal counts); never interpolated. Flag: "" ok, "short" if that run has fewer
+    than `min_fraction` x `budget` detections, "none" if no run is at or below the budget."""
+    c = curve[curve["detections"] > 0]
+    below = c[c["detections"] <= budget]
+    if below.empty:
+        return np.nan, np.nan, "none"
+    n = int(below["detections"].max())
+    r = float(below.loc[below["detections"] == n, "recall"].max())
+    return r, n, "short" if n < min_fraction * budget else ""
 
 
-def matched_table(sweep: pd.DataFrame, counts: list[int]) -> pd.DataFrame:
+def matched_table(sweep: pd.DataFrame, counts: list[int], min_fraction: float) -> pd.DataFrame:
     rows = []
     for det, g in sweep.groupby("detector", sort=False):
-        r = recall_at(g, counts)
-        rows.append({"detector": det, **{f"recall@{n}": v for n, v in zip(counts, r,
-                                                                          strict=True)},
-                     "detections_min": int(g["detections"].min()),
-                     "detections_max": int(g["detections"].max()),
-                     "pfas_run": len(g)})
+        row: dict[str, Any] = {"detector": det}
+        for n in counts:
+            r, k, flag = at_budget(g, n, min_fraction)
+            row |= {f"recall@{n}": r, f"detections@{n}": k, f"flag@{n}": flag}
+        rows.append(row | {"detections_min": int(g["detections"].min()),
+                           "detections_max": int(g["detections"].max()), "pfas_run": len(g)})
     return pd.DataFrame(rows)
 
 
 def size_breakdown(dets: dict[str, dict[float, gpd.GeoDataFrame]], truth: gpd.GeoDataFrame,
                    t_xy: np.ndarray, crs: Any, radius_m: float, count: int,
                    pfa_by_tag: dict[str, float] | None = None) -> pd.DataFrame:
-    """Recall per IIP size group at each detector's PFA with the detection count nearest
-    `count` (a real operating point, not an interpolation), or at `pfa_by_tag` where given
-    (pooled: one PFA for every frame; detectors not in it are skipped)."""
+    """Recall per IIP size group at each detector's PFA with the most detections at or below
+    `count` (a real run, revision C6; detectors with none are skipped), or at `pfa_by_tag`
+    where given (pooled: one PFA for every frame; detectors not in it are skipped)."""
     size = truth["size"].map(SIZE_GROUPS).fillna("other / unknown").to_numpy()
     rows = []
     for tag, by_pfa in dets.items():
         if not by_pfa or (pfa_by_tag is not None and pfa_by_tag.get(tag) not in by_pfa):
             continue
-        pfa = pfa_by_tag[tag] if pfa_by_tag is not None else \
-            min(by_pfa, key=lambda p: abs(np.log(max(len(by_pfa[p]), 1) / count)))
+        if pfa_by_tag is not None:
+            pfa = pfa_by_tag[tag]
+        else:
+            ok = [q for q in by_pfa if 0 < len(by_pfa[q]) <= count]
+            if not ok:
+                continue
+            pfa = max(ok, key=lambda q: len(by_pfa[q]))
         d = by_pfa[pfa]
         _, hit = score_points(xy(d, crs), t_xy, radius_m)
         for group in sorted(set(size)):
@@ -221,15 +257,15 @@ def run_iw_compare(cfg: Config, log: Callable[[str], None] = print) -> dict[str,
     scenes: dict[str, dict[str, Any]] = {}   # per-scene data for the pooled section
     for scene in sp.scenes:
         work = sp.out_dir / scene
-        truth, t_xy, crs = scene_truth(cfg, scene)
+        truth, t_xy, crs = scene_truth(cfg, scene, p.domain)
         tags = [*sp.detectors, *sp.cacfar_tags, *sp.cacfar_10m_tags]
-        dets = {t: load_detections(work / t, t, p.near_ice_km) for t in tags}
+        dets = {t: load_detections(work / t, t, p.domain) for t in tags}
         sweep = sweep_table(dets, t_xy, crs, p.radius_m)
         ref = reference_10m(p.ref_5d, scene)
         full = pd.concat([sweep, ref], ignore_index=True)
         full.insert(0, "scene", scene)
         full.to_csv(work / "sweep_scored.csv", index=False)
-        matched = matched_table(full, p.matched_counts)
+        matched = matched_table(full, p.matched_counts, p.budget_min_fraction)
         matched.to_csv(work / "recall_at_matched_counts.csv", index=False)
         sizes = pd.concat([size_breakdown(dets, truth, t_xy, crs, p.radius_m,
                                           p.breakdown_count),
@@ -281,35 +317,36 @@ def pool_sweep(per_scene: pd.DataFrame, n_scenes: int) -> pd.DataFrame:
 
 
 def summary_table(per_scene: pd.DataFrame, pooled: pd.DataFrame, scenes: list[str],
-                  per_label: float) -> pd.DataFrame:
-    """Recall of each detector at `per_label` x the labels, in each frame and pooled
-    (interpolated in log(detections); NaN where the curve doesn't reach that count)."""
+                  per_label: float, min_fraction: float) -> pd.DataFrame:
+    """Recall of each detector at a budget of `per_label` x the labels, in each frame and
+    pooled, from real runs (`at_budget`): columns <scene>, <scene>_detections, <scene>_flag,
+    <scene>_budget."""
     rows = []
     for det in pooled["detector"].unique().tolist() + [
             d for d in per_scene["detector"].unique() if d not in set(pooled["detector"])]:
         row: dict[str, Any] = {"detector": det}
-        for scene in scenes:
-            c = per_scene[(per_scene["scene"] == scene) & (per_scene["detector"] == det)]
-            n = int(round(per_label * c["truth"].iloc[0])) if len(c) else 0
-            row[scene] = recall_at(c, [n])[0] if len(c) else np.nan
-        c = pooled[pooled["detector"] == det]
-        row[POOLED] = (recall_at(c, [int(round(per_label * c["truth"].iloc[0]))])[0]
-                       if len(c) else np.nan)
+        for scene in [*scenes, POOLED]:
+            c = (pooled[pooled["detector"] == det] if scene == POOLED else
+                 per_scene[(per_scene["scene"] == scene) & (per_scene["detector"] == det)])
+            budget = int(round(per_label * c["truth"].iloc[0])) if len(c) else 0
+            r, k, flag = (at_budget(c, budget, min_fraction) if len(c)
+                          else (np.nan, np.nan, "not run"))
+            row |= {scene: r, f"{scene}_detections": k, f"{scene}_flag": flag,
+                    f"{scene}_budget": budget}
         rows.append(row)
     return pd.DataFrame(rows)
 
 
 def pooled_sizes(scenes: dict[str, dict[str, Any]], pooled: pd.DataFrame, p: IwCompareParams,
                  count: int) -> pd.DataFrame:
-    """Recall by size, pooled: each detector of this sweep at the one setting whose pooled
-    detection count is nearest `count`, summed over the frames; 10 m CA-CFARs and THOR at
-    5d's pooled operating points."""
+    """Recall by size, pooled: each detector of this sweep at the one setting with the most
+    pooled detections at or below `count` (a real run, revision C6), summed over the frames;
+    10 m CA-CFARs and THOR at 5d's pooled operating points."""
     pfa_by_tag = {}
     for det, g in pooled.groupby("detector", sort=False):
-        g = g[g["detections"] > 0]
+        g = g[(g["detections"] > 0) & (g["detections"] <= count)]
         if len(g):
-            pfa_by_tag[det] = float(g.loc[(np.log(g["detections"] / count)).abs().idxmin(),
-                                          "setting"])
+            pfa_by_tag[det] = float(g.loc[g["detections"].idxmax(), "setting"])
     parts = [size_breakdown(d["dets"], d["truth"], d["t_xy"], d["crs"], p.radius_m, count,
                             pfa_by_tag) for d in scenes.values()]
     t = pd.concat(parts, ignore_index=True)
@@ -336,7 +373,7 @@ def run_pooled(scenes: dict[str, dict[str, Any]], p: IwCompareParams, root: Path
     pooled = pool_sweep(per_scene, len(scenes))
     n_truth = int(sum(len(d["t_xy"]) for d in scenes.values()))
     order = sorted(scenes, key=scene_date)
-    summary = summary_table(per_scene, pooled, order, p.per_label)
+    summary = summary_table(per_scene, pooled, order, p.per_label, p.budget_min_fraction)
     count = int(round(p.per_label * n_truth))
     sizes = pooled_sizes(scenes, pooled, p, count)
     out_dir = sp.out_dir
@@ -389,24 +426,25 @@ def _pooled_section(scenes: dict[str, dict[str, Any]], order: list[str], pooled:
     ]
     for _, r in summary.iterrows():
         lines.append(f"| {LABELS.get(r['detector'], r['detector'])} | "
-                     + " | ".join(_fmt(r[s]) for s in [*order, POOLED]) + " |")
-    lines += ["", "Blank: the curve doesn't reach that count in that frame (pooled: in "
-              "every frame at a shared setting).", ""]
+                     + " | ".join(_cell(r, s, f"{s}_detections", f"{s}_flag")
+                                  for s in [*order, POOLED]) + " |")
+    lines += ["", _BUDGET_NOTE.format(f=p.budget_min_fraction), ""]
     if p.pooled_counts:
-        matched = matched_table(pooled, p.pooled_counts)
+        matched = matched_table(pooled, p.pooled_counts, p.budget_min_fraction)
         lines += ["### Pooled recall at matched detection counts", "",
                   "| Detector | " + " | ".join(f"@{n}" for n in p.pooled_counts)
                   + " | Detections covered |",
                   "|---|" + "---|" * len(p.pooled_counts) + "---|"]
         for _, r in matched.iterrows():
             lines.append(f"| {LABELS.get(r['detector'], r['detector'])} | "
-                         + " | ".join(_fmt(r[f"recall@{n}"]) for n in p.pooled_counts)
+                         + " | ".join(_cell(r, f"recall@{n}", f"detections@{n}", f"flag@{n}")
+                                      for n in p.pooled_counts)
                          + f" | {r['detections_min']}-{r['detections_max']} |")
         lines.append("")
     groups = [g for g in ("small 15-60 m", "medium 61-120 m", "large >120 m",
                           "other / unknown") if g in set(sizes["size"])]
     n_by = sizes.drop_duplicates("size").set_index("size")["labels"]
-    lines += [f"### Pooled recall by IIP size, near {count} detections", "",
+    lines += [f"### Pooled recall by IIP size, at most {count} detections (real runs)", "",
               "| Detector | PFA | Detections | "
               + " | ".join(f"{g} (n={int(n_by[g])})" for g in groups) + " |",
               "|---|---|---|" + "---|" * len(groups)]
@@ -514,7 +552,7 @@ def recall_figure(sweep: pd.DataFrame, sp: SweepParams, n_truth: int, p: IwCompa
     fig.text(0.01, 0.005,
              f"{caption}, {n_truth} same-pass IIP labels. Reference "
              "points are labelled with their total PFA. Dotted diagonal: every detection is a "
-             f"label. Detections within {p.near_ice_km:g} km of pack ice are dropped.",
+             f"label. Scoring domain (labels and detections): {p.domain.describe()}.",
              fontsize=7.5, color=TEXT_2)
     fig.tight_layout(rect=(0, 0.03, 1, 0.92))
     png.parent.mkdir(parents=True, exist_ok=True)
@@ -539,7 +577,7 @@ def ten_m_figure(scenes: dict[str, dict[str, Any]], order: list[str], pooled: pd
         CURRENT_5D: ("#9a9890", "s", ":", "CA-CFAR, current 5d (length rule in icy frames)"),
         CACFAR_10M: (SAR_ONLY, "s", "-", "CA-CFAR, HV + 6 dB HH check (Stage 1)"),
         CACFAR_10M_AND: (MISSED, "^", "-", "CA-CFAR, HH AND HV"),
-        "thor-linear-10m": (FOUND, "o", "-", "THOR linear head (5d)"),
+        "thor-linear-10m": (FOUND, "o", "-", f"{PIPELINE_SHORT}, linear head (5d)"),
     }
     panels = [(f"{scene_date(s)[5:]} ({len(scenes[s]['t_xy'])} labels)", scenes[s]["sweep"],
                len(scenes[s]["t_xy"])) for s in order]
@@ -579,7 +617,7 @@ def ten_m_figure(scenes: dict[str, dict[str, Any]], order: list[str], pooled: pd
              "10 m, same-pass IIP labels, April 2019; CA-CFAR curves without the length rule "
              "unless noted. Vertical line: "
              f"{p.per_label:g} detections per label. Dotted diagonal: every detection is a label. "
-             f"Detections within {p.near_ice_km:g} km of pack ice are dropped.",
+             f"Scoring domain (labels and detections): {p.domain.describe()}.",
              fontsize=7.5, color=TEXT_2)
     fig.tight_layout(rect=(0, 0.04, 1, 0.9))
     png.parent.mkdir(parents=True, exist_ok=True)
@@ -616,16 +654,26 @@ def _header(p: IwCompareParams) -> str:
         "10 m. Unlabelled CA-CFAR rows below use the paper windows.",
         f"- Total PFA: {', '.join(f'{x:.0e}' for x in sp.pfas)}; a detector stops after the "
         f"first PFA with more than {sp.max_objects} objects.",
-        f"- Truth: same-pass IIP labels where the SAR is valid. Detections within "
-        f"{p.near_ice_km:g} km of pack ice dropped. One-to-one matching at {p.radius_m:.0f} m.",
-        "- Precision isn't measurable without AIS: compare **recall at matched detection "
-        "counts**, interpolated in log(detections) between PFA points.",
+        f"- Truth: same-pass IIP labels where the SAR is valid. Scoring domain (labels and "
+        f"detections alike): {p.domain.describe()}. One-to-one matching at {p.radius_m:.0f} m.",
+        "- Precision isn't measurable without AIS: compare **recall at a fixed detection "
+        "budget**, read from real runs only (no interpolation). This compares review "
+        "workload, not false-alarm rate or precision.",
         "",
     ])
 
 
 def _fmt(v: float) -> str:
     return "" if pd.isna(v) else f"{v:.2f}"
+
+
+def _cell(r: Any, key: str, det_key: str, flag_key: str) -> str:
+    """Recall at a budget with the run's detection count; † short of the budget, `none`: no
+    run at or below it."""
+    flag = r[flag_key]
+    if flag in ("none", "not run"):
+        return flag
+    return f"{r[key]:.2f} ({int(r[det_key])})" + ("†" if flag == "short" else "")
 
 
 def _scene_section(scene: str, sweep: pd.DataFrame, matched: pd.DataFrame, sizes: pd.DataFrame,
@@ -649,16 +697,17 @@ def _scene_section(scene: str, sweep: pd.DataFrame, matched: pd.DataFrame, sizes
     ]
     for _, r in matched.iterrows():
         lines.append(f"| {LABELS.get(r['detector'], r['detector'])} | "
-                     + " | ".join(_fmt(r[f"recall@{n}"]) for n in counts)
+                     + " | ".join(_cell(r, f"recall@{n}", f"detections@{n}", f"flag@{n}")
+                                  for n in counts)
                      + f" | {r['detections_min']}-{r['detections_max']} | "
                      + (f"{r['pfas_run']}" if not r["detector"].endswith("-10m") else "5d")
                      + " |")
-    lines += ["", "Blank: the curve doesn't reach that count. 10 m rows (own windows): the "
+    lines += ["", _BUDGET_NOTE.format(f=p.budget_min_fraction), "", "10 m rows (own windows): the "
               "CA-CFAR without the length rule is this sweep's `cacfar-nolength-10m` (current "
               "5d's curve on open-water frames); with the rule, the old 5d run with the rule "
               "always on (`ref_5d_dir`; current 5d's curve on icy frames); THOR, 5d's score "
               "sweep.", "",
-              f"### Recall by IIP size, near {p.breakdown_count} detections", ""]
+              f"### Recall by IIP size, at most {p.breakdown_count} detections (real runs)", ""]
     groups = [g for g in ("small 15-60 m", "medium 61-120 m", "large >120 m",
                           "other / unknown") if g in set(sizes["size"])]
     n_by = sizes.drop_duplicates("size").set_index("size")["labels"]

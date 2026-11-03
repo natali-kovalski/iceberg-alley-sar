@@ -26,13 +26,20 @@ from rasterio.windows import Window
 from scipy.spatial import cKDTree
 
 from iceberg_sar.benchmark.reproduce import scene_paths
-from iceberg_sar.benchmark.score import _other_variant, _variant, load_labels, scoring_aoi
+from iceberg_sar.benchmark.score import (
+    _other_variant,
+    _variant,
+    eval_domain,
+    labels_in_domain,
+    load_labels,
+)
 from iceberg_sar.benchmark.thor_faerch import (
     ThorFaerchParams,
     ThorRunParams,
     crop_geometry,
 )
 from iceberg_sar.config import Config
+from iceberg_sar.thor import PIPELINE, PIPELINE_SHORT
 from iceberg_sar.thor.encoder import ThorParams, embed_blocks, load_encoder
 from iceberg_sar.thor.features import FeatureParams
 
@@ -121,9 +128,8 @@ def faerch_rows(cfg: Config, bp: BergsParams, log: Callable[[str], None]) -> lis
     rp = ThorRunParams.from_config(cfg)
     scores = pd.read_csv(rp.out_dir / "thor_scores.csv")
     labels, _ = load_labels(cfg, "faerch")
-    aoi = scoring_aoi(cfg, fc["score"]["aoi"])
-    inside = gpd.GeoSeries(gpd.points_from_xy(labels.x, labels.y)).within(aoi).to_numpy()
-    med = labels[inside & (labels.size_class == "medium") & (labels.status == "verified")]
+    labels = labels_in_domain(labels, eval_domain(cfg, fc["score"]["aoi"]))   # revision C3
+    med = labels[(labels.size_class == "medium") & (labels.status == "verified")]
     med = med.reset_index(drop=True)
     lab = gpd.read_file(cfg.root / fc["labels_faerch"]["out_dir"] / "labels_faerch.geojson")
     length = lab.set_index("label_id").length_m.reindex(med.label_id).to_numpy()
@@ -330,15 +336,16 @@ def berg_figure(faerch: list[dict[str, Any]], train: list[dict[str, Any]], out: 
                 h = row["heat"][key]
                 im = show_heat(axes[r, c], h)
                 if r == 0:
-                    axes[r, c].set_title(f"THOR {h['title']}\n(peaks >= {h['thr']:g})",
-                                         fontsize=8)
+                    axes[r, c].set_title(
+                        f"{PIPELINE_SHORT} {h['title']}\n(peaks >= {h['thr']:g})", fontsize=8)
             axes[r, 0].set_ylabel(f"label {row['label_id']}\n{row['length_m']:.0f} m",
                                   fontsize=8)
         for ax in axes.flat:
             ax.set_xticks([])
             ax.set_yticks([])
         top.suptitle("Færch 2023 scene (EW, 40 m, July): verified medium bergs, hits then misses "
-                     "of noTNR / upsample at its best-F threshold", fontsize=10)
+                     "of noTNR / upsample at its best-F threshold (misses of that run only; other "
+                     "runs recover some, see the report)", fontsize=10)
     if train:
         axes = bottom.subplots(len(train), ncol, squeeze=False)
         cbar_at = cbar_at or (bottom, axes)
@@ -354,7 +361,7 @@ def berg_figure(faerch: list[dict[str, Any]], train: list[dict[str, Any]], out: 
                     title = f"{key} dB"
                 else:
                     im = show_heat(ax, row["heat"][key])
-                    title = f"THOR {key}"
+                    title = f"{PIPELINE_SHORT} {key}"
                 if r == 0:
                     ax.set_title(title, fontsize=8)
             for ax in axes[r, len(keys):]:
@@ -369,9 +376,9 @@ def berg_figure(faerch: list[dict[str, Any]], train: list[dict[str, Any]], out: 
     if im is not None and cbar_at is not None:
         sub, axs = cbar_at
         cb = sub.colorbar(im, ax=axs[:, -1].tolist(), shrink=0.6, location="right", pad=0.01)
-        cb.set_label("THOR head score", fontsize=8)
+        cb.set_label("head score", fontsize=8)
         cb.ax.tick_params(labelsize=7)
-    fig.suptitle(f"Medium icebergs through THOR (linear head, unchanged). Panels "
+    fig.suptitle(f"Medium icebergs through the {PIPELINE} (head unchanged). Panels "
                  f"{window_m / 1000:g} km; ring = label; squares = peaks at the run's threshold; "
                  "score = best token within 250 m", fontsize=10)
     out.parent.mkdir(parents=True, exist_ok=True)

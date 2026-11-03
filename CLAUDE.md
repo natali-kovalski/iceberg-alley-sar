@@ -19,6 +19,10 @@ This is a portfolio project. It should show hands-on SAR and maritime-domain ski
 - Never commit raw data, credentials, or model weights. Use `.env` for secrets and keep `data/` in `.gitignore`.
 - Default CRS for outputs is EPSG:4326 (GeoJSON / CZML). For metric processing, use the scene's native projection or UTM 21N/22N (EPSG:32621 / 32622).
 - When a choice has a well-known trade-off (e.g. CFAR variant, window sizes), pick a sensible default, say why in one line, and move on.
+- **Evaluation policy (standing rule, every dataset):** every score uses the shared evaluation
+  mask (`evaluation.EvalDomain`), applied identically to labels (by SAR position) and
+  detections. Never exclude detections from a zone while keeping its labels in the denominator.
+  Report the label count used.
 
 ## Tech stack
 - **Python 3.11+**: numpy, scipy, rasterio, shapely, geopandas, scikit-image, pyyaml, typer (CLI)
@@ -712,6 +716,8 @@ Milestone numbering restarts at 0 for Stage 2. Stage 1 milestones stay as they a
 - The ice-strip length rule applies only in scenes with pack ice (`detections.length_rule: auto`,
   >= 500 km² of pack-ice mask; 2026-10-26). In open water it only dropped large bergs. Until I've
   read how the literature handles ice; a shape-based strip test is the candidate replacement.
+  **Frozen (2026-11-02):** the 500 km² trigger was set after seeing the April 2019 data; no more
+  tuning on those frames, and it is evaluated only on scenes not yet looked at.
 
 ### Stage 2 pitfalls
 - Per-channel PFA ≠ final PFA. Always log both.

@@ -63,12 +63,15 @@ def test_score_thresholds_filters_area_unknown_and_score():
     import geopandas as gpd
     import pandas as pd
 
+    from iceberg_sar.evaluation import EvalDomain
+
     peaks = gpd.GeoDataFrame({"score": [0.9, 0.5, 0.1, 0.9]},
                              geometry=gpd.points_from_xy([0, 1000, 2000, 50_000], [0, 0, 0, 0]))
     labels = pd.DataFrame({"x": [0.0, 2000.0], "y": [0.0, 0.0], "radius_m": [250.0, 250.0],
                            "status": ["verified", "verified"], "size_class": ["small", "large"]})
     unknown = np.array([[1000.0, 10.0]])                     # the 0.5 peak is ignored
-    t = score_thresholds(peaks, labels, unknown, box(-100, -100, 3000, 100), 250, (0.05, 0.3))
+    domain = EvalDomain(area=box(-100, -100, 3000, 100))
+    t = score_thresholds(peaks, labels, unknown, domain, 250, (0.05, 0.3))
     assert t.n_det.tolist() == [2, 1]                        # 50 km peak is outside the area
     assert t.TP.tolist() == [2, 1] and t.FP.tolist() == [0, 0]
     assert t.ignored_unknown.tolist() == [1, 1]
@@ -109,3 +112,18 @@ def test_label_and_water_scores():
     np.testing.assert_allclose(s, [0.8, 0.0])
     w = water_scores(prob, np.ones_like(prob, bool), np.array([[2, 2]]), r=3)
     assert w.max() == pytest.approx(0.3) and 0.8 not in w
+
+
+def test_score_thresholds_drops_labels_outside_the_area_too():
+    """Revision C3: a label outside the scoring area is not a miss."""
+    import geopandas as gpd
+    import pandas as pd
+
+    from iceberg_sar.evaluation import EvalDomain
+
+    peaks = gpd.GeoDataFrame({"score": [0.9]}, geometry=gpd.points_from_xy([0], [0]))
+    labels = pd.DataFrame({"x": [0.0, 9000.0], "y": [0.0, 0.0], "radius_m": [250.0, 250.0],
+                           "status": ["verified", "verified"], "size_class": ["small", "small"]})
+    t = score_thresholds(peaks, labels, np.empty((0, 2)),
+                         EvalDomain(area=box(-100, -100, 3000, 100)), 250, (0.05,))
+    assert t.labels_scored.tolist() == [1] and t.FN.tolist() == [0]

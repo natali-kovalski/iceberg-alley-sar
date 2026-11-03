@@ -13,13 +13,15 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from iceberg_sar.figures import FOUND, GRID, MISSED, SAR_ONLY, SURFACE, TEXT, TEXT_2  # noqa: E402
+from iceberg_sar.thor import PIPELINE_SHORT  # noqa: E402
 
 # Validated three-series palette from figures.py, fixed per detector; marker shape is the
 # second encoding, and every series is direct-labelled at its end.
 STYLE = {
     "cfar": {"color": SAR_ONLY, "marker": "s", "label": "CA-CFAR (PFA sweep)"},
-    "thor-linear": {"color": FOUND, "marker": "o", "label": "THOR + linear head"},
-    "thor-centernet": {"color": MISSED, "marker": "^", "label": "THOR + CenterNet ensemble"},
+    "thor-linear": {"color": FOUND, "marker": "o", "label": f"{PIPELINE_SHORT}, linear head"},
+    "thor-centernet": {"color": MISSED, "marker": "^",
+                       "label": f"{PIPELINE_SHORT}, CenterNet ensemble"},
 }
 
 

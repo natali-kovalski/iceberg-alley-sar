@@ -31,14 +31,19 @@ from shapely.geometry import box
 
 from iceberg_sar.benchmark.reproduce import scene_paths
 from iceberg_sar.benchmark.score import (
+    MatchSettings,
     _other_variant,
     _variant,
+    apply_match_settings,
+    eval_domain,
+    labels_in_domain,
     load_labels,
     score_points,
     scoring_aoi,
 )
 from iceberg_sar.config import Config
 from iceberg_sar.preprocess import linear_to_db
+from iceberg_sar.thor import PIPELINE, PIPELINE_SHORT
 from iceberg_sar.thor.encoder import ThorParams, embed_blocks, load_encoder, pca_rgb, to_model_input
 from iceberg_sar.thor.features import FeatureParams
 from iceberg_sar.thor.heads import extract_peaks
@@ -283,16 +288,16 @@ def run_thor_smoke(cfg: Config, device: str | None = None, n_crops: int | None =
                     "water_score_p99": _r(np.percentile(ws, 99)) if len(ws) else None,
                     "water_score_max": _r(ws.max()) if len(ws) else None,
                     "peaks": len(pk_xy),
-                    **{key: sc[key] for key in ("TP_v", "FP_v", "FN_v", "ignored_v")},
-                    "precision_v": _r(sc["precision_v"]), "recall_v": _r(sc["recall_v"]),
+                    "TP": sc["TP"], "FP": sc["FP"], "FN": sc["FN"], "TP_v": sc["TP_v"],
+                    "n_v": sc["n_v"], "recall_v": _r(sc["recall_v"]),
                     "berg_rank_pct": sep.get("berg_rank_pct"),
                     "berg_median_dist": sep.get("berg_median_dist"),
                 }
                 summary.append(row)
                 log(f"crop {k} {sname:5s} {v.name:8s}: verified label score median "
                     f"{row['label_score_median_v']}, water p99 {row['water_score_p99']}, "
-                    f"{row['peaks']} peaks >= {p.score_threshold:g}: TP_v {row['TP_v']} "
-                    f"FP_v {row['FP_v']} FN_v {row['FN_v']}")
+                    f"{row['peaks']} peaks >= {p.score_threshold:g}: TP {row['TP']} "
+                    f"FP {row['FP']} FN {row['FN']}, verified {row['TP_v']}/{row['n_v']}")
         fig = p.out_dir / f"thor_smoke_crop{k}_r{r0}_c{c0}.png"
         save_smoke_figure(db, panels, crop_lab_rc, crop_ver, crop_unk_rc, p.score_threshold,
                           f"Færch 2023 EW 40 m, crop {k}: rows {r0}:{r0 + crop_px}, cols "
@@ -594,11 +599,15 @@ def run_scenes(cfg: Config, device: str | None = None, force: bool = False,
     return out
 
 
-def score_thresholds(peaks: Any, labels: pd.DataFrame, unknown: np.ndarray, aoi: Any,
-                     ignore_m: float, thresholds: tuple[float, ...]) -> pd.DataFrame:
-    """`score_points` per threshold, on peaks inside the area and away from unknown objects."""
-    peaks = peaks[peaks.within(aoi)]
-    xy = np.column_stack([peaks.geometry.x, peaks.geometry.y])
+def score_thresholds(peaks: Any, labels: pd.DataFrame, unknown: np.ndarray, domain: Any,
+                     ignore_m: float, thresholds: tuple[float, ...], matcher: str = "greedy"
+                     ) -> pd.DataFrame:
+    """`score_points` per threshold, on peaks in the scoring domain and away from unknown
+    objects; `labels` are taken into the same domain (revision C3)."""
+    labels = labels_in_domain(labels, domain)
+    xy = np.column_stack([peaks.geometry.x, peaks.geometry.y]).reshape(-1, 2)
+    inside = domain.keep(xy)
+    peaks, xy = peaks[inside], xy[inside]
     keep = np.ones(len(xy), bool)
     if len(unknown) and len(xy):
         keep = cKDTree(unknown).query(xy, distance_upper_bound=ignore_m)[0] > ignore_m
@@ -607,7 +616,7 @@ def score_thresholds(peaks: Any, labels: pd.DataFrame, unknown: np.ndarray, aoi:
     for t in thresholds:
         sel = keep & (s >= t)
         rows.append({"threshold": t, "ignored_unknown": int((~keep & (s >= t)).sum()),
-                     **score_points(xy[sel], labels)})
+                     "labels_scored": len(labels), **score_points(xy[sel], labels, matcher)})
     return pd.DataFrame(rows)
 
 
@@ -619,13 +628,17 @@ def run_thor(cfg: Config, device: str | None = None, force: bool = False,
     fc = cfg.section("benchmark")["faerch2023"]
     runs = run_scenes(cfg, device, force, log)
     labels, unknown = load_labels(cfg, "faerch")
-    aoi = scoring_aoi(cfg, fc["score"]["aoi"])
+    domain = eval_domain(cfg, fc["score"]["aoi"])
+    ms = MatchSettings.from_config(cfg)
+    labels = apply_match_settings(labels, ms)
+    n_scored = len(labels_in_domain(labels, domain))
     tables = []
     for run, gj in runs.items():
         if not gj.is_file():
             continue
         peaks = gpd.read_file(gj).to_crs(fc["crs"])
-        t = score_thresholds(peaks, labels, unknown, aoi, p.unknown_ignore_m, rp.thresholds)
+        t = score_thresholds(peaks, labels, unknown, domain, p.unknown_ignore_m, rp.thresholds,
+                             ms.matcher)
         tables.append(t.assign(detector="thor", variant=run.variant, stack=run.stack,
                                norm=run.norm, series=run.series))
     scores = pd.concat(tables, ignore_index=True)
@@ -634,14 +647,15 @@ def run_thor(cfg: Config, device: str | None = None, force: bool = False,
     refs = reference_optima(cfg)
     order = list(dict.fromkeys(r.series for r in runs))   # config order -> fixed colour slots
     fig = thor_f_figure(scores, refs, rp.figure, p.score_threshold, order)
-    rp.report.write_text(thor_report(cfg, scores, refs, fig, csv, len(labels), order),
+    rp.report.write_text(thor_report(cfg, scores, refs, fig, csv, n_scored, order),
                          encoding="utf-8")
     for run in runs:
         d = scores[(scores["stack"] == run.stack) & (scores.series == run.series)]
         if d.empty:
             continue
         b = d.loc[d.f.idxmax()]
-        log(f"{run.stack:5s} {run.series:20s}: best F {b.f:.3f} (verified {b.f_v:.3f}) at "
+        log(f"{run.stack:5s} {run.series:20s}: best F {b.f:.3f} (verified recall "
+            f"{b.recall_v:.3f}) at "
             f"{b.threshold:g}, P {b.precision:.2f} R {b.recall:.2f}, {int(b.n_det)} detections")
     return {"scores": csv, "figure": fig, "report": rp.report}
 
@@ -685,9 +699,9 @@ def thor_f_figure(scores: pd.DataFrame, refs: pd.DataFrame, out: Path, view_scor
             d = d.sort_values("threshold")
             c = colors[name]
             ax.plot(d.threshold, d.f, color=c, lw=2, marker="o", ms=4,
-                    label=f"THOR {name}, all labels")
-            ax.plot(d.threshold, d.f_v, color=c, lw=1.5, ls=":",
-                    label=f"THOR {name}, verified only")
+                    label=f"{PIPELINE_SHORT} {name}, F (all labels)")
+            ax.plot(d.threshold, d.recall_v, color=c, lw=1.5, ls=":",
+                    label=f"{PIPELINE_SHORT} {name}, verified-only recall")
         if not refs.empty:
             r = refs[refs["stack"] == stack]
             for sub, color in ((r[~r.detector.isin(list(MINE))], INK),
@@ -708,7 +722,7 @@ def thor_f_figure(scores: pd.DataFrame, refs: pd.DataFrame, out: Path, view_scor
                     textcoords="offset points", fontsize=8, color=INK, rotation=90, va="bottom")
         removal = "with" if stack == "TNR" else "no"
         ax.set_title(f"{stack} stack ({removal} thermal noise removal)", fontsize=10)
-        ax.set_xlabel("THOR score threshold")
+        ax.set_xlabel(f"{PIPELINE_SHORT}: head score threshold")
         ax.set_ylim(0, 1)
         ax.grid(color="#e4e4e0", lw=0.6)
         for s in ("top", "right"):
@@ -717,11 +731,11 @@ def thor_f_figure(scores: pd.DataFrame, refs: pd.DataFrame, out: Path, view_scor
     handles: dict[str, Any] = {}   # every panel's series (a run may exist on one stack only)
     for ax in axes[0]:
         for h, lab in zip(*ax.get_legend_handles_labels(), strict=True):
-            if lab.startswith("THOR "):
+            if lab.startswith(PIPELINE_SHORT):
                 handles.setdefault(lab, h)
     axes[0, -1].legend(handles.values(), handles.keys(), fontsize=8, frameon=False,
                        loc="upper left", bbox_to_anchor=(1.01, 1))
-    fig.suptitle("THOR (head trained on 10 m IW, unchanged) on the Færch 2023 EW scene, 40 m",
+    fig.suptitle(f"{PIPELINE} on the Færch 2023 EW scene, 40 m (head unchanged)",
                  fontsize=11)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=130)
@@ -741,11 +755,11 @@ def thor_report(cfg: Config, scores: pd.DataFrame, refs: pd.DataFrame, fig: Path
     def f3(v: float) -> str:
         return "" if pd.isna(v) else f"{v:.3f}"
 
-    head = ("| stack | {} | {} | detections | P | R | F | F verified | R small | R medium | "
+    head = ("| stack | {} | {} | detections | P | R | F | R verified | R small | R medium | "
             "R large |")
     rule = "|---|---|---|---|---|---|---|---|---|---|---|"
     lines = [
-        "# THOR on the Færch 2023 scene (Sentinel-1 EW, 40 m)", "",
+        f"# {PIPELINE} on the Færch 2023 scene (Sentinel-1 EW, 40 m)", "",
         "Generated by `bench-thor`; don't edit by hand.", "",
         "## Setup", "",
         f"- Head: the final linear head (`{p.head.parent.parent.name}`), trained on 10 m HyP3 IW "
@@ -756,9 +770,10 @@ def thor_report(cfg: Config, scores: pd.DataFrame, refs: pd.DataFrame, fig: Path
         "- SNAP sigma0 (no gamma0 conversion). Normalisation: THOR's IW stats (what the head was "
         "trained with) unless the run says `ew norm` (THOR's own EW HH/HV stats). Land mask "
         "only (no pack-ice mask). Peaks: 3 x 3 token maxima, moved to the brightest HH pixel.",
-        f"- Scoring as `bench-score`: {n_labels} Færch labels (250 m verified / 1789 m "
-        "interpolated), scoring area `fig1`, detections near unknown objects ignored. The score "
-        "threshold is swept the way the CFARs' PFA is.", "",
+        f"- Scoring as `bench-score`: {n_labels} Færch labels in the scoring area `fig1` (one "
+        "shared evaluation mask for labels and detections), 250 m verified / 1789 m "
+        "interpolated, detections near unknown objects ignored. The score threshold is swept "
+        "the way the CFARs' PFA is.", "",
         "## Best F per stack and run", "",
         head.format("run", "threshold"), rule,
     ]
@@ -770,7 +785,7 @@ def thor_report(cfg: Config, scores: pd.DataFrame, refs: pd.DataFrame, fig: Path
             b = d.loc[d.f.idxmax()]
             lines.append(
                 f"| {stack} | {name} | {b.threshold:g} | {int(b.n_det)} | "
-                f"{f3(b.precision)} | {f3(b.recall)} | **{f3(b.f)}** | {f3(b.f_v)} | "
+                f"{f3(b.precision)} | {f3(b.recall)} | **{f3(b.f)}** | {f3(b.recall_v)} | "
                 f"{f3(b.recall_small)} | {f3(b.recall_medium)} | {f3(b.recall_large)} |")
     if not refs.empty:
         lines += ["", "## CFAR detectors on the same stacks (`bench-score`, best F over PFA)", "",
@@ -778,7 +793,7 @@ def thor_report(cfg: Config, scores: pd.DataFrame, refs: pd.DataFrame, fig: Path
         for r in refs.sort_values(["stack", "f"], ascending=[True, False]).itertuples():
             name = DISPLAY.get(r.detector, r.detector) + (" (mine)" if r.detector in MINE else "")
             lines.append(f"| {r.stack} | {name} | {r.pfa:.0e} | {int(r.n_det)} | "
-                         f"{f3(r.precision)} | {f3(r.recall)} | {f3(r.f)} | {f3(r.f_v)} | "
+                         f"{f3(r.precision)} | {f3(r.recall)} | {f3(r.f)} | {f3(r.recall_v)} | "
                          f"{f3(r.recall_small)} | {f3(r.recall_medium)} | {f3(r.recall_large)} |")
     lines += ["", f"![F vs threshold](../{rel(fig)})", "",
               "## Caveats", "",
