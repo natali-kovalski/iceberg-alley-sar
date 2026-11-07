@@ -25,6 +25,7 @@ from typing import Any
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+from scipy.spatial import cKDTree
 
 from iceberg_sar.benchmark import score as sc
 from iceberg_sar.config import Config
@@ -99,6 +100,26 @@ class EwRun:
     name: str
     setting: float
     det_xy: np.ndarray
+    # THOR only: every candidate peak in the domain (unknowns ignored) with its head score, and
+    # the thresholds of its sweep, so N1 can re-optimise the threshold as it does the CFAR PFA.
+    cand_xy: np.ndarray | None = None
+    cand_score: np.ndarray | None = None
+    thresholds: tuple[float, ...] = ()
+
+
+def best_threshold(run: EwRun, labels: pd.DataFrame, matcher: str
+                   ) -> tuple[float, dict[str, Any]]:
+    """Threshold with the highest F under these labels / matcher (ties: the lower threshold,
+    as `bench-thor` picks it), and its scores."""
+    if run.cand_xy is None or run.cand_score is None or not run.thresholds:
+        raise ValueError(f"{run.name}: no candidate peaks to sweep")
+    best: tuple[float, dict[str, Any]] | None = None
+    for t in sorted(run.thresholds):
+        r = sc.score_points(run.cand_xy[run.cand_score >= t], labels, matcher)
+        if best is None or r["f"] > best[1]["f"]:
+            best = (t, r)
+    assert best is not None
+    return best
 
 
 def ew_runs(cfg: Config, labels: pd.DataFrame, unknown: np.ndarray, domain: Any,
@@ -126,9 +147,16 @@ def ew_runs(cfg: Config, labels: pd.DataFrame, unknown: np.ndarray, domain: Any,
     if len(t):
         thr = float(t.loc[t.f.idxmax(), "threshold"])
         g = gpd.read_file(rp.out_dir / f"{run.tag}.geojson").to_crs(fc["crs"])
-        g = g[g.score >= thr]
-        xy, _ = sc.detections_xy_from(g, domain, unknown, ignore)
-        out.append(EwRun("thor-pipeline", thr, xy))
+        g = g[g.score >= float(t.threshold.min())]
+        xy = np.column_stack([g.geometry.x, g.geometry.y]).reshape(-1, 2)
+        s = g.score.to_numpy(float)
+        keep = domain.keep(xy)
+        xy, s = xy[keep], s[keep]
+        if len(unknown) and len(xy):
+            far = cKDTree(unknown).query(xy, distance_upper_bound=ignore)[0] > ignore
+            xy, s = xy[far], s[far]
+        out.append(EwRun("thor-pipeline", thr, xy[s >= thr], cand_xy=xy, cand_score=s,
+                         thresholds=tuple(sorted(float(v) for v in t.threshold.unique()))))
     return out
 
 
@@ -154,11 +182,11 @@ def matching_sensitivity(cfg: Config, labels: pd.DataFrame, unknown: np.ndarray,
         for det, b in best.iterrows():
             rows.append({"variant": ms.describe(), **v, "detector": det, "pfa": b.pfa,
                          "TP": int(b.TP), "FP": int(b.FP), "f": b.f, "recall_v": b.recall_v})
-        if thor is not None:   # THOR at its default-matching threshold, re-matched
+        if thor is not None:   # THOR threshold re-optimised, like the CFAR PFA above
             lab = sc.apply_match_settings(sc.labels_in_domain(labels, domain), ms)
-            r = sc.score_points(thor.det_xy, lab, ms.matcher)
+            thr, r = best_threshold(thor, lab, ms.matcher)
             rows.append({"variant": ms.describe(), **v, "detector": "thor-pipeline",
-                         "pfa": thor.setting, "TP": r["TP"], "FP": r["FP"], "f": r["f"],
+                         "pfa": thr, "TP": r["TP"], "FP": r["FP"], "f": r["f"],
                          "recall_v": r["recall_v"]})
         log(f"N1: {ms.describe()} done")
     t = pd.DataFrame(rows)
@@ -362,9 +390,9 @@ def report(p: RobustnessParams, n1: pd.DataFrame, ew_c: pd.DataFrame, ew_b: pd.D
          f"({p.n_boot} resamples, seed {p.seed}). Chance matches: detections shifted by "
          f"{p.shift_m / 1000:g} km in {p.n_shifts} random directions.", "",
          "## N1: matching sensitivity (Færch EW scene, noTNR)", "",
-         f"{meta['ew_labels']} labels in the scoring area. Best F per detector with the PFA "
-         f"re-optimised under each matching variant ({PIPELINE_SHORT}: its default threshold, "
-         "re-matched).", ""]
+         f"{meta['ew_labels']} labels in the scoring area. Best F per detector with its "
+         f"setting re-optimised under each matching variant (PFA for the CFARs, head score "
+         f"threshold for the {PIPELINE_SHORT}).", ""]
     piv = n1.pivot_table(index="detector", columns="variant", values="f")
     rk = n1.pivot_table(index="detector", columns="variant", values="rank")
     cols = list(dict.fromkeys(n1.variant))
