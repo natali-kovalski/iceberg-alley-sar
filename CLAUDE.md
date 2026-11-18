@@ -228,9 +228,10 @@ iceberg-alley-sar/
   `detections.connectivity`), `bench-thor-iw40` (`docs/revision-thor-iw40.md`: 0.91 at 40 m),
   `bench-tnr-ablation` (`docs/revision-tnr-ablation.md`: floored subtraction keeps gamma's F
   0.640; clipping drives the TNR drop; 2026-11-18: a real SNAP 14 run with
-  `clipNegativeValues=false`, variant `snapnoclip`, confirms the reconstructed negatives-kept
-  row: CA-CFAR F 0.153 vs 0.155, HV ENL 0.28, 23.6 % HV negative; turning SNAP's clipping off is
-  no fix). `bench-thor-bergs` writes `medium_contrast.csv`. Report
+  `clipNegativeValues=false`, variant `snapnoclip`, replaces the reconstructed negatives-kept
+  row (CA-CFAR F 0.153 vs 0.155, HV ENL 0.28; turning SNAP's clipping off is no fix); the
+  reconstructed stack stays only as a pixel check of the floored row's noise field: 23.5 vs
+  23.6 % HV negative, corr 0.965). `bench-thor-bergs` writes `medium_contrast.csv`. Report
   doc revised (claude.ai Doc "Iceberg CFAR benchmark: summary (Revised)"). Open: ask Laust for
   his SNAP settings; viewer CZMLs / compare charts need `czml` + `publish` + push.
 - **Stage 1 uses HH AND HV (2026-11-02):** `detections.copol_test: and` (default; `db` = old 6 dB
