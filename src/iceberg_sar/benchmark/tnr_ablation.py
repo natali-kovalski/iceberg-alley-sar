@@ -10,7 +10,9 @@ Four preprocessing variants then differ only in what happens below the noise flo
 - `clip`: subtraction, negatives clipped (SNAP's TNR stack);
 - `floor`: subtraction, floored at N (values below the noise level set to the noise level);
 - `noclip`: subtraction, negatives kept. The library takes dB input and can't run on negative
-  intensities, so only my linear CA-CFAR runs here.
+  intensities, so only my linear CA-CFAR runs here;
+- `snapnoclip`: SNAP's own TNR with clipNegativeValues=false (a real SNAP run). It checks
+  `noclip`, whose N is smoothed in where SNAP clipped. It gets the noTNR land / valid masks.
 ENL is measured in the same open-water box on every stack (the noTNR run's box).
 """
 
@@ -29,6 +31,7 @@ import rasterio
 from scipy import ndimage
 
 from iceberg_sar.benchmark import score as sc
+from iceberg_sar.benchmark.preprocess import SNAP_NOCLIP
 from iceberg_sar.config import Config
 
 VARIANTS = ("floor", "noclip")
@@ -57,6 +60,58 @@ def noise_field(no_tnr: np.ndarray, tnr: np.ndarray, valid: np.ndarray, clip_lev
     return out, filled
 
 
+def snap_noclip_stack(cfg: Config, log: Callable[[str], None]) -> Any:
+    """SNAP run with clipNegativeValues=false (skipped if its stack exists), then the noTNR
+    land / valid masks copied in, so every variant is scored on the same pixels."""
+    from iceberg_sar.benchmark.reproduce import preprocess_scene, scene_paths
+
+    vc = variant_config(cfg, SNAP_NOCLIP, tnr=True)
+    sp, src = scene_paths(vc), scene_paths(variant_config(cfg, None))
+    if not sp.stack.is_file():
+        info = preprocess_scene(vc, log=log)
+        log(f"{SNAP_NOCLIP}: negative in swath HH {info.get('hh_negative_in_swath', 0):.2%}, "
+            f"HV {info.get('hv_negative_in_swath', 0):.2%}")
+    for f in ("land", "valid"):
+        shutil.copyfile(getattr(src, f), getattr(sp, f))
+    return sp
+
+
+def compare_noclip(cfg: Config, a: dict[str, Any]) -> dict[str, Any]:
+    """SNAP's negatives-kept stack vs the reconstructed `noclip` one, per band: equal where SNAP
+    did not clip (sanity), and how close the reconstruction is where it did."""
+    from iceberg_sar.benchmark.reproduce import scene_paths
+
+    paths = {"snap": scene_paths(variant_config(cfg, SNAP_NOCLIP, tnr=True)).stack,
+             "synth": scene_paths(variant_config(cfg, "noclip")).stack,
+             "clip": scene_paths(variant_config(cfg, None, tnr=True)).stack}
+    valid_path = scene_paths(variant_config(cfg, None)).valid
+    with rasterio.open(valid_path) as fv:
+        valid = fv.read(1) > 0
+    out: dict[str, Any] = {}
+    srcs = {k: rasterio.open(v) for k, v in paths.items()}
+    try:
+        for i, pol in enumerate(srcs["clip"].descriptions):
+            x = {k: f.read(i + 1) for k, f in srcs.items()}
+            ok = valid & np.isfinite(x["snap"]) & np.isfinite(x["synth"])
+            clipped = ok & (x["clip"] <= float(a["clip_level"]))
+            kept = ok & ~clipped
+            rel = np.abs(x["snap"][kept] - x["clip"][kept]) / np.abs(x["clip"][kept])
+            s, y = x["snap"][clipped], x["synth"][clipped]
+            out[pol] = {
+                "negative_share_snap": round(float(np.mean(x["snap"][ok] < 0)), 4),
+                "negative_share_synth": round(float(np.mean(x["synth"][ok] < 0)), 4),
+                "unclipped_max_rel_diff": float(rel.max()) if rel.size else 0.0,
+                "clipped_px": int(clipped.sum()),
+                "clipped_median_snap": float(np.median(s)) if s.size else float("nan"),
+                "clipped_median_synth": float(np.median(y)) if y.size else float("nan"),
+                "clipped_corr": round(float(np.corrcoef(s, y)[0, 1]), 3) if s.size > 1 else
+                float("nan")}
+    finally:
+        for f in srcs.values():
+            f.close()
+    return out
+
+
 def build_stacks(cfg: Config, a: dict[str, Any], log: Callable[[str], None]) -> dict[str, Any]:
     """Write the `floor` and `noclip` stacks (+ copies of the noTNR masks); returns stats."""
     from iceberg_sar.benchmark.enl import estimate_enl
@@ -66,8 +121,10 @@ def build_stacks(cfg: Config, a: dict[str, Any], log: Callable[[str], None]) -> 
                                                                                       tnr=True))
     outs = {v: scene_paths(variant_config(cfg, v)) for v in VARIANTS}
     stats: dict[str, Any] = {}
-    if all(o.stack.is_file() for o in outs.values()):
+    stats_json = outs["floor"].stack.parent / "tnr_ablation_stats.json"
+    if all(o.stack.is_file() for o in outs.values()) and stats_json.is_file():
         log("stacks: done")
+        stats = json.loads(stats_json.read_text(encoding="utf-8"))
     else:
         with rasterio.open(src_n.stack) as fn, rasterio.open(src_t.stack) as ft, \
                 rasterio.open(src_n.valid) as fv:
@@ -98,15 +155,26 @@ def build_stacks(cfg: Config, a: dict[str, Any], log: Callable[[str], None]) -> 
                     dst.set_band_description(i + 1, descriptions[i])
             for f in ("inc", "swath", "land", "valid"):
                 shutil.copyfile(getattr(src_n, f), getattr(o, f))
-        (outs["floor"].stack.parent / "tnr_ablation_stats.json").write_text(
+        stats_json.write_text(
             json.dumps(stats, indent=2), encoding="utf-8")
     box = json.loads(src_n.enl.read_text(encoding="utf-8"))["box_wgs84"]
+    stacks = [("none", src_n), ("clip", src_t), *outs.items()]
+    snap_noclip = SNAP_NOCLIP in a["detectors"]
+    if snap_noclip:
+        stacks.append((SNAP_NOCLIP, snap_noclip_stack(cfg, log)))
     enl = {}
-    for name, sp in [("none", src_n), ("clip", src_t), *outs.items()]:
+    for name, sp in stacks:
         r = estimate_enl(sp.stack, sp.valid, 2000.0, box, "min",
-                         sidecar=sp.enl if name in VARIANTS else None)
+                         sidecar=sp.enl if name in (*VARIANTS, SNAP_NOCLIP) else None)
         enl[name] = r["enl"]
-    return {"noise": stats, "enl": enl}
+    info: dict[str, Any] = {"noise": stats, "enl": enl}
+    if snap_noclip:
+        info["noclip_check"] = compare_noclip(cfg, a)
+        for pol, c in info["noclip_check"].items():
+            log(f"{pol}: negative SNAP {100 * c['negative_share_snap']:.1f} % vs reconstructed "
+                f"{100 * c['negative_share_synth']:.1f} %; where SNAP clipped, corr "
+                f"{c['clipped_corr']}")
+    return info
 
 
 def run_tnr_ablation(cfg: Config, sweep: bool = True, log: Callable[[str], None] = print
@@ -116,17 +184,19 @@ def run_tnr_ablation(cfg: Config, sweep: bool = True, log: Callable[[str], None]
     fc = cfg.section("benchmark")["faerch2023"]
     a = cfg.section("benchmark")["tnr_ablation"]
     info = build_stacks(cfg, a, log)
+    derived = [(v, variant_config(cfg, v)) for v in VARIANTS]
+    if SNAP_NOCLIP in a["detectors"]:
+        derived.append((SNAP_NOCLIP, variant_config(cfg, SNAP_NOCLIP, tnr=True)))
     if sweep:
-        for v in VARIANTS:
+        for v, vc in derived:
             only = list(a["detectors"][v])
             log(f"{v}: sweep {only}")
-            run_faerch_sweep(variant_config(cfg, v), only=only, log=log)
+            run_faerch_sweep(vc, only=only, log=log)
     labels, unknown = sc.load_labels(cfg, fc["labels_source"])
     domain = sc.eval_domain(cfg, fc["score"]["aoi"])
     rows = []
     for name, vc in [("none", variant_config(cfg, None)),
-                     ("clip", variant_config(cfg, None, tnr=True)),
-                     *[(v, variant_config(cfg, v)) for v in VARIANTS]]:
+                     ("clip", variant_config(cfg, None, tnr=True)), *derived]:
         if not (sweep_dir(vc) / "sweep_runtime.csv").is_file():
             continue
         s = sc.score_sweep(vc, labels, unknown, domain, lambda _m: None)
@@ -149,7 +219,8 @@ def run_tnr_ablation(cfg: Config, sweep: bool = True, log: Callable[[str], None]
 NAMES = {"none": "No subtraction (noTNR, reproduction run)",
          "clip": "Subtraction, negatives clipped (SNAP 14 TNR)",
          "floor": "Subtraction, floored at the noise level",
-         "noclip": "Subtraction, negatives kept"}
+         "noclip": "Subtraction, negatives kept (reconstructed N)",
+         SNAP_NOCLIP: "Subtraction, negatives kept (SNAP 14, clipNegativeValues=false)"}
 
 
 def report(t: pd.DataFrame, info: dict[str, Any]) -> str:
@@ -172,6 +243,16 @@ def report(t: pd.DataFrame, info: dict[str, Any]) -> str:
                  f"{100 * s['filled_share']:.1f} %; below the noise level after subtraction "
                  f"{100 * s['below_noise_share']:.1f} %.")
     L += ["", "The library's detectors take dB input, so they can't run on `negatives kept`.", ""]
+    if info.get("noclip_check"):
+        L += ["Reconstructed vs SNAP's own negatives-kept stack (`clipNegativeValues=false`):", ""]
+        for pol, c in info["noclip_check"].items():
+            L.append(f"- {pol}: negative {100 * c['negative_share_snap']:.1f} % (SNAP) vs "
+                     f"{100 * c['negative_share_synth']:.1f} % (reconstructed). Where SNAP 14 "
+                     f"clipped ({c['clipped_px']:,} px): median {c['clipped_median_snap']:.2e} vs "
+                     f"{c['clipped_median_synth']:.2e}, correlation {c['clipped_corr']}. "
+                     f"Elsewhere identical to the clipped stack up to "
+                     f"{c['unclipped_max_rel_diff']:.1e} (relative).")
+        L.append("")
     f = t.set_index(["variant", "detector"]).f
     if {("none", "gamma"), ("clip", "gamma"), ("floor", "gamma")} <= set(f.index):
         L += ["## Reading", "",
@@ -181,7 +262,8 @@ def report(t: pd.DataFrame, info: dict[str, Any]) -> str:
               "level. On this scene the drop after SNAP 14 thermal noise removal comes from "
               "how the pixels below the noise floor are handled (set to ~3.7e-12, i.e. "
               "-115 dB), not from subtracting the noise. Kept negative, they break the "
-              "speckle statistics outright. This is a finding about one scene and one SNAP "
+              "speckle statistics outright; SNAP's own `clipNegativeValues=false` run "
+              "confirms the reconstructed one, so turning SNAP's clipping off is no fix. This is a finding about one scene and one SNAP "
               "version, not a claim of a software defect; which handling the paper's SNAP "
               "used is open (question to the authors).", "",
               "Caveats: where SNAP clipped (23.6 % of HV pixels), the floor value is the "

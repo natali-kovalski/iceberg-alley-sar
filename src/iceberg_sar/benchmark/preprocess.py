@@ -28,25 +28,40 @@ def gpt_command(snap: dict[str, Any], graph: Path, src: Path, out: Path, crs: st
             f"-PpixelSpacing={pixel_m:g}", f"-Presampling={snap['resampling']}"]
 
 
+SNAP_NOCLIP = "snapnoclip"   # `snap.tnr_variant`: SNAP's own TNR with clipNegativeValues=false
+
+
 def graph_variant(snap: dict[str, Any], graph: Path, out_dir: Path) -> Path:
-    """The graph to run: as is, or (snap.remove_thermal_noise false) a copy without the
-    ThermalNoiseRemoval node, its consumers rewired to its source. SNAP 14 ignores
+    """The graph to run: as is; (snap.tnr_variant `snapnoclip`) a copy with thermal noise
+    removal on and clipNegativeValues=false; or (snap.remove_thermal_noise false) a copy
+    without the ThermalNoiseRemoval node, its consumers rewired to its source. SNAP 14 ignores
     removeThermalNoise=false, so the node has to go."""
-    if snap.get("remove_thermal_noise", True):
+    noclip = snap.get("tnr_variant") == SNAP_NOCLIP
+    if snap.get("remove_thermal_noise", True) and not noclip:
         return graph
     import xml.etree.ElementTree as ET
 
     tree = ET.parse(graph)
     root = tree.getroot()
     tnr = next(n for n in root.findall("node") if n.findtext("operator") == "ThermalNoiseRemoval")
-    src_ref = tnr.find("sources/sourceProduct")
-    assert src_ref is not None
-    for node in root.findall("node"):
-        for ref in node.findall("sources/*"):
-            if ref.get("refid") == tnr.get("id"):
-                ref.set("refid", src_ref.get("refid", ""))
-    root.remove(tnr)
-    out = out_dir / f"{graph.stem}_noTNR.xml"
+    if noclip:
+        params = tnr.find("parameters")
+        assert params is not None
+        for key, value in (("removeThermalNoise", "true"), ("clipNegativeValues", "false")):
+            el = params.find(key)
+            if el is None:
+                el = ET.SubElement(params, key)
+            el.text = value
+        out = out_dir / f"{graph.stem}_TNR{SNAP_NOCLIP}.xml"
+    else:
+        src_ref = tnr.find("sources/sourceProduct")
+        assert src_ref is not None
+        for node in root.findall("node"):
+            for ref in node.findall("sources/*"):
+                if ref.get("refid") == tnr.get("id"):
+                    ref.set("refid", src_ref.get("refid", ""))
+        root.remove(tnr)
+        out = out_dir / f"{graph.stem}_noTNR.xml"
     out.parent.mkdir(parents=True, exist_ok=True)
     tree.write(out, encoding="utf-8")
     return out
@@ -75,14 +90,15 @@ def split_snap_output(snap_tif: Path, stack: Path, inc: Path, mask: Path) -> dic
     the swath), incidence angle (deg) and a uint8 valid mask (1 = inside swath, HH > 0).
 
     SNAP writes 0 outside the swath. Thermal noise removal also clips noise-dominated HV pixels
-    to 0, so the swath is taken from HH alone and HV zeros inside it stay valid zeros.
+    to ~0, so the swath is taken from HH alone and HV zeros inside it stay valid zeros. With
+    clipNegativeValues=false, HH can be negative inside the swath too, so the swath is HH != 0.
     """
     with rasterio.open(snap_tif) as src:
         if src.count < 3:
             raise ValueError(f"{snap_tif}: expected 3 bands (HH, HV, incidence), got {src.count}")
         hh, hv, ang = (src.read(i).astype(np.float32) for i in (1, 2, 3))
         profile = src.profile
-    valid = hh > 0
+    valid = np.isfinite(hh) & (hh != 0)
     profile.update(driver="GTiff", compress="deflate", tiled=True, blockxsize=512,
                    blockysize=512, BIGTIFF="IF_SAFER")
     stack.parent.mkdir(parents=True, exist_ok=True)
@@ -101,7 +117,9 @@ def split_snap_output(snap_tif: Path, stack: Path, inc: Path, mask: Path) -> dic
         dst.write(valid.astype(np.uint8), 1)
     return {"shape": hh.shape, "pixel_m": (abs(profile["transform"].a),
                                            abs(profile["transform"].e)),
-            "valid_px": int(valid.sum()), "hv_zero_in_swath": float((hv[valid] <= 0).mean())}
+            "valid_px": int(valid.sum()), "hv_zero_in_swath": float((hv[valid] <= 0).mean()),
+            "hv_negative_in_swath": float((hv[valid] < 0).mean()),
+            "hh_negative_in_swath": float((hh[valid] < 0).mean())}
 
 
 def block_mean(x: np.ndarray, factor: int) -> tuple[np.ndarray, np.ndarray]:

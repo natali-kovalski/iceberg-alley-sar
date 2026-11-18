@@ -105,3 +105,39 @@ def test_graph_variant_drops_thermal_noise_node(tmp_path: Path) -> None:
     assert "ThermalNoiseRemoval" not in ops
     calib_src = ops["Calibration"].find("sources/sourceProduct")
     assert calib_src.get("refid") == "Remove-GRD-Border-Noise"
+
+
+def test_graph_variant_snap_noclip_keeps_node_and_turns_clipping_off(tmp_path: Path) -> None:
+    import xml.etree.ElementTree as ET
+
+    from iceberg_sar.benchmark.preprocess import SNAP_NOCLIP, graph_variant
+
+    graph = Path(__file__).resolve().parents[1] / "benchmarks/faerch2023/s1_ew_preprocess.xml"
+    out = graph_variant({"remove_thermal_noise": True, "tnr_variant": SNAP_NOCLIP}, graph, tmp_path)
+    assert out != graph
+    root = ET.parse(out).getroot()
+    tnr = next(n for n in root.findall("node") if n.findtext("operator") == "ThermalNoiseRemoval")
+    assert tnr.findtext("parameters/removeThermalNoise") == "true"
+    assert tnr.findtext("parameters/clipNegativeValues") == "false"
+    calib_src = next(n for n in root.findall("node") if n.get("id") == "Calibration")
+    assert calib_src.find("sources/sourceProduct").get("refid") == tnr.get("id")
+
+
+def test_split_snap_output_keeps_negative_pixels_inside_swath(tmp_path: Path) -> None:
+    from iceberg_sar.benchmark.preprocess import split_snap_output
+
+    hh = np.full((4, 4), 0.01, np.float32)
+    hh[:, 0] = 0.0                     # outside the swath (SNAP writes 0)
+    hh[1, 1] = -1e-4                   # below the noise floor, kept negative
+    hv = np.full((4, 4), -2e-5, np.float32)
+    ang = np.full((4, 4), 30.0, np.float32)
+    src = tmp_path / "snap.tif"
+    with rasterio.open(src, "w", driver="GTiff", height=4, width=4, count=3, dtype="float32",
+                       crs="EPSG:32620", transform=from_origin(0, 160, 40, 40)) as dst:
+        dst.write(np.stack([hh, hv, ang]))
+    info = split_snap_output(src, tmp_path / "s.tif", tmp_path / "i.tif", tmp_path / "m.tif")
+    assert info["valid_px"] == 12
+    with rasterio.open(tmp_path / "s.tif") as f:
+        assert f.read(1)[1, 1] == pytest.approx(-1e-4)
+    assert info["hh_negative_in_swath"] == pytest.approx(1 / 12)
+    assert info["hv_negative_in_swath"] == 1.0

@@ -16,6 +16,7 @@ benchmark:
     detectors:              # swept per derived stack; the library can't take negative intensities
       floor: [gamma, cacfar-nolength-and]
       noclip: [cacfar-nolength-and]
+      snapnoclip: [cacfar-nolength-and]   # real SNAP run, clipNegativeValues=false (checks noclip)
     report_detectors: [gamma, cacfar-nolength-and]
     out_dir: data/benchmark/faerch2023/tnr_ablation
     report: docs/revision-tnr-ablation.md
