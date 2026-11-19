@@ -242,7 +242,8 @@ def report(t: pd.DataFrame, info: dict[str, Any]) -> str:
                  f"{100 * s['snap_clipped_share']:.1f} % of valid pixels, filled "
                  f"{100 * s['filled_share']:.1f} %; below the noise level after subtraction "
                  f"{100 * s['below_noise_share']:.1f} %.")
-    L += ["", "The library's detectors take dB input, so they can't run on `negatives kept`.", ""]
+    L += ["", "The library's detectors take dB input, and negative intensities have no dB value, "
+          "so they can't run on `negatives kept`.", ""]
     if info.get("noclip_check"):
         L += ["Check of the reconstructed N (used for the floored stack): noTNR − N with "
               "negatives kept, against SNAP's own negatives-kept run:", ""]

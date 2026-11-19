@@ -17,7 +17,7 @@ Noise field per band:
 - HH: N median -28.82 dB; SNAP clipped 0.8 % of valid pixels, filled 0.8 %; below the noise level after subtraction 0.7 %.
 - HV: N median -30.04 dB; SNAP clipped 23.6 % of valid pixels, filled 23.6 %; below the noise level after subtraction 23.5 %.
 
-The library's detectors take dB input, so they can't run on `negatives kept`.
+The library's detectors take dB input, and negative intensities have no dB value, so they can't run on `negatives kept`.
 
 Check of the reconstructed N (used for the floored stack): noTNR − N with negatives kept, against SNAP's own negatives-kept run:
 
