@@ -53,7 +53,8 @@ from iceberg_sar.evaluation import EvalDomain
 PAPER_NAMES = {"Gamma": "gamma", "iDPolRAD": "idpolrad", "K": "k", "Log-normal": "lognorm",
                "NIS": "nis", "Wishart": "wishart"}
 # 2a: my CA-CFAR (`sweep.cacfar_tag`), scored with the rest; no paper value to compare with
-MINE = {"cacfar": "My CA-CFAR", "cacfar-nolength": "My CA-CFAR, no length rule",
+MINE = {"cacfar": "My CA-CFAR, 6 dB HH check",
+        "cacfar-nolength": "My CA-CFAR, 6 dB HH check, no length rule",
         # 2c: HH AND HV CA-CFAR instead of the 6 dB co-pol check
         "cacfar-and": "My CA-CFAR, HH AND HV",
         "cacfar-nolength-and": "My CA-CFAR, HH AND HV, no length rule"}
@@ -402,7 +403,8 @@ GREY = "#9a9a96"         # the other stack variant (context, not a series of its
 
 def f_figure(scores: pd.DataFrame, ref: dict[str, Any], fig6: pd.DataFrame | None,
              detectors: list[str], out: Path, note: str,
-             alt: pd.DataFrame | None = None, alt_label: str = "") -> Path:
+             alt: pd.DataFrame | None = None, alt_label: str = "",
+             title: str = "") -> Path:
     """Small multiples: F vs PFA per detector (all labels), verified-only recall, paper
     optimum; `alt`: the other stack variant's all-labels F, drawn in grey. Runs flagged
     `unreliable` (revision C2) are grey crosses, not part of the curve."""
@@ -420,12 +422,13 @@ def f_figure(scores: pd.DataFrame, ref: dict[str, Any], fig6: pd.DataFrame | Non
         bad = d.unreliable.astype(bool) if "unreliable" in d else pd.Series(False, d.index)
         u, d = d[bad], d[~bad]
         x = np.log10(d.pfa)
-        ax.plot(x, d.f, color=LIGHT_BLUE, lw=2, marker="o", ms=4, label="mine, F (all labels)")
+        ax.plot(x, d.f, color=LIGHT_BLUE, lw=2, marker="o", ms=4,
+                label="This reproduction: F score, all labels")
         ax.plot(x, d.recall_v, color=LIGHT_BLUE, lw=1.2, ls=(0, (1, 2)),
-                label="mine, verified-only recall")
+                label="This reproduction: recall of the verified labels only")
         if len(u):
             ax.plot(np.log10(u.pfa), u.f, color=GREY, marker="x", ms=6, ls="none",
-                    label="numerically unreliable PFA (not scored)")
+                    label="PFA too small for the library to compute (not scored)")
         if alt is not None:
             a = alt[alt.detector == det].sort_values("pfa")
             if "unreliable" in a:
@@ -437,10 +440,11 @@ def f_figure(scores: pd.DataFrame, ref: dict[str, Any], fig6: pd.DataFrame | Non
         if det in ref["table3"]:
             t = ref["table3"][det]
             ax.plot(np.log10(t["pfa"]), t["derived"]["f"], marker="*", ms=14, color=INK,
-                    ls="none", label="paper optimum (Table 3)")
+                    ls="none", label="Paper's best F, at the paper's PFA (Table 3)")
         cap = d[d.over_cap]
         if len(cap):
-            ax.axvline(np.log10(cap.pfa.min()), color="#9a9a96", lw=1, ls=":")
+            ax.axvline(np.log10(cap.pfa.min()), color="#9a9a96", lw=1, ls=":",
+                       label="Object cap reached: no score to the right")
         ax.set_title(DISPLAY.get(det, det), fontsize=11, color=INK)
         if det in MINE:
             ax.text(0.03, 0.03, "no paper value", transform=ax.transAxes, fontsize=8,
@@ -452,17 +456,19 @@ def f_figure(scores: pd.DataFrame, ref: dict[str, Any], fig6: pd.DataFrame | Non
         for s in ("top", "right"):
             ax.spines[s].set_visible(False)
     for ax in axes[-1]:
-        ax.set_xlabel("log10 PFA (total)")
+        ax.set_xlabel("PFA, total (log10)")
     for ax in axes[:, 0]:
-        ax.set_ylabel("F score / verified-only recall")
+        ax.set_ylabel("Score (0–1)")
     leg: dict[str, Any] = {}
     for ax in axes.flat:
         for h_, l_ in zip(*ax.get_legend_handles_labels(), strict=True):
             leg.setdefault(l_, h_)
-    fig.legend(list(leg.values()), list(leg), loc="upper center", ncol=min(len(leg), 4),
-               frameon=False)
+    fig.suptitle(title or "F score vs PFA, one panel per detector", fontsize=14,
+                 color=INK, x=0.01, ha="left", fontweight="bold")
+    fig.legend(list(leg.values()), list(leg), loc="upper center", ncol=3,
+               frameon=False, bbox_to_anchor=(0.5, 0.95), fontsize=10)
     fig.text(0.5, 0.005, note, ha="center", fontsize=8, color="#5f5e5a")
-    fig.tight_layout(rect=(0, 0.03, 1, 0.94))
+    fig.tight_layout(rect=(0, 0.03, 1, 0.88))
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=130, facecolor="white")
     plt.close(fig)
@@ -478,7 +484,7 @@ FIG6_STYLE = {"lognorm": ("#3e6fa8", "1"), "gamma": ("#5ec8ec", "2"), "k": ("#2e
 
 
 def fig6_style_figure(scores: pd.DataFrame, detectors: list[str], out: Path, subtitle: str,
-                      note: str) -> Path:
+                      note: str, title: str | None = "F score vs PFA, all detectors") -> Path:
     """All detectors' all-labels F vs PFA on one panel, styled like the paper's Fig. 6.
     Over-cap PFAs (no score) are left out, so a curve can end before 1e-1."""
     import matplotlib
@@ -518,7 +524,8 @@ def fig6_style_figure(scores: pd.DataFrame, detectors: list[str], out: Path, sub
     # outside the axes: with 8 curves, every corner inside covers one of them
     ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), fontsize=12, facecolor="#eaeaf2",
               edgecolor="#cccccc")
-    fig.suptitle("F Score (Accuracy)", fontsize=18)
+    if title:
+        fig.suptitle(title, fontsize=18)
     fig.text(0.5, 0.01, note, ha="center", fontsize=8, color="#5f5e5a")
     fig.tight_layout(rect=(0, 0.03, 1, 1))
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -796,13 +803,17 @@ def run_score(cfg: Config, source: str | None = None, log: Callable[[str], None]
     fig6 = pd.read_csv(fig6_path) if fig6_path.is_file() else None
     dets = [d for d in [*fc["sweep"]["detectors"], *MINE] if d in set(scores.detector)]
     note = ("Færch labels (Path A)" if source == "faerch" else "RECONSTRUCTED LABELS (Path B)") + \
-        f"; {_variant(cfg)} stack; scoring area `{sc['aoi']}`; dotted line: object cap reached"
+        f"; {_variant(cfg)} stack; scoring area {sc['aoi']}; {len(labels) - n_out} labels"
+    tnr = _variant(cfg).startswith("TNR")
     fig = f_figure(scores, ref, fig6, dets, cfg.root / sc["figure"], note, alt,
-                   f"{_variant(other)} stack, all labels")
+                   ("Without" if tnr else "With") + " thermal noise removal: F score, all labels",
+                   title="F score vs PFA per detector: this reproduction "
+                         f"({'with' if tnr else 'no'} thermal noise removal) "
+                         "against the paper's best F")
     fig_s = fig6_style_figure(
         scores, dets, cfg.root / sc["figure_fig6_style"],
         f"Sentinel-1 ({'with' if _variant(cfg) == 'TNR' else 'no'} thermal noise removal)",
-        note.split("; dotted")[0] + "; all labels; over-cap PFAs left out")
+        note + "; F over all labels; PFAs over the object cap left out")
     rep = cfg.root / sc["report"]
     rep.write_text(report(cfg, source, ref, cmp, sizes, scores, len(labels),
                           n_out, fig, fig6 is not None, csvs, fig_s),
