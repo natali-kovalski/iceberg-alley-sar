@@ -69,6 +69,25 @@ def test_optimum_lowest_pfa_on_ties() -> None:
     assert score.optimum(df).loc["a"].pfa == pytest.approx(1e-9)
 
 
+def test_optimum_spread_range_and_sweep_edge() -> None:
+    """Plateau around the best PFA (contiguous, within `width`), edge flag at the last PFA
+    swept, no edge when the sweep went on (over the cap), NaN `unreliable` = not flagged."""
+    pfas = [1e-9, 1e-7, 1e-5, 1e-3, 1e-1]
+    flat = pd.DataFrame({"detector": "flat", "pfa": pfas, "f": [0.50, 0.582, 0.585, 0.59, 0.591]})
+    peak = pd.DataFrame({"detector": "peak", "pfa": pfas, "f": [0.60, 0.645, 0.60, np.nan,
+                                                                np.nan]})
+    peak["over_cap"] = [False, False, False, True, True]
+    gap = pd.DataFrame({"detector": "gap", "pfa": pfas, "f": [0.59, 0.50, 0.595, 0.59, 0.3]})
+    s = score.optimum_spread(pd.concat([flat, peak, gap], ignore_index=True), 0.01)
+    assert (s.loc["flat"].pfa_lo, s.loc["flat"].pfa_hi) == pytest.approx((1e-7, 1e-1))
+    assert s.loc["flat"].edge == "high"
+    assert (s.loc["peak"].pfa_lo, s.loc["peak"].pfa_hi) == pytest.approx((1e-7, 1e-7))
+    assert s.loc["peak"].edge == ""
+    assert (s.loc["gap"].pfa_lo, s.loc["gap"].pfa_hi) == pytest.approx((1e-5, 1e-3))
+    assert score.spread_text(s.loc["flat"]) == "1e-7 – 1e-1, **best at sweep edge**"
+    assert score.spread_text(s.loc["peak"]) == "1e-7"
+
+
 def test_compare_and_size_tables_add_my_cacfar_without_paper_values() -> None:
     ref = score.parse_reference(ROOT / "benchmarks/faerch2023/faerch2023.xml")
     rows = []

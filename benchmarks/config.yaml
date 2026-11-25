@@ -70,6 +70,7 @@ benchmark:
   # library's one ENL for both (smoke.enl_combine). Wishart always takes the single value.
   enl_mode: per_band
   repro_tolerance_f1: 0.05  # Milestone 1f: |my F - paper F| at each detector's optimum PFA
+  optimum_band_f: 0.01      # reports: PFA range around the optimum with F within this of the best
   # Window diameters in metres -> nearest odd pixel count per raster (360 / 520 m = 9 / 13 px at 40 m)
   detectors:
     gamma:    {inner_m: 360, outer_m: 520}

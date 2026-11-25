@@ -387,10 +387,47 @@ def optimum(scores: pd.DataFrame, col: str = "f") -> pd.DataFrame:
     (revision C2) never count."""
     ok = scores.dropna(subset=[col])
     if "unreliable" in ok:
-        ok = ok[~ok.unreliable.astype(bool)]
+        ok = ok[~ok.unreliable.fillna(False).astype(bool)]   # NaN: not flagged
     ok = ok.sort_values(["detector", col, "pfa"],
                                                  ascending=[True, False, True])
     return ok.groupby("detector", sort=False).head(1).set_index("detector")
+
+
+def optimum_spread(scores: pd.DataFrame, width: float, col: str = "f") -> pd.DataFrame:
+    """How sharp each detector's optimum is: the contiguous PFA range around the best PFA where
+    `col` stays within `width` of its best (`pfa_lo`, `pfa_hi`), and `edge` ("low" / "high" /
+    "") when the best PFA is the first or last PFA swept, so the optimum may lie outside the
+    sweep. PFAs past the object cap count as swept (the curve was cut there, not left
+    unexplored); unreliable runs are skipped like in `optimum`."""
+    best = optimum(scores, col)
+    rows = []
+    for det, b in best.iterrows():
+        all_d = scores[scores.detector == det]
+        d = all_d.dropna(subset=[col])
+        if "unreliable" in d:
+            d = d[~d.unreliable.fillna(False).astype(bool)]
+        d = d.sort_values("pfa").reset_index(drop=True)
+        i = int(np.flatnonzero(same_pfa(d.pfa, b.pfa))[0])
+        near = (d[col] >= b[col] - width).to_numpy()
+        lo = i
+        while lo > 0 and near[lo - 1]:
+            lo -= 1
+        hi = i
+        while hi < len(d) - 1 and near[hi + 1]:
+            hi += 1
+        swept = np.log10(all_d.pfa.to_numpy(float))
+        edge = ("low" if np.log10(b.pfa) <= swept.min() + 1e-6 else
+                "high" if np.log10(b.pfa) >= swept.max() - 1e-6 else "")
+        rows.append({"detector": det, "pfa": b.pfa, "pfa_lo": d.pfa[lo], "pfa_hi": d.pfa[hi],
+                     "edge": edge})
+    return pd.DataFrame(rows).set_index("detector")
+
+
+def spread_text(s: pd.Series) -> str:
+    """'1e-3 – 1e-1, at sweep edge' style cell for a row of `optimum_spread`."""
+    rng = _e(s.pfa_lo) if same_pfa([s.pfa_lo], s.pfa_hi)[0] else \
+        f"{_e(s.pfa_lo)} – {_e(s.pfa_hi)}"
+    return rng + (", **best at sweep edge**" if s.edge in ("low", "high") else "")
 
 
 # --- figure and report --------------------------------------------------------------------------
@@ -535,8 +572,10 @@ def fig6_style_figure(scores: pd.DataFrame, detectors: list[str], out: Path, sub
 
 
 def compare_table(scores: pd.DataFrame, ref: dict[str, Any], tol: float,
-                  sens: pd.DataFrame | None, alt: pd.DataFrame | None = None) -> pd.DataFrame:
+                  sens: pd.DataFrame | None, alt: pd.DataFrame | None = None,
+                  band: float = 0.01) -> pd.DataFrame:
     best = optimum(scores)
+    spread = optimum_spread(scores, band)
     rows = []
     for det, t in ref["table3"].items():
         if det not in best.index:
@@ -547,7 +586,7 @@ def compare_table(scores: pd.DataFrame, ref: dict[str, Any], tol: float,
                "paper_TP": t["TP"], "TP": int(b.TP), "paper_FP": t["FP"], "FP": int(b.FP),
                "paper_FN": t["FN"], "FN": int(b.FN), "paper_f": f_ref, "f": b.f,
                "diff": b.f - f_ref, "within": abs(b.f - f_ref) <= tol,
-               "recall_v": b.recall_v}
+               "recall_v": b.recall_v, "pfa_range": spread_text(spread.loc[det])}
         if sens is not None and det in optimum(sens).index:
             row["f_sens"] = optimum(sens).loc[det].f
         if alt is not None:
@@ -562,7 +601,7 @@ def compare_table(scores: pd.DataFrame, ref: dict[str, Any], tol: float,
         row = {"detector": det, "paper_pfa": np.nan, "pfa": b.pfa, "paper_TP": None,
                "TP": int(b.TP), "paper_FP": None, "FP": int(b.FP), "paper_FN": None,
                "FN": int(b.FN), "paper_f": np.nan, "f": b.f, "diff": np.nan, "within": None,
-               "recall_v": b.recall_v}
+               "recall_v": b.recall_v, "pfa_range": spread_text(spread.loc[det])}
         if sens is not None:
             s_best = optimum(sens)
             row["f_sens"] = s_best.loc[det].f if det in s_best.index else np.nan
@@ -614,6 +653,7 @@ def report(cfg: Config, source: str, ref: dict[str, Any], cmp: pd.DataFrame, siz
     fc = cfg.section("benchmark")["faerch2023"]
     sc = fc["score"]
     tol = float(cfg.section("benchmark")["repro_tolerance_f1"])
+    band = float(cfg.section("benchmark")["optimum_band_f"])
     rel = lambda f: Path(f).resolve().relative_to(cfg.root.resolve()).as_posix()  # noqa: E731
     from iceberg_sar.benchmark.reproduce import scene_paths
     from iceberg_sar.benchmark.sweep import FaerchSweepParams
@@ -663,29 +703,35 @@ def report(cfg: Config, source: str, ref: dict[str, Any], cmp: pd.DataFrame, siz
         f"## Partial agreement: F at the optimum PFA (tolerance {tol})",
         "",
         "Paper F is derived from Table 3 (TP, FP, FN). My optimum is the PFA with the highest",
-        "all-labels F. Preprocessing differs from the paper's description: the main rows are "
+        f"all-labels F; next to it, the PFA range around it where F stays within {band:g} of the",
+        "best. A wide range means a flat curve: the exact best PFA is then noise, and a nominal",
+        "PFA far from the others (e.g. 1e-1 for the 6 dB-check rows, where the fixed HH check,",
+        "not the PFA, limits detections) says little about the detector. Preprocessing "
+        "differs from the paper's description: the main rows are "
         f"{'with' if tnr else 'without'} thermal noise removal; the table after this one has "
         f"the {'without' if tnr else 'with'}-removal rows next to the paper.",
         "",
-        "| Detector | Paper PFA | My PFA | Paper TP / FP / FN | Mine TP / FP / FN | Paper F |"
+        f"| Detector | Paper PFA | My PFA | PFA range, F within {band:g} | Paper TP / FP / FN"
+        " | Mine TP / FP / FN | Paper F |"
         " My F |"
         " Diff | Within | Verified-only recall (at my PFA) |"
         + (" F, AOI `" + str(sc["aoi_sensitivity"]) + "` |" if "f_sens" in cmp else "")
         + (f" F {'with' if not tnr else 'without'} TNR (PFA) |" if "f_alt" in cmp else ""),
-        "|---|---|---|---|---|---|---|---|---|---|" + ("---|" if "f_sens" in cmp else "")
+        "|---|---|---|---|---|---|---|---|---|---|---|" + ("---|" if "f_sens" in cmp else "")
         + ("---|" if "f_alt" in cmp else ""),
     ]
     for r in cmp.itertuples():
         if r.detector in MINE:   # 2a: no paper value, no diff or tolerance
             lines.append(
-                f"| {DISPLAY[r.detector]} | – | {_e(r.pfa)} | – | {r.TP} / {r.FP} / {r.FN} | – | "
+                f"| {DISPLAY[r.detector]} | – | {_e(r.pfa)} | {r.pfa_range} | – | "
+                f"{r.TP} / {r.FP} / {r.FN} | – | "
                 f"{r.f:.3f} | – | – | {r.recall_v:.3f} |"
                 + (f" {r.f_sens:.3f} |" if "f_sens" in cmp else "")
                 + ((f" {r.f_alt:.3f} ({_e(r.pfa_alt)}) |" if np.isfinite(r.f_alt)
                     else " not run |") if "f_alt" in cmp else ""))
             continue
         lines.append(
-            f"| {DISPLAY[r.detector]} | {_e(r.paper_pfa)} | {_e(r.pfa)} | "
+            f"| {DISPLAY[r.detector]} | {_e(r.paper_pfa)} | {_e(r.pfa)} | {r.pfa_range} | "
             f"{r.paper_TP:.0f} / {r.paper_FP:.0f} / {r.paper_FN:.0f} | {r.TP} / {r.FP} / {r.FN} | "
             f"{r.paper_f:.3f} | {r.f:.3f} | {r.diff:+.3f} | {'yes' if r.within else '**no**'} | "
             f"{r.recall_v:.3f} |"
@@ -797,7 +843,8 @@ def run_score(cfg: Config, source: str | None = None, log: Callable[[str], None]
         alt.to_csv(csvs[_variant(other)], index=False)
 
     tol = float(cfg.section("benchmark")["repro_tolerance_f1"])
-    cmp = compare_table(scores, ref, tol, sens, alt)
+    cmp = compare_table(scores, ref, tol, sens, alt,
+                        float(cfg.section("benchmark")["optimum_band_f"]))
     sizes = size_table(scores, ref)
     fig6_path = cfg.root / sc["fig6_csv"]
     fig6 = pd.read_csv(fig6_path) if fig6_path.is_file() else None
