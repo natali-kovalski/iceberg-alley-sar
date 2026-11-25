@@ -102,6 +102,10 @@ def runner_command(
         cmd += ["--enl-hh", f"{enl_bands['HH']:.6g}", "--enl-hv", f"{enl_bands['HV']:.6g}"]
     if max_objects is not None:
         cmd += ["--max-objects", str(int(max_objects))]
+    if bench.get("library_dir"):   # another copy of the library (`library_variants`)
+        cmd += ["--library-dir", str(root / bench["library_dir"])]
+    if bench.get("nan_fill_db") is not None:
+        cmd += ["--nan-fill-db", f"{float(bench['nan_fill_db']):g}"]
     return cmd
 
 

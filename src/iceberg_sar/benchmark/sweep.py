@@ -418,10 +418,48 @@ class FaerchSweepParams:
                    detectors=list(s["detectors"]), enl=enl, max_objects=int(s["max_objects"]))
 
 
+def apply_library_variant(cfg: Config, name: str | None) -> Config:
+    """`cfg` with `benchmark.library_variants[name]` applied (in place, returned): the runner
+    imports that copy of the library, with its runner options; the sweep folder gets
+    `_lib-<name>`. Checks the copy is at the configured commit."""
+    if not name:
+        return cfg
+    import subprocess
+
+    bench = cfg.section("benchmark")
+    variants = bench.get("library_variants") or {}
+    if name not in variants:
+        raise ValueError(f"Unknown library variant {name!r}; known: {sorted(variants)}")
+    v = variants[name]
+    lib = cfg.root / v["dir"]
+    try:
+        head = subprocess.run(["git", "-C", str(lib), "rev-parse", "HEAD"], capture_output=True,
+                              text=True, check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError) as e:
+        raise FileNotFoundError(f"{lib}: not a git checkout of the library ({e})") from e
+    if not head.startswith(str(v["commit"])):
+        raise ValueError(f"{lib} is at {head[:7]}, library_variants.{name} expects {v['commit']}")
+    bench |= {"library_variant": name, "library_dir": v["dir"],
+              "masked_as_nan": bool(v["masked_as_nan"]),
+              "min_ring_fraction": float(v["min_ring_fraction"]),
+              "nan_fill_db": v.get("nan_fill_db")}
+    return cfg
+
+
 def sweep_dir(cfg: Config) -> Path:
-    """`sweep.out_dir`, plus `_noTNR` for the stack without thermal noise removal."""
+    """Sweep folder of the stack (`_sweep_dir_stack`), plus `_lib-<name>` for another library."""
+    lib = cfg.section("benchmark").get("library_variant")
+    d = _sweep_dir_stack(cfg)
+    return d.with_name(f"{d.name}_lib-{lib}") if lib else d
+
+
+def _sweep_dir_stack(cfg: Config) -> Path:
+    """`sweep.out_dir`, plus `_noTNR` for the stack without thermal noise removal, or
+    `_<tag>` for a SNAP profile's stack."""
     fc = cfg.section("benchmark")["faerch2023"]
     tnr = fc["snap"].get("remove_thermal_noise", True)
+    if fc["snap"].get("profile_tag"):   # a whole preprocessing chain (`apply_snap_profile`)
+        return cfg.root / (fc["sweep"]["out_dir"] + f"_{fc['snap']['profile_tag']}")
     if fc["snap"].get("tnr_variant"):   # revision C12 derived stacks
         return cfg.root / (fc["sweep"]["out_dir"] + f"_TNR{fc['snap']['tnr_variant']}")
     return cfg.root / (fc["sweep"]["out_dir"] + ("" if tnr else "_noTNR"))
@@ -492,8 +530,11 @@ def sweep_detector(cfg: Config, name: str, p: FaerchSweepParams, force: bool,
         s = adapter.detector_settings(name, adapter.pixel_size_m(sp.stack), bench)
         cmd = adapter.runner_command(bench, cfg.root, s, sp.stack, sp.valid, todo, p.enl, out_dir,
                                      max_objects=p.max_objects)
+        lib = bench.get("library_variant")
+        win = (f"library {lib}: its own fixed window" if lib else
+               f"wi/wo {s.wi_px}/{s.wo_px} px")
         log(f"{name}: running {len(todo)} PFAs ({todo[0]:.0e} .. {todo[-1]:.0e}), "
-            f"wi/wo {s.wi_px}/{s.wo_px} px, ENL {p.enl:g}")
+            f"{win}, ENL {p.enl:g}")
         if _run_runner(cmd, log) != 0:
             log(f"{name}: FAILED; finished PFAs are kept, rerun to continue")
         done, todo = pfa_status(out_dir, name, p.pfas, p.max_objects)

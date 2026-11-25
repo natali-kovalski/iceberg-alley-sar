@@ -30,15 +30,16 @@ HV and 0.75 % of HH open-water pixels sit there. Dark, calm water then fluctuate
 ENL of 10.7 allows, and the false positives cluster in one such patch near the coast (median HH
 -35.6 dB). SNAP 14 also ignores `removeThermalNoise=false`, so the run without it drops the node
 from the graph (`preprocess.graph_variant`). Without noise removal the measured ENL matches
-Table 1, which is what the detectors assume. Which SNAP version the paper used, and what its
-noise removal did, is an open question for the authors.
+Table 1, which is what the detectors assume. The paper used SNAP 9; its noise removal clips
+too (see "The author's preprocessing" below).
 
 **Optimum PFA.** NIS, K, log-normal and iDPolRAD peak within one decade of the paper's optimum.
 Gamma (1e-6 vs 1e-19) and Wishart (1e-5 vs 1e-20) reach the paper's F, TP and FP about 13-15
 decades higher: at the paper's PFA they detect fewer objects (gamma 1e-19: TP / FP 156 / 8 vs
 238 / 32). These are the two detectors that take the ENL as given (NIS estimates its own; K's
 look-up table also uses it, but K matches). A different effective ENL in the paper's gamma and
-Wishart runs would shift the PFA axis without changing the F level; not checked. Tables 3 and 5
+Wishart runs would shift the PFA axis without changing the F level; the author's own processing
+has one (ENL 3.2 / 0.7, see below). Tables 3 and 5
 also disagree on gamma's optimum PFA (1e-19 vs 1e-9) while describing the same detections.
 
 **iDPolRAD (outside tolerance, -0.058).** Same number of false positives as the paper (70 vs 74),
@@ -67,14 +68,80 @@ float64 for PFA <= 1e-17. Those runs are flagged and left out of every optimum (
   interpolated radius of 1000 or 500 m change best F by at most 0.03 and swap at most adjacent
   ranks. Differences under ~0.02 F between detectors are not distinguishable with this sample:
   the 95% bootstrap interval of F is about ±0.04, of paired differences about ±0.02.
-- GRDH instead of GRDM (gamma 1e-19): more false positives (575 vs 341) and higher recall, so
-  the paper's 40 m, ENL 10.7 product is GRDM; Table 1's "GRDH" is a typo.
+- GRDH instead of GRDM (gamma 1e-19, nearest neighbour): more false positives (575 vs 341) and
+  higher recall. The author confirmed GRDH (2026-11-25); Table 1's ENL of 10.7 is the GRDM
+  product value, so the ENL, not the product, is the inconsistent entry.
 - Sweep coverage (1e-1 to 1e-21): 117 of 126 (detector, PFA) runs scored; the other 9 are above
   the 20,000-object cap, where precision is below 0.1.
 
-**Open questions for the authors:** SNAP version and whether thermal noise removal was applied;
-the ENL passed to gamma and Wishart; the radius for the 15 small `manual` labels (250 m used);
-Table 3 vs Table 5 optimum PFAs.
+**Answered by the first author (personal communication, 2026-11-25):** SNAP 9 with thermal
+noise removal; EW GRDH resampled to 40 m; Table 1's ENL (10.7) for every detector; radii and
+lengths in EPSG:5938 metres; iDPolRAD's window cropped. Still open: the radius for the 15 small
+`manual` labels (250 m used); Table 3 vs Table 5 optimum PFAs.
+
+### The author's preprocessing (2026-11-25)
+
+The first author shared his preprocessing code (snappy, SNAP 9; private, not in this repo). Its
+defaults differ from sec. 3.1 in three places: bilinear resampling (the text says nearest
+neighbour), a UTM output grid (the text: polar stereographic) and dB output. It is rebuilt with
+the same operators and parameters as a GPT graph (`s1_ew_preprocess_faerch_code.xml`) and run
+with SNAP 9.0.0: `bench-preprocess --profile faerch-code` (bilinear, files `_snap9`) and
+`faerch-code-nn` (nearest neighbour, `_snap9nn`). The output lands on UTM 20N, the grid used
+here, so labels and scoring area are unchanged.
+
+**SNAP 9 clips as well.** Its thermal noise removal has no clip option; negatives become ~4.9e-12
+(-113 dB), as in SNAP 14. With nearest neighbour that leaves 35 % of open-water HV at the floor;
+bilinear resampling mixes floored pixels with their neighbours (0.01 % below -60 dB).
+
+**The ENL is not 10.7 anywhere.** Median ENL of 2 km open-water boxes:
+
+| Stack | HH | HV |
+|---|---|---|
+| SNAP 9, GRDH, bilinear, TNR (author's code defaults) | 3.2 (3.2-3.4 at every incidence angle; best 10 % of boxes 3.5) | 0.73 |
+| SNAP 9, GRDH, nearest neighbour, TNR | 2.45 | 0.54 |
+| SNAP 14, GRDH, nearest neighbour, TNR | 2.45 | 0.52 |
+| SNAP 14, GRDM, no TNR (reproduction run) | 10.7 (15.5 at 18-28°, sub-swath EW1; 10-11 elsewhere) | 11.5 |
+
+The SNAP version does not matter (same ENL with nearest neighbour). Bilinear resampling adds
+little, because neighbouring GRDH pixels are correlated. Table 1's 10.7 fits GRDM outside EW1.
+With HH at ENL 3.2 and a threshold set for 10.7, gamma's per-band false-alarm rate at the
+paper's 1e-19 (3.2e-10 per band) is about 3e-4: a stack like this needs PFAs far below an
+ENL-matched one for the same detections, as the paper's optima are.
+
+**Detector code version.** The library used here is the 2025 version. The paper (received
+2023-02-03) used the code before its 2023-10-25 rewrite: gamma and log-normal are unchanged
+from 2022-11-21 to 2023-09-04 (`4bb96ad`). That code has a fixed square clutter ring (15 x 15
+minus 9 x 9 = 144 px, outer 600 m; the paper's "520 m" is not what it ran) instead of the round
+9 / 13 px ring (68 px), and masks 7 px of image edge instead of 20. `bench-sweep --library
+paper2023` runs it from a git worktree at that commit, as the library was (land in the ring,
+0 dB outside the swath as in the author's dB file).
+
+**Counts at the paper's PFAs** (TP / FP, F; 487 labels, shared evaluation mask):
+
+| Stack | Library | gamma 1e-19 | log-normal 1e-5 |
+|---|---|---|---|
+| Paper, Table 3 | | 238 / 32 (0.625) | 231 / 24 (0.619) |
+| SNAP 9, GRDH, bilinear, TNR | 2025 | 242 / 187 (0.528) | 95 / 6 (0.323) |
+| SNAP 9, GRDH, bilinear, TNR | 2023 | 248 / 168 (0.549) | 119 / 10 (0.386) |
+| SNAP 9, GRDH, nearest neighbour, TNR | 2025 | 252 / 520 (0.400) | 44 / 1 (0.165) |
+| SNAP 14, GRDM, no TNR | 2025 | 156 / 8 (0.479) | 251 / 121 (0.584) |
+| SNAP 14, GRDM, no TNR | 2023 | 169 / 9 (0.508) | 258 / 65 (0.637) |
+
+- The author's code as sent does not reproduce Table 3. Gamma's recall matches (242 vs 238),
+  but with 5-6 times the false positives: speckle in dark water (median HH -23.5, HV -29.3 dB),
+  134 of 187 at 42-46° incidence (far range, sub-swath EW5, where HH ENL drops below 1 in
+  places). Only 25 of them lie under clouds or outside the Sentinel-2 data.
+- Nearest neighbour (the paper's text) is further off than bilinear (the code default).
+- The 2023 library moves the counts by 10-50 %, not enough to close the gap.
+- The paper sits between the two stacks: cleaner than ENL ~3 data, noisier than ENL ~10.7
+  data. That fits an averaging step that is not in the shared code (the author describes
+  "some multilooking" to reach 40 m). It is not reconstructed here: choosing a multilook
+  factor until the counts match would be fitting, not reproducing.
+
+**Conclusion.** The reproduction run stays GRDM without thermal noise removal: F within 0.05 of
+the paper for five of six detectors. The author's processing explains why the paper's optimum
+PFAs are so low (an ENL of 3.2 / 0.7 treated as 10.7), but its TP / FP counts at those PFAs
+depend on a step that neither the paper nor the shared code records.
 
 ### My CA-CFAR on this scene (Stage 2, Milestone 2a, 2026-10-27)
 

@@ -20,12 +20,21 @@ from rasterio.windows import Window
 BANDS = ("HH", "HV")
 
 
+def db_output_path(out: Path) -> Path:
+    """The graph's second output (`snap.db_output`): the same product after LinearToFromdB."""
+    return out.with_name(f"{out.stem}_db{out.suffix}")
+
+
 def gpt_command(snap: dict[str, Any], graph: Path, src: Path, out: Path, crs: str,
                 pixel_m: float) -> list[str]:
-    """`gpt` call for the preprocessing graph; graph variables are passed as -P options."""
-    return [str(Path(snap["gpt"]).expanduser()), str(graph), "-c", str(snap["cache"]),
-            "-q", str(snap["threads"]), f"-Pinput={src}", f"-Poutput={out}", f"-Pcrs={crs}",
-            f"-PpixelSpacing={pixel_m:g}", f"-Presampling={snap['resampling']}"]
+    """`gpt` call for the preprocessing graph; graph variables are passed as -P options.
+    With `snap.db_output` the graph also writes its dB product to `db_output_path(out)`."""
+    cmd = [str(Path(snap["gpt"]).expanduser()), str(graph), "-c", str(snap["cache"]),
+           "-q", str(snap["threads"]), f"-Pinput={src}", f"-Poutput={out}", f"-Pcrs={crs}",
+           f"-PpixelSpacing={pixel_m:g}", f"-Presampling={snap['resampling']}"]
+    if snap.get("db_output"):
+        cmd.append(f"-PoutputDb={db_output_path(out)}")
+    return cmd
 
 
 SNAP_NOCLIP = "snapnoclip"   # `snap.tnr_variant`: SNAP's own TNR with clipNegativeValues=false
@@ -72,6 +81,9 @@ def run_snap(snap: dict[str, Any], graph: Path, src: Path, out: Path, crs: str,
     """Run the SNAP graph (skipped if `out` exists). SNAP's own log goes to <out>.gpt.log."""
     if out.is_file():
         return out
+    gpt = Path(snap["gpt"]).expanduser()
+    if not gpt.is_file():
+        raise FileNotFoundError(f"SNAP gpt not found at {gpt} (config `snap.gpt` / profile)")
     out.parent.mkdir(parents=True, exist_ok=True)
     cmd = gpt_command(snap, graph_variant(snap, graph, out.parent), src, out, crs, pixel_m)
     log(" ".join(cmd))
@@ -79,7 +91,9 @@ def run_snap(snap: dict[str, Any], graph: Path, src: Path, out: Path, crs: str,
     log_path = out.with_suffix(".gpt.log")
     with log_path.open("w", encoding="utf-8") as f:
         res = subprocess.run(cmd, stdout=f, stderr=subprocess.STDOUT, check=False)
-    if res.returncode != 0 or not out.is_file():
+    missing = [f for f in (out, *([db_output_path(out)] if snap.get("db_output") else []))
+               if not f.is_file()]
+    if res.returncode != 0 or missing:
         raise RuntimeError(f"gpt failed (exit {res.returncode}); see {log_path}")
     log(f"gpt done in {time.perf_counter() - t0:.0f} s")
     return out

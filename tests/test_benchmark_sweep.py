@@ -280,3 +280,30 @@ def test_old_run_json_without_copol_stays_cached(tmp_path: Path, monkeypatch) ->
     meta_f.write_text(json.dumps(meta), encoding="utf-8")
     sweep.run_cacfar(CFG, prep, p, v, None, False, lambda m: None)
     assert len(calls) == 1
+
+
+def test_library_variant_own_sweep_dir_and_commit_check(monkeypatch) -> None:
+    import subprocess
+
+    from iceberg_sar.benchmark import sweep
+    from iceberg_sar.config import load_config
+
+    base = sweep.sweep_dir(load_config())
+
+    def fake_run(cmd, **kw):
+        return subprocess.CompletedProcess(cmd, 0, stdout="4bb96ad0000000\n", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    cfg = sweep.apply_library_variant(load_config(), "paper2023")
+    bench = cfg.section("benchmark")
+    assert sweep.sweep_dir(cfg) == base.with_name(f"{base.name}_lib-paper2023")
+    assert bench["masked_as_nan"] is False and bench["min_ring_fraction"] == 0.0
+    assert bench["nan_fill_db"] == 0.0
+
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(
+        cmd, 0, stdout="4136b4c999\n", stderr=""))
+    import pytest
+    with pytest.raises(ValueError, match="expects 4bb96ad"):
+        sweep.apply_library_variant(load_config(), "paper2023")
+    with pytest.raises(ValueError, match="Unknown library variant"):
+        sweep.apply_library_variant(load_config(), "nope")

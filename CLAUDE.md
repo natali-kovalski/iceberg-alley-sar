@@ -234,6 +234,47 @@ iceberg-alley-sar/
   23.6 % HV negative, corr 0.965). `bench-thor-bergs` writes `medium_contrast.csv`. Report
   doc revised (claude.ai Doc "Iceberg CFAR benchmark: summary (Revised)"). Open: ask Laust for
   his SNAP settings; viewer CZMLs / compare charts need `czml` + `publish` + push.
+- **Laust's reply (2026-11-25):** SNAP 9 with TNR (no clip option), **EW GRDH** resampled to
+  40 m, ENL 10.7 (Table 1, ESA's value) for all detectors, radii / lengths in EPSG:5938,
+  iDPolRAD cropped (his oversight), S1/S2 relative orbits unrecoverable. No more questions to
+  him for now. His snappy code is in `external/faerch-s1-preprocess/` (gitignored, no licence):
+  bilinear resampling and `AUTO:42001` by default (the paper's text says nearest neighbour), dB
+  output. Hypothesis to test: GRDH + bilinear has a true ENL of ~3-6, not 10.7, which would
+  explain the paper's very low optimum PFAs. S9-a/b done: `--profile faerch-code` on
+  `bench-preprocess` / `bench-landmask` (config `faerch2023.snap_profiles`, graph
+  `s1_ew_preprocess_faerch_code.xml`, files `<GRDH>_snap9_*`, sweep `sweep_snap9`, writes his
+  dB file `_snap_40m_db.tif` too). SNAP 9.0.0 in `esa-snap9` (userdir `~/.snap9`, -Xmx10G,
+  POEORB copied). `bench-sweep --profile ... --pfa-exp N` for spot checks.
+  S9-c (2026-11-25): AUTO:42001 -> UTM 20N (same grid; `snap.crs` is gpt-only). SNAP 9 TNR also
+  clips (min 4.9e-12, ~-113 dB); bilinear blends it away (HV < -60 dB 0.01 % vs 35 % with
+  SNAP 14 NN). dB file = 10log10(linear) (max diff 8e-6), but 0 dB outside the swath, no nodata
+  tag. **ENL HH 3.2 / HV 0.73** (Table 1: 10.7): the ENL hypothesis holds.
+  S9-d: gamma 1e-19 TP/FP 242/187 (paper 238/32), log-normal 1e-5 95/6 (paper 231/24). Recall
+  matches for gamma, FPs 6x: speckle in dark calm water (median HH -23.5, HV -29.3 dB), not the
+  swath edge. The author's chain as coded does not reproduce Table 3 better than noTNR GRDM.
+  Profile `faerch-code-nn` (tag `snap9nn`, nearest neighbour as the paper's text): ENL HH 2.45 /
+  HV 0.54 (= SNAP 14 GRDH NN, so the SNAP version doesn't matter), gamma 1e-19 252/520,
+  log-normal 1e-5 44/1: further from the paper than bilinear. Open: full S9-e sweep on `snap9`.
+  ENL by area (2 km boxes, `data/benchmark/faerch2023/enl/enl_boxes_*.geojson`): snap9 HH
+  3.2-3.4 at every incidence angle (best 10 % of boxes 3.5), HV 0.6-1.0, HH falls past 40°;
+  never near 10.7. GRDM noTNR: 15.5 at 18-28° (EW1), 10-11 from 28° on: Table 1's 10.7 fits
+  GRDM outside EW1. Scored gamma 1e-19 layers for GIS in `data/benchmark/faerch2023/gm_snap9/`.
+  snap9 gamma 1e-19 FPs: 134 of 187 at >= 42° incidence (EW5 far range, noise floor; HH ENL
+  p10 < 1 there); TPs spread 32-44°.
+  **Library version (found 2026-11-25):** we run the library at `4136b4c` (2025). The paper
+  (received 2023-02-03) used the pre-2023-10-25 code: gamma / log-normal unchanged from
+  2022-11-21 to `4bb96ad` (2023-09-04). That code has a fixed **square ring 15 x 15 minus 9 x 9
+  (144 px)**, not our round wi 9 / wo 13 (68 px); 7 px edge mask (not 20); gamma ring = nanmean,
+  log-normal = plain mean; wrapper `detector.run(..., sensitivity=40)` with no wi / wo. Ring alone:
+  ~1.2-2.2x fewer gamma false alarms (analytic), not the 6x gap.
+  Step 1 done: `bench-sweep --library paper2023` (config `benchmark.library_variants`, git
+  worktree `external/cfar-object-detection-2023` at 4bb96ad, runner `--library-dir` /
+  `--nan-fill-db`, old `detector.run` API auto-detected, `np.bool` alias; sweep folder
+  `<sweep>_lib-paper2023`). Spot checks (TP/FP, 487 labels; paper gamma 238/32, log-normal
+  231/24): gamma 1e-19 snap9 248/168 (2025 lib 242/187), GRDM noTNR 169/9 (156/8); log-normal
+  1e-5 snap9 119/10 (95/6), GRDM noTNR 258/65 (251/121). The library version moves counts by
+  10-50 %, not enough: the paper sits between the two stacks (cleaner than snap9, noisier than
+  GRDM noTNR). ~10 s per detector run (vs 2-7 min with the 2025 library).
 - **Stage 1 uses HH AND HV (2026-11-02):** `detections.copol_test: and` (default; `db` = old 6 dB
   check), `detections.copol_setup` / `and_cfars` in `detect` / `run` / 5d's sweep. `cfar.pfa` 1e-11
   (total; per band sqrt), set to match the 6 dB check's pooled count at 1e-6 on the 5d frames (no

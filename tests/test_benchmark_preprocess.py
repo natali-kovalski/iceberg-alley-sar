@@ -141,3 +141,60 @@ def test_split_snap_output_keeps_negative_pixels_inside_swath(tmp_path: Path) ->
         assert f.read(1)[1, 1] == pytest.approx(-1e-4)
     assert info["hh_negative_in_swath"] == pytest.approx(1 / 12)
     assert info["hv_negative_in_swath"] == 1.0
+
+
+def test_gpt_command_adds_db_output_only_when_asked() -> None:
+    from iceberg_sar.benchmark.preprocess import db_output_path, gpt_command
+
+    snap = {"gpt": "gpt", "cache": "6G", "threads": 8, "resampling": "BILINEAR_INTERPOLATION"}
+    out = Path("x/S1_snap9_snap_40m.tif")
+    plain = gpt_command(snap, Path("g.xml"), Path("in.zip"), out, "AUTO:42001", 40.0)
+    assert not any(a.startswith("-PoutputDb=") for a in plain)
+    cmd = gpt_command({**snap, "db_output": True}, Path("g.xml"), Path("in.zip"), out,
+                      "AUTO:42001", 40.0)
+    assert f"-PoutputDb={db_output_path(out)}" in cmd
+    assert db_output_path(out).name == "S1_snap9_snap_40m_db.tif"
+
+
+def test_snap_profile_faerch_code_has_own_files_and_settings() -> None:
+    from iceberg_sar.benchmark.reproduce import apply_snap_profile, scene_paths
+    from iceberg_sar.benchmark.sweep import sweep_dir
+    from iceberg_sar.config import load_config
+
+    base = scene_paths(load_config())
+    cfg = apply_snap_profile(load_config(), "faerch-code")
+    fc = cfg.section("benchmark")["faerch2023"]
+    p = scene_paths(cfg)
+    assert "_EW_GRDH_" in p.product and p.stem == f"{p.product}_snap9"
+    assert p.snap.name.startswith(f"{p.product}_snap9_") and p.snap != base.snap
+    assert sweep_dir(cfg).name.endswith("_snap9")
+    assert fc["snap"]["crs"] == "AUTO:42001" and fc["crs"] == "EPSG:32620"   # gpt vs Python
+    assert fc["snap"]["resampling"] == "BILINEAR_INTERPOLATION"
+    assert fc["snap"]["remove_thermal_noise"] is True and fc["snap"]["db_output"] is True
+    assert "esa-snap9" in fc["snap"]["gpt"] and "cache" in fc["snap"]   # cache / threads inherited
+    with pytest.raises(ValueError, match="Unknown SNAP profile"):
+        apply_snap_profile(load_config(), "nope")
+
+
+def test_faerch_code_graph_mirrors_his_parameters() -> None:
+    """Only what his `graph_functions.py` sets: no clip option, no nodataValueAtSea, two writes."""
+    import xml.etree.ElementTree as ET
+
+    from iceberg_sar.config import load_config
+
+    cfg = load_config()
+    prof = cfg.section("benchmark")["faerch2023"]["snap_profiles"]["faerch-code"]
+    nodes = {n.get("id"): n for n in ET.parse(cfg.root / prof["snap"]["graph"]).getroot()
+             .findall("node")}
+
+    def params(node_id: str) -> dict[str, str]:
+        return {c.tag: (c.text or "") for c in nodes[node_id].find("parameters")}
+
+    assert params("Apply-Orbit-File")["continueOnFail"] == "true"
+    assert params("ThermalNoiseRemoval") == {"selectedPolarisations": "HH,HV",
+                                             "removeThermalNoise": "true"}
+    ec = params("Ellipsoid-Correction-RD")
+    assert "nodataValueAtSea" not in ec and ec["imgResamplingMethod"] == "${resampling}"
+    assert params("Write")["file"] == "${outputDb}"
+    assert params("Write-linear")["file"] == "${output}"
+    assert nodes["Write"].find("sources/sourceProduct").get("refid") == "LinearToFromdB"

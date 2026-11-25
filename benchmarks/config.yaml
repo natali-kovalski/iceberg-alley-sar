@@ -53,6 +53,19 @@ benchmark:
   object_connectivity: 4    # same as the library's small-object filter
   masked_as_nan: true       # keep masked pixels out of the clutter ring (library checks the centre only)
   min_ring_fraction: 0.5    # skip pixels whose ring is mostly masked, as cfar.min_background_fraction; 0 = as-is
+  # Other copies of the library, picked with `bench-sweep --library <name>`; own sweep folder
+  # (`<sweep dir>_lib-<name>`). Each sets the runner options it needs.
+  library_variants:
+    # The code the paper's results came from: gamma / log-normal unchanged 2022-11-21 ..
+    # 2023-09-04 (paper received 2023-02-03); rewritten 2023-10-25 (round wi / wo windows).
+    # Fixed square ring 15 x 15 minus 9 x 9 (144 px), 7 px edge mask. A git worktree of
+    # external/cfar-object-detection at `commit` (`git worktree add --detach ../<dir> <commit>`).
+    paper2023:
+      dir: external/cfar-object-detection-2023
+      commit: 4bb96ad
+      masked_as_nan: false    # library as-is: land enters the ring, as in the author's runs
+      min_ring_fraction: 0
+      nan_fill_db: 0.0        # outside the swath 0 dB, as the author's SNAP dB GeoTIFF
   # per_band: gamma / K use each band's own ENL (HyP3 HV water ENL << HH). single: the
   # library's one ENL for both (smoke.enl_combine). Wishart always takes the single value.
   enl_mode: per_band
@@ -178,6 +191,38 @@ benchmark:
       # false (decided 2026-10-26): files tagged `_noTNR`, sweep in `<sweep.out_dir>_noTNR`.
       # `--tnr` on bench-preprocess / bench-landmask switches back to the as-described variant.
       remove_thermal_noise: false
+    # Whole preprocessing chains, picked with `--profile <name>` (bench-preprocess / -landmask).
+    # A profile's `snap` keys override `snap` (`snap.crs`: gpt only); `s1_format` the scene's; `tag`
+    # names its files (`<S1>_<tag>_*`) and sweep folder (`<sweep.out_dir>_<tag>`).
+    snap_profiles:
+      # The author's own code (Laust Færch, `s1_preprocess`, snappy + SNAP 9; email 2026-11-25,
+      # kept in external/faerch-s1-preprocess/), with run_graph's defaults. Not asked further:
+      # bilinear and AUTO:42001 are his code defaults, the paper's text says nearest neighbour.
+      faerch-code:
+        tag: snap9
+        s1_format: GRDH       # his email: "I used GRDH - but EW mode"
+        snap:
+          # run_graph default: UTM, zone from the scene centre (SNAP-only code; it gave UTM 20N,
+          # the scene `crs`, checked by bench-preprocess)
+          crs: AUTO:42001
+          gpt: ~/AppData/Local/Programs/esa-snap9/bin/gpt.exe   # SNAP 9.0.0, own userdir
+          graph: benchmarks/faerch2023/s1_ew_preprocess_faerch_code.xml
+          resampling: BILINEAR_INTERPOLATION   # run_graph default
+          remove_thermal_noise: true           # his email: SNAP 9 with thermal noise removal
+          db_output: true     # also write his dB product (`<S1>_snap9_snap_40m_db.tif`)
+      # Same chain with the paper's resampling ("nearest-neighbor ... to avoid averaging pixel
+      # intensities"), in case he passed it to run_graph (2026-11-25: faerch-code spot check
+      # gave gamma 1e-19 TP/FP 242/187 vs the paper's 238/32).
+      faerch-code-nn:
+        tag: snap9nn
+        s1_format: GRDH
+        snap:
+          crs: AUTO:42001
+          gpt: ~/AppData/Local/Programs/esa-snap9/bin/gpt.exe
+          graph: benchmarks/faerch2023/s1_ew_preprocess_faerch_code.xml
+          resampling: NEAREST_NEIGHBOUR
+          remove_thermal_noise: true
+          db_output: true
     land:
       buffer_m: 500         # paper sec. 3.1
       # Fallback when osmdata.openstreetmap.de is unreachable: land built from the coastline ways

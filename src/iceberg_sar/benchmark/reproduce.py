@@ -3,6 +3,7 @@
 File layout under `benchmark.faerch2023.dir`:
   raw/<S1 product>.zip                    downloaded by `bench-download`
   interim/<S1>_snap_40m.tif               SNAP output [Sigma0_HH, Sigma0_HV, incidence]
+  interim/<S1>_snap_40m_db.tif            same in dB (profiles with `snap.db_output`)
   interim/<S1>_40m_HHHV.tif               [HH, HV] linear sigma0, NaN outside the swath
   interim/<S1>_40m_inc.tif / _swath.tif   incidence angle (deg) / 1 = inside the swath
   interim/<S1>_40m_land.tif               1 = land or within buffer_m of it
@@ -24,14 +25,14 @@ import rasterio
 from iceberg_sar.benchmark import plots
 from iceberg_sar.benchmark.enl import estimate_enl
 from iceberg_sar.benchmark.landmask import land_mask, mask_overlay
-from iceberg_sar.benchmark.preprocess import run_snap, split_snap_output
+from iceberg_sar.benchmark.preprocess import db_output_path, run_snap, split_snap_output
 from iceberg_sar.config import Config
 
 
 @dataclass(frozen=True)
 class ScenePaths:
     product: str
-    stem: str          # file prefix: the product, or `<product>_noTNR`
+    stem: str          # file prefix: the product, `<product>_noTNR` or `<product>_<profile tag>`
     raw_zip: Path
     snap: Path
     stack: Path
@@ -41,6 +42,30 @@ class ScenePaths:
     valid: Path
     enl: Path
     quicklooks: Path
+
+
+def apply_snap_profile(cfg: Config, name: str | None) -> Config:
+    """`cfg` with `benchmark.faerch2023.snap_profiles[name]` applied (in place, returned).
+
+    A profile is a whole preprocessing chain (gpt, graph, resampling, CRS, product), e.g.
+    `faerch-code` = the author's own code under SNAP 9. Its `snap` keys override `snap`, its
+    `s1_format` the scene's, and its `tag` names every file and the sweep folder, so
+    the profile's stack never mixes with the others. `snap.crs` goes to gpt only.
+    """
+    if not name:
+        return cfg
+    fc = cfg.section("benchmark")["faerch2023"]
+    profiles = fc.get("snap_profiles") or {}
+    if name not in profiles:
+        raise ValueError(f"Unknown SNAP profile {name!r}; known: {sorted(profiles)}")
+    prof = profiles[name]
+    if not prof.get("tag"):
+        raise ValueError(f"snap_profiles.{name}: `tag` is required (names the profile's files)")
+    fc["snap"] = {**fc["snap"], **prof.get("snap", {}), "profile_tag": prof["tag"]}
+    fc["snap"].pop("tnr_variant", None)
+    if "s1_format" in prof:
+        fc["s1_format"] = prof["s1_format"]
+    return cfg
 
 
 def s1_product(cfg: Config, s1_format: str | None = None) -> str:
@@ -65,6 +90,9 @@ def scene_paths(cfg: Config, s1_format: str | None = None) -> ScenePaths:
     # Revision C12: stacks derived from the two SNAP runs (`tnr_ablation`), own files too
     if fc["snap"].get("tnr_variant"):
         st = f"{s1}_TNR{fc['snap']['tnr_variant']}"
+    # A whole preprocessing chain (`apply_snap_profile`), e.g. the author's code under SNAP 9
+    if fc["snap"].get("profile_tag"):
+        st = f"{s1}_{fc['snap']['profile_tag']}"
     return ScenePaths(
         product=s1, stem=st, raw_zip=base / "raw" / f"{s1}.zip", snap=i / f"{st}_snap_{res}.tif",
         stack=i / f"{st}_{res}_HHHV.tif", inc=i / f"{st}_{res}_inc.tif",
@@ -81,10 +109,16 @@ def preprocess_scene(cfg: Config, force: bool = False, s1_format: str | None = N
     if not p.raw_zip.is_file():
         raise FileNotFoundError(f"{p.raw_zip} missing; run `bench-download` first")
     if force:
-        for f in (p.snap, p.stack):
+        for f in (p.snap, db_output_path(p.snap), p.stack):
             f.unlink(missing_ok=True)
-    run_snap(fc["snap"], cfg.root / fc["snap"]["graph"], p.raw_zip, p.snap, fc["crs"],
-             float(fc["pixel_m"]), log)
+    # `snap.crs` (e.g. AUTO:42001, SNAP-only) is what gpt gets; the output must still land on
+    # the scene `crs`, which labels, masks and scoring use.
+    run_snap(fc["snap"], cfg.root / fc["snap"]["graph"], p.raw_zip, p.snap,
+             fc["snap"].get("crs", fc["crs"]), float(fc["pixel_m"]), log)
+    with rasterio.open(p.snap) as src:
+        if src.crs != rasterio.crs.CRS.from_user_input(fc["crs"]):
+            raise ValueError(f"{p.snap.name}: SNAP output CRS {src.crs.to_string()} is not the "
+                             f"scene crs {fc['crs']}")
     if force or not p.stack.is_file():
         info = split_snap_output(p.snap, p.stack, p.inc, p.swath)
     else:

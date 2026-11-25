@@ -27,6 +27,7 @@ Copyright (C) 2026 Natali Kovalski. GPL-3.0-or-later, see LICENSE in this folder
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import subprocess
 import sys
@@ -38,6 +39,22 @@ import numpy as np
 import rasterio
 from scipy import ndimage
 
+
+def _library_dir(argv: list[str]) -> Path | None:
+    """--library-dir, read before the library import (it decides which copy is imported)."""
+    for i, arg in enumerate(argv):
+        if arg == "--library-dir" and i + 1 < len(argv):
+            return Path(argv[i + 1])
+        if arg.startswith("--library-dir="):
+            return Path(arg.split("=", 1)[1])
+    return None
+
+
+LIBRARY_DIR = _library_dir(sys.argv[1:])
+if LIBRARY_DIR is not None:
+    # Ahead of the editable install's finder, so this checkout is the one imported
+    sys.path.insert(0, str(LIBRARY_DIR.resolve()))
+
 t_import = time.perf_counter()
 import cfar_filters  # noqa: E402  (Numba compiles the window kernels at import)
 from cfar_filters import detector as cfar_detector  # noqa: E402
@@ -45,6 +62,15 @@ from cfar_filters import gamma, kdistribution, utils  # noqa: E402
 from cfar_filters.fast_functions import fast_edge_mean  # noqa: E402
 
 IMPORT_S = time.perf_counter() - t_import
+if LIBRARY_DIR is not None and Path(cfar_filters.__file__).resolve().parents[1] != LIBRARY_DIR.resolve():
+    raise SystemExit(f"--library-dir {LIBRARY_DIR}: imported {cfar_filters.__file__} instead")
+
+# Paper-era API (before 2023-10-25): run() has no wi / wo; the window is a fixed square
+# 15 x 15 ring minus a 9 x 9 guard (144 px), and the detectors check `mask.dtype != np.bool`,
+# which numpy >= 1.24 no longer has. Aliasing it to bool doesn't change any computation.
+PAPER_ERA_API = "wi" not in inspect.signature(cfar_detector.run).parameters
+if PAPER_ERA_API and not hasattr(np, "bool"):
+    np.bool = bool  # type: ignore[attr-defined]
 
 DETECTORS = ("gamma", "lognorm", "k", "wishart", "nis", "idpolrad")
 STENCIL_LIMIT_PX = 41  # fast_functions: neighbourhood (-20, 20)
@@ -115,6 +141,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--max-objects", type=int,
                    help="Stop after the first PFA (ascending) with more objects than this.")
     p.add_argument("--out-dir", type=Path, required=True)
+    p.add_argument("--library-dir", type=Path,
+                   help="Import cfar_filters from this checkout (e.g. the paper-era commit).")
+    p.add_argument("--nan-fill-db", type=float,
+                   help="Fill NaN (outside the swath) with this dB value before the library, as "
+                        "a SNAP dB GeoTIFF has it (0 dB); default: leave NaN.")
     return p.parse_args(argv)
 
 
@@ -129,6 +160,9 @@ def main(argv: list[str] | None = None) -> int:
     if (a.enl_hh is None) != (a.enl_hv is None):
         raise SystemExit("--enl-hh and --enl-hv go together")
     per_band = a.enl_hh is not None and a.detector in PER_BAND_ENL
+    if PAPER_ERA_API and (per_band or a.min_ring_fraction > 0):
+        raise SystemExit("The paper-era library takes one ENL and its own fixed window: use "
+                         "--min-ring-fraction 0 and no --enl-hh / --enl-hv")
     a.out_dir.mkdir(parents=True, exist_ok=True)
 
     with rasterio.open(a.image) as src:
@@ -152,6 +186,8 @@ def main(argv: list[str] | None = None) -> int:
         run_mask = valid.copy()
     with np.errstate(divide="ignore", invalid="ignore"):
         image_db = (10.0 * np.log10(image)).astype(np.float32)
+    if a.nan_fill_db is not None:
+        image_db[np.isnan(image_db)] = np.float32(a.nan_fill_db)
 
     out_profile = dict(profile) | {"count": 1, "dtype": "uint8", "nodata": None, "compress": "lzw",
                              "predictor": 1}
@@ -165,6 +201,10 @@ def main(argv: list[str] | None = None) -> int:
             if per_band:
                 outliers = run_per_band(image_db, run_mask, a.detector, a.method, pfa,
                                         a.enl_hh, a.enl_hv, a.minsize, a.wi, a.wo)
+            elif PAPER_ERA_API:   # fixed 15 / 9 square window, `sensitivity` at its default
+                outliers = cfar_detector.run(image_db, run_mask, detector=a.detector,
+                                             method=a.method, pfa=pfa, enl=a.enl,
+                                             minsize=a.minsize)
             else:
                 outliers = cfar_detector.run(image_db, run_mask, detector=a.detector,
                                              method=a.method, pfa=pfa, enl=a.enl,
@@ -190,7 +230,12 @@ def main(argv: list[str] | None = None) -> int:
             break
 
     meta = {
-        "detector": a.detector, "method": a.method, "wi_px": a.wi, "wo_px": a.wo,
+        "detector": a.detector, "method": a.method,
+        "wi_px": 9 if PAPER_ERA_API else a.wi, "wo_px": 15 if PAPER_ERA_API else a.wo,
+        "window": "square 15 x 15 minus 9 x 9 (library fixed)" if PAPER_ERA_API else "round",
+        "library_api": "paper-era (before 2023-10-25)" if PAPER_ERA_API else "current",
+        "library_dir": str(LIBRARY_DIR) if LIBRARY_DIR else None,
+        "nan_fill_db": a.nan_fill_db,
         "enl_mode": "per_band" if per_band else "single",
         "enl": {"HH": a.enl_hh, "HV": a.enl_hv} if per_band else a.enl,
         "minsize": a.minsize, "min_ring_fraction": a.min_ring_fraction,

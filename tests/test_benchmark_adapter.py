@@ -182,3 +182,19 @@ def test_sweep_stops_after_the_object_cap(tmp_path: Path) -> None:
     meta = (tmp_path / "out" / "gamma_run.json").read_text(encoding="utf-8")
     assert '"stopped_early": true' in meta and '"max_objects": 1' in meta
     assert not (tmp_path / "out" / "gamma_pfa1e-01.tif").exists()
+
+
+def test_runner_command_library_variant_flags() -> None:
+    cfg = load_config()
+    bench = dict(cfg.section("benchmark"))
+    s = adapter.DetectorSettings("gamma", 9, 13)
+    plain = adapter.runner_command(bench, cfg.root, s, Path("i.tif"), Path("m.tif"), [1e-9], 10.7,
+                                   Path("out"))
+    assert "--library-dir" not in plain and "--nan-fill-db" not in plain
+    bench |= {"library_dir": "external/cfar-object-detection-2023", "nan_fill_db": 0.0,
+              "masked_as_nan": False, "min_ring_fraction": 0.0}
+    cmd = adapter.runner_command(bench, cfg.root, s, Path("i.tif"), Path("m.tif"), [1e-9], 10.7,
+                                 Path("out"))
+    assert cmd[cmd.index("--library-dir") + 1] == str(cfg.root / "external/cfar-object-detection-2023")
+    assert cmd[cmd.index("--nan-fill-db") + 1] == "0"
+    assert "--no-masked-as-nan" in cmd and cmd[cmd.index("--min-ring-fraction") + 1] == "0.0"

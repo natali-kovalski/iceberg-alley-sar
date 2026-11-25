@@ -1,0 +1,123 @@
+<!--
+  The author's own preprocessing chain, as a GPT graph (run with SNAP 9.0).
+
+  Source: Laust Færch's `s1_preprocess` package (snappy, SNAP 9), sent by email 2026-11-25 and
+  kept privately in external/faerch-s1-preprocess/ (no licence; not part of this repo). This
+  file reproduces its `run_graph()` defaults, which build the same operators with the same
+  parameters through GPF.createProduct. Every parameter he set is set here with his value;
+  every parameter he left out is left out, so SNAP 9's defaults apply as they did for him.
+
+  His email (2026-11-25): SNAP v9 with thermal noise removal, no floor / clip options;
+  EW GRDH resampled to 40 m ("some multilooking"); ENL from Table 1.
+
+  Where this differs from s1_ew_preprocess.xml (the paper's text, run with SNAP 14):
+  - imgResamplingMethod: run_graph's default BILINEAR_INTERPOLATION. The paper says nearest
+    neighbour; his email describes averaging, so the code default is taken (assumption, not
+    asked).
+  - mapProjection: run_graph's default AUTO:42001 (UTM, zone from the scene centre). The
+    paper's final grid was polar stereographic; whether he passed another CRS is unknown.
+  - Apply-Orbit-File continueOnFail=true: a failed orbit download goes on silently.
+  - ThermalNoiseRemoval: only removeThermalNoise=true (SNAP 9 has no clipNegativeValues).
+  - Ellipsoid-Correction-RD: no nodataValueAtSea, no saveSelectedSourceBand (his defaults).
+  - LinearToFromdB on HH, HV and the incidence band, as his code (band 3 ends up in dB too).
+  - Two outputs: ${outputDb} is his file (dB); ${output} taps the same product before the
+    dB step (linear), for the pipeline's split / ENL / quicklooks and for checking what the
+    dB step does to pixels <= 0.
+  - His Apply-Orbit-File / Remove-GRD-Border-Noise also put a key named after the operator
+    ('Apply-Orbit-File': True, ...). Not an operator parameter; SNAP ignores it, so it's left out.
+
+  Run through `python -m iceberg_sar.cli bench-preprocess` with the `faerch-code` profile.
+-->
+<graph id="faerch2023_s1_ew_preprocess_faerch_code">
+  <version>1.0</version>
+  <node id="Read">
+    <operator>Read</operator>
+    <parameters>
+      <file>${input}</file>
+    </parameters>
+  </node>
+  <node id="Apply-Orbit-File">
+    <operator>Apply-Orbit-File</operator>
+    <sources>
+      <sourceProduct refid="Read"/>
+    </sources>
+    <parameters>
+      <orbitType>Sentinel Precise (Auto Download)</orbitType>
+      <polyDegree>3</polyDegree>
+      <continueOnFail>true</continueOnFail>
+    </parameters>
+  </node>
+  <node id="Remove-GRD-Border-Noise">
+    <operator>Remove-GRD-Border-Noise</operator>
+    <sources>
+      <sourceProduct refid="Apply-Orbit-File"/>
+    </sources>
+    <parameters>
+      <selectedPolarisations>HH,HV</selectedPolarisations>
+    </parameters>
+  </node>
+  <node id="ThermalNoiseRemoval">
+    <operator>ThermalNoiseRemoval</operator>
+    <sources>
+      <sourceProduct refid="Remove-GRD-Border-Noise"/>
+    </sources>
+    <parameters>
+      <selectedPolarisations>HH,HV</selectedPolarisations>
+      <removeThermalNoise>true</removeThermalNoise>
+    </parameters>
+  </node>
+  <node id="Calibration">
+    <operator>Calibration</operator>
+    <sources>
+      <sourceProduct refid="ThermalNoiseRemoval"/>
+    </sources>
+    <parameters>
+      <sourceBands>Intensity_HH,Intensity_HV</sourceBands>
+      <selectedPolarisations>HH,HV</selectedPolarisations>
+      <outputImageScaleInDb>false</outputImageScaleInDb>
+      <outputSigmaBand>true</outputSigmaBand>
+    </parameters>
+  </node>
+  <node id="Ellipsoid-Correction-RD">
+    <operator>Ellipsoid-Correction-RD</operator>
+    <sources>
+      <sourceProduct refid="Calibration"/>
+    </sources>
+    <parameters>
+      <sourceBands>Sigma0_HH,Sigma0_HV</sourceBands>
+      <saveIncidenceAngleFromEllipsoid>true</saveIncidenceAngleFromEllipsoid>
+      <pixelSpacingInMeter>${pixelSpacing}</pixelSpacingInMeter>
+      <mapProjection>${crs}</mapProjection>
+      <imgResamplingMethod>${resampling}</imgResamplingMethod>
+    </parameters>
+  </node>
+  <node id="Write-linear">
+    <operator>Write</operator>
+    <sources>
+      <sourceProduct refid="Ellipsoid-Correction-RD"/>
+    </sources>
+    <parameters>
+      <file>${output}</file>
+      <formatName>GeoTIFF-BigTIFF</formatName>
+    </parameters>
+  </node>
+  <node id="LinearToFromdB">
+    <operator>LinearToFromdB</operator>
+    <sources>
+      <sourceProduct refid="Ellipsoid-Correction-RD"/>
+    </sources>
+    <parameters>
+      <sourceBands>Sigma0_HH,Sigma0_HV,incidenceAngleFromEllipsoid</sourceBands>
+    </parameters>
+  </node>
+  <node id="Write">
+    <operator>Write</operator>
+    <sources>
+      <sourceProduct refid="LinearToFromdB"/>
+    </sources>
+    <parameters>
+      <file>${outputDb}</file>
+      <formatName>GeoTIFF-BigTIFF</formatName>
+    </parameters>
+  </node>
+</graph>

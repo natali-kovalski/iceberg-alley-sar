@@ -781,6 +781,12 @@ def bench_sweep(
     tnr: Annotated[bool | None, typer.Option(
         "--tnr/--no-tnr", help="Stack with / without thermal noise removal. "
         "Default: benchmark.faerch2023.snap.remove_thermal_noise.")] = None,
+    profile: ProfileOption = None,
+    pfa_exp: Annotated[int | None, typer.Option(
+        help="Spot check: run only PFA 1e<N> (cached like any sweep PFA).")] = None,
+    library: Annotated[str | None, typer.Option(
+        help="Another copy of the CFAR library from benchmark.library_variants, e.g. "
+             "paper2023 (the code the paper's results came from). Own sweep folder.")] = None,
     config: ConfigOption = DEFAULT_CONFIG,
 ) -> None:
     """Stage 2 / 1e: every reference detector x 21 PFAs on the Færch 2023 EW scene (40 m),
@@ -788,9 +794,23 @@ def bench_sweep(
     one pass each). Resumable per detector and PFA; run it overnight."""
     from iceberg_sar.benchmark.sweep import run_faerch_sweep
 
+    from iceberg_sar.benchmark.reproduce import apply_snap_profile
+
     cfg = load_config(config)
+    if profile and tnr is not None:
+        raise typer.BadParameter("--tnr/--no-tnr can't be combined with --profile")
     if tnr is not None:
         cfg.section("benchmark")["faerch2023"]["snap"]["remove_thermal_noise"] = tnr
+    apply_snap_profile(cfg, profile)
+    if library:
+        from iceberg_sar.benchmark.sweep import apply_library_variant
+
+        if only is None or any(o.startswith("cacfar") for o in only):
+            raise typer.BadParameter("--library runs reference detectors only: give --only")
+        apply_library_variant(cfg, library)
+    if pfa_exp is not None:
+        sw = cfg.section("benchmark")["faerch2023"]["sweep"]
+        sw["pfa_min_exp"] = sw["pfa_max_exp"] = pfa_exp
     typer.echo(f"ok  {run_faerch_sweep(cfg, force, only, log=typer.echo)}")
 
 
@@ -972,12 +992,25 @@ def bench_download(config: ConfigOption = DEFAULT_CONFIG) -> None:
     typer.echo(f"ok  {png}")
 
 
-def _tnr_config(config: Path, tnr: bool) -> Config:
-    """Config with `--no-tnr` applied (thermal noise removal off -> the `_noTNR` file variant)."""
+def _tnr_config(config: Path, tnr: bool, profile: str | None = None) -> Config:
+    """Config with `--no-tnr` applied (thermal noise removal off -> the `_noTNR` file variant),
+    or with a SNAP profile (`benchmark.faerch2023.snap_profiles`), which sets its own TNR."""
+    from iceberg_sar.benchmark.reproduce import apply_snap_profile
+
     cfg = load_config(config)
+    if profile:
+        if not tnr:
+            raise typer.BadParameter("--no-tnr can't be combined with --profile "
+                                     "(the profile sets thermal noise removal itself)")
+        return apply_snap_profile(cfg, profile)
     if not tnr:
         cfg.section("benchmark")["faerch2023"]["snap"]["remove_thermal_noise"] = False
     return cfg
+
+
+ProfileOption = Annotated[str | None, typer.Option(
+    help="SNAP preprocessing profile from benchmark.faerch2023.snap_profiles, e.g. faerch-code "
+    "(the author's own chain, SNAP 9). Own files (`_<tag>`) and product / CRS.")]
 
 
 @app.command("bench-preprocess")
@@ -988,15 +1021,18 @@ def bench_preprocess(
     tnr: Annotated[bool, typer.Option(
         "--tnr/--no-tnr", help="Thermal noise removal (default: config snap.remove_thermal_noise); "
         "--no-tnr writes a separate `_noTNR` variant.")] = True,
+    profile: ProfileOption = None,
     config: ConfigOption = DEFAULT_CONFIG,
 ) -> None:
     """Stage 2 / 1b: SNAP GPT on the Sentinel-1 EW scene -> 40 m linear sigma0 HH/HV."""
     from iceberg_sar.benchmark.reproduce import preprocess_scene
 
-    info = preprocess_scene(_tnr_config(config, tnr), force, s1, log=typer.echo)
+    info = preprocess_scene(_tnr_config(config, tnr, profile), force, s1, log=typer.echo)
     typer.echo(f"grid {info['shape']} px, spacing {info['pixel_m']} m")
     if "hv_zero_in_swath" in info:
-        typer.echo(f"HV clipped to 0 by thermal noise removal: {info['hv_zero_in_swath']:.2%}")
+        typer.echo(f"HV <= 0 in the swath: {info['hv_zero_in_swath']:.2%} "
+                   f"(negative {info['hv_negative_in_swath']:.2%}); "
+                   f"HH negative {info['hh_negative_in_swath']:.2%}")
     for png in info["quicklooks"]:
         typer.echo(f"ok  {png}")
 
@@ -1008,12 +1044,13 @@ def bench_landmask(
     tnr: Annotated[bool, typer.Option(
         "--tnr/--no-tnr", help="Thermal noise removal (default: config snap.remove_thermal_noise); "
         "--no-tnr writes a separate `_noTNR` variant.")] = True,
+    profile: ProfileOption = None,
     config: ConfigOption = DEFAULT_CONFIG,
 ) -> None:
     """Stage 2 / 1c: OSM land polygons + buffer on the scene grid, and the open-water ENL."""
     from iceberg_sar.benchmark.reproduce import build_land_mask
 
-    res = build_land_mask(_tnr_config(config, tnr), s1, log=typer.echo)
+    res = build_land_mask(_tnr_config(config, tnr, profile), s1, log=typer.echo)
     typer.echo(f"land (in swath) {res['land_px_in_swath']} px, valid {res['valid_px']} px")
     typer.echo(f"ok  {res['overlay']}")
 

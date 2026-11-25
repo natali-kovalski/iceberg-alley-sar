@@ -47,3 +47,7 @@ Thumbs.db
 # (only external/cfar_runner/ is committed)
 external/cfar-object-detection/
 external/cfar-bench/
+# the same library at 4bb96ad (2023-09-04, the paper-era code), a git worktree of the above
+external/cfar-object-detection-2023/
+# Laust Færch's s1_preprocess (snappy, SNAP 9), sent by email 2026-11-25: no licence, keep private
+external/faerch-s1-preprocess/
